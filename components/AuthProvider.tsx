@@ -314,7 +314,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (loading || !isSupabaseConfigured) return;
 
-    const isPublicPage = pathname === '/login' || pathname === '/signup' || pathname === '/preview' || pathname?.startsWith('/preview');
+    const isPublicPage = pathname === '/login' || pathname === '/signup' || pathname === '/preview' || pathname?.startsWith('/preview') || pathname === '/s' || pathname?.startsWith('/s/') || pathname === '/p' || pathname?.startsWith('/p/');
 
     if (!user && !isPublicPage) {
       router.replace('/login');
@@ -423,7 +423,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
-  const isPublicPage = isAuthPage || pathname === '/preview' || pathname?.startsWith('/preview');
+  const isPublicPage = isAuthPage || pathname === '/preview' || pathname?.startsWith('/preview') || pathname === '/s' || pathname?.startsWith('/s/') || pathname === '/p' || pathname?.startsWith('/p/');
 
   let renderContent: React.ReactNode = null;
 

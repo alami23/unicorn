@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import React, { useState, useEffect } from 'react'
+import { motion } from 'motion/react'
 import {
   X,
   Send,
@@ -14,16 +14,20 @@ import {
   FileText,
   Smartphone,
   CheckCircle2,
-  Share2
+  Share2,
+  Sparkles,
+  Link as LinkIcon
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { shortenInvoiceUrl } from '@/lib/shortener'
 
 interface SendInvoiceModalProps {
   isOpen: boolean
   onClose: () => void
   invoice: any
   previewUrl: string
+  shortUrl?: string
   verificationCode: string
   onSendSms?: (phone: string, message: string) => Promise<boolean>
 }
@@ -33,27 +37,69 @@ export default function SendInvoiceModal({
   onClose,
   invoice,
   previewUrl,
+  shortUrl: initialShortUrl,
   verificationCode,
   onSendSms
 }: SendInvoiceModalProps) {
+  const [shortUrl, setShortUrl] = useState<string>(initialShortUrl || '')
+  const [activeUrlType, setActiveUrlType] = useState<'short' | 'full'>('short')
+  const [shortening, setShortening] = useState(!initialShortUrl)
   const [copied, setCopied] = useState(false)
   const [sendingSms, setSendingSms] = useState(false)
   const [recipientPhone, setRecipientPhone] = useState(invoice?.customerPhone || '')
-  
+
   const customerName = invoice?.customer || 'Valued Customer'
   const invNumber = invoice?.displayId || invoice?.invoice_number || invoice?.id || 'Invoice'
   const totalAmount = invoice?.amount ? Math.round(invoice.amount).toLocaleString() : '0'
   const dueAmount = invoice?.due !== undefined ? Math.round(invoice.due).toLocaleString() : '0'
 
-  const defaultMessage = `Dear ${customerName}, here is your Invoice ${invNumber}. Bill: ৳${totalAmount}, Due: ৳${dueAmount}. View and download your official invoice PDF online: ${previewUrl}`
+  // Generate short link if not already provided
+  useEffect(() => {
+    let isMounted = true
+    if (initialShortUrl) {
+      setShortUrl(initialShortUrl)
+      setShortening(false)
+      return
+    }
+
+    const runShorten = async () => {
+      setShortening(true)
+      try {
+        const result = await shortenInvoiceUrl(invoice)
+        if (isMounted && result?.shortUrl) {
+          setShortUrl(result.shortUrl)
+        }
+      } catch (e) {
+        console.warn('Could not shorten URL:', e)
+      } finally {
+        if (isMounted) setShortening(false)
+      }
+    }
+
+    runShorten()
+    return () => {
+      isMounted = false
+    }
+  }, [invoice, initialShortUrl])
+
+  // Active URL to share (prioritizes short URL)
+  const activeLink = activeUrlType === 'short' && shortUrl ? shortUrl : previewUrl
+
+  // Dynamic message template
+  const defaultMessage = `Dear ${customerName}, here is your Invoice ${invNumber}. Bill: ৳${totalAmount}, Due: ৳${dueAmount}. View and download your official invoice PDF online: ${activeLink}`
   const [smsMessage, setSmsMessage] = useState(defaultMessage)
 
-  // Copy unique URL to clipboard
-  const handleCopyUrl = async () => {
+  // Keep SMS message in sync when link changes
+  useEffect(() => {
+    setSmsMessage(`Dear ${customerName}, here is your Invoice ${invNumber}. Bill: ৳${totalAmount}, Due: ৳${dueAmount}. View and download your official invoice PDF online: ${activeLink}`)
+  }, [activeLink, customerName, invNumber, totalAmount, dueAmount])
+
+  // Copy URL to clipboard
+  const handleCopyUrl = async (urlToCopy: string) => {
     try {
-      await navigator.clipboard.writeText(previewUrl)
+      await navigator.clipboard.writeText(urlToCopy)
       setCopied(true)
-      toast.success('Unique invoice preview link copied to clipboard!')
+      toast.success(urlToCopy === shortUrl ? 'Compressed short link copied!' : 'Full preview link copied!')
       setTimeout(() => setCopied(false), 2500)
     } catch (err) {
       toast.error('Failed to copy link.')
@@ -70,10 +116,10 @@ export default function SendInvoiceModal({
     }
   }
 
-  // Open Preview in new tab
+  // Open in new tab
   const handleOpenPreview = () => {
     if (typeof window !== 'undefined') {
-      window.open(previewUrl, '_blank', 'noopener,noreferrer')
+      window.open(activeLink, '_blank', 'noopener,noreferrer')
     }
   }
 
@@ -144,7 +190,7 @@ export default function SendInvoiceModal({
                 Send Invoice
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Share auto-validating invoice preview link with customer
+                Share compressed short link with auto-validating invoice preview
               </p>
             </div>
           </div>
@@ -184,33 +230,63 @@ export default function SendInvoiceModal({
             </div>
           </div>
 
-          {/* Generated Unique URL Box */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-              <span>Unique Auto-Validating URL</span>
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Includes Domain, Date, Number & Code
-              </span>
-            </label>
+          {/* Link Type Selector (Short vs Full) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <LinkIcon className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Invoice Preview Link</span>
+              </label>
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setActiveUrlType('short')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer flex items-center gap-1",
+                    activeUrlType === 'short'
+                      ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  )}
+                >
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <span>Compressed Short Link</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveUrlType('full')}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md font-semibold transition-all cursor-pointer",
+                    activeUrlType === 'full'
+                      ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  )}
+                >
+                  Full URL
+                </button>
+              </div>
+            </div>
+
+            {/* Link Box */}
             <div className="flex items-center gap-2">
               <div className="flex-1 relative">
                 <input
                   type="text"
                   readOnly
-                  value={previewUrl}
+                  value={shortening && activeUrlType === 'short' ? 'Compressing link...' : activeLink}
                   className="w-full pl-3 pr-3 py-2.5 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 select-all focus:outline-none focus:ring-2 focus:ring-indigo-500/40 truncate"
                 />
               </div>
               <button
                 type="button"
-                onClick={handleCopyUrl}
+                onClick={() => handleCopyUrl(activeLink)}
+                disabled={shortening && activeUrlType === 'short'}
                 className={cn(
-                  "px-3.5 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all shadow-sm shrink-0 active:scale-95 cursor-pointer",
+                  "px-3.5 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all shadow-sm shrink-0 active:scale-95 cursor-pointer disabled:opacity-50",
                   copied
                     ? "bg-emerald-600 text-white"
                     : "bg-indigo-600 hover:bg-indigo-500 text-white"
                 )}
-                title="Copy Unique URL"
+                title="Copy Link"
               >
                 {copied ? (
                   <>
@@ -220,7 +296,7 @@ export default function SendInvoiceModal({
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Link</span>
+                    <span>Copy</span>
                   </>
                 )}
               </button>
@@ -233,9 +309,17 @@ export default function SendInvoiceModal({
                 <ExternalLink className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500">
-              When opened, the preview page automatically populates all parameters and validates the invoice PDF without manual entry.
-            </p>
+
+            <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 px-1">
+              <span>
+                {activeUrlType === 'short'
+                  ? '✨ Short URL saves SMS characters and automatically resolves to full invoice preview.'
+                  : 'Contains domain, invoice number, date, and 8-character verification code.'}
+              </span>
+              <span className="font-mono text-[10px]">
+                {activeLink.length} chars
+              </span>
+            </div>
           </div>
 
           {/* Recipient Phone & SMS Section */}

@@ -33,6 +33,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import InvoicePrint from '@/components/InvoicePrint'
 import { getDisplayInvoiceId } from '@/lib/invoice'
+import { decodeInvoiceToken } from '@/lib/shortener'
 
 function PublicInvoicePreviewContent() {
   const searchParams = useSearchParams()
@@ -122,35 +123,67 @@ function PublicInvoicePreviewContent() {
   useEffect(() => {
     if (autoValidatedRef.current) return
 
-    let pInv = searchParams?.get('invoiceNumber') || searchParams?.get('inv') || searchParams?.get('invoice') || searchParams?.get('no') || ''
-    let pDate = searchParams?.get('invoiceDate') || searchParams?.get('date') || ''
-    let pCode = searchParams?.get('code') || searchParams?.get('c') || searchParams?.get('pin') || ''
+    const parseAndValidate = async () => {
+      let pInv = searchParams?.get('invoiceNumber') || searchParams?.get('inv') || searchParams?.get('invoice') || searchParams?.get('no') || ''
+      let pDate = searchParams?.get('invoiceDate') || searchParams?.get('date') || ''
+      let pCode = searchParams?.get('code') || searchParams?.get('c') || searchParams?.get('pin') || ''
+      let pSlug = searchParams?.get('s') || searchParams?.get('slug') || searchParams?.get('short') || ''
 
-    // Browser fallback in case searchParams wasn't immediately hydrated
-    if ((!pInv || !pDate || !pCode) && typeof window !== 'undefined') {
-      const sp = new URLSearchParams(window.location.search)
-      if (!pInv) pInv = sp.get('invoiceNumber') || sp.get('inv') || sp.get('invoice') || sp.get('no') || ''
-      if (!pDate) pDate = sp.get('invoiceDate') || sp.get('date') || ''
-      if (!pCode) pCode = sp.get('code') || sp.get('c') || sp.get('pin') || ''
+      // Browser fallback in case searchParams wasn't immediately hydrated
+      if ((!pInv || !pDate || !pCode || !pSlug) && typeof window !== 'undefined') {
+        const sp = new URLSearchParams(window.location.search)
+        if (!pInv) pInv = sp.get('invoiceNumber') || sp.get('inv') || sp.get('invoice') || sp.get('no') || ''
+        if (!pDate) pDate = sp.get('invoiceDate') || sp.get('date') || ''
+        if (!pCode) pCode = sp.get('code') || sp.get('c') || sp.get('pin') || ''
+        if (!pSlug) pSlug = sp.get('s') || sp.get('slug') || sp.get('short') || ''
+      }
+
+      // If a short slug was passed as ?s=slug, resolve it first
+      if (pSlug && (!pInv || !pDate || !pCode)) {
+        if (pSlug.startsWith('t_')) {
+          const decoded = decodeInvoiceToken(pSlug)
+          if (decoded) {
+            pInv = decoded.invoiceNumber
+            pDate = decoded.invoiceDate
+            pCode = decoded.code
+          }
+        } else {
+          try {
+            const res = await fetch(`/api/shorten?slug=${encodeURIComponent(pSlug)}`)
+            if (res.ok) {
+              const data = await res.json()
+              if (data.invoiceNumber && data.invoiceDate && data.code) {
+                pInv = data.invoiceNumber
+                pDate = data.invoiceDate
+                pCode = data.code
+              }
+            }
+          } catch (e) {
+            console.warn('Could not resolve query slug:', e)
+          }
+        }
+      }
+
+      // Clean up URI encoded parameters (e.g. %23INV-F-260901 -> #INV-F-260901)
+      if (pInv) {
+        try {
+          pInv = decodeURIComponent(pInv)
+        } catch (e) {}
+        setInvoiceNumber(pInv)
+      }
+      if (pDate) setInvoiceDate(pDate)
+      if (pCode) setCode(pCode.toUpperCase())
+
+      // If all three parameters are present in the URL, validate directly from database!
+      if (pInv && pDate && pCode) {
+        autoValidatedRef.current = true
+        validateInvoiceFromDatabase(pInv, pDate, pCode)
+      } else {
+        setInitialChecking(false)
+      }
     }
 
-    // Clean up URI encoded parameters (e.g. %23INV-F-260901 -> #INV-F-260901)
-    if (pInv) {
-      try {
-        pInv = decodeURIComponent(pInv)
-      } catch (e) {}
-      setInvoiceNumber(pInv)
-    }
-    if (pDate) setInvoiceDate(pDate)
-    if (pCode) setCode(pCode.toUpperCase())
-
-    // If all three parameters are present in the URL, validate directly from database!
-    if (pInv && pDate && pCode) {
-      autoValidatedRef.current = true
-      validateInvoiceFromDatabase(pInv, pDate, pCode)
-    } else {
-      setInitialChecking(false)
-    }
+    parseAndValidate()
   }, [searchParams, validateInvoiceFromDatabase])
 
   // Form submit handler

@@ -34,6 +34,7 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { addNotification } from '@/lib/notifications'
 import { getDisplayInvoiceId, getInvoiceVerificationCode, generateInvoicePreviewUrl } from '@/lib/invoice'
+import { shortenInvoiceUrl } from '@/lib/shortener'
 import InvoiceModal from '@/components/InvoiceModal'
 import CreateInvoiceModal from '@/components/CreateInvoiceModal'
 import ReceivePaymentModal from '@/components/ReceivePaymentModal'
@@ -127,6 +128,7 @@ function InvoicePageContent() {
   const [sendInvoiceData, setSendInvoiceData] = useState<{
     invoice: any
     previewUrl: string
+    shortUrl?: string
     verificationCode: string
   } | null>(null)
 
@@ -536,28 +538,49 @@ function InvoicePageContent() {
     }
   }
 
-  const handleSendInvoice = (inv: any) => {
+  const handleSendInvoice = async (inv: any) => {
     if (!inv) return
 
     const verificationCode = getInvoiceVerificationCode(inv)
     const previewUrl = generateInvoicePreviewUrl(inv)
 
-    // Automatically copy URL to clipboard for fast sharing
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(previewUrl).then(() => {
-        toast.success('Unique invoice preview link generated & copied to clipboard!')
-      }).catch(() => {
-        toast.success('Unique invoice preview link generated!')
-      })
-    } else {
-      toast.success('Unique invoice preview link generated!')
-    }
-
+    // Open modal immediately
     setSendInvoiceData({
       invoice: inv,
       previewUrl,
       verificationCode
     })
+
+    // Compress with private URL shortener
+    try {
+      const shortenResult = await shortenInvoiceUrl(inv)
+      if (shortenResult?.shortUrl) {
+        setSendInvoiceData({
+          invoice: inv,
+          previewUrl,
+          shortUrl: shortenResult.shortUrl,
+          verificationCode
+        })
+
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          navigator.clipboard.writeText(shortenResult.shortUrl).then(() => {
+            toast.success('Compressed invoice short link copied to clipboard!')
+          }).catch(() => {
+            toast.success('Compressed short link generated!')
+          })
+        }
+        return
+      }
+    } catch (e) {
+      console.warn('URL shortener error:', e)
+    }
+
+    // Fallback clipboard copy if shortener failed
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(previewUrl).then(() => {
+        toast.success('Invoice preview link copied to clipboard!')
+      }).catch(() => {})
+    }
   }
 
   const handleSendInvoiceSms = async (phone: string, message: string): Promise<boolean> => {
@@ -1567,6 +1590,7 @@ function InvoicePageContent() {
             onClose={() => setSendInvoiceData(null)}
             invoice={sendInvoiceData.invoice}
             previewUrl={sendInvoiceData.previewUrl}
+            shortUrl={sendInvoiceData.shortUrl}
             verificationCode={sendInvoiceData.verificationCode}
             onSendSms={handleSendInvoiceSms}
           />

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import InvoicePrint from './InvoicePrint'
 import { supabase } from '@/lib/supabase'
 import { getDisplayInvoiceId, generateInvoicePreviewUrl } from '@/lib/invoice'
+import { shortenInvoiceUrl } from '@/lib/shortener'
 import { toast } from 'sonner'
 
 interface InvoiceModalProps {
@@ -352,15 +353,24 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     }
   }
 
-  const handleShareLink = () => {
+  const handleShareLink = async () => {
     if (!invoice) return;
-    const url = generateInvoicePreviewUrl(invoice);
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => {
-        toast.success('Invoice preview link copied to clipboard!');
-      }).catch(() => {
-        toast.error('Failed to copy link.');
-      });
+    try {
+      const shortenResult = await shortenInvoiceUrl(invoice);
+      const url = shortenResult?.shortUrl || generateInvoicePreviewUrl(invoice);
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        toast.success('Compressed invoice short link copied to clipboard!');
+      }
+    } catch {
+      const url = generateInvoicePreviewUrl(invoice);
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => {
+          toast.success('Invoice preview link copied to clipboard!');
+        }).catch(() => {
+          toast.error('Failed to copy link.');
+        });
+      }
     }
   };
 
