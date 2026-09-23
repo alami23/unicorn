@@ -1,0 +1,8 @@
+{
+  "name": "Furniture Inventory Management System",
+  "description": "A premium, modern inventory management system for furniture businesses, featuring POS, invoicing, staff management, and detailed reporting.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

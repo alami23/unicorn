@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+html {
+  font-size: 14px;
+}
+
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide unrelated layouts and controls completely when printing */
+  aside,
+  header,
+  nav,
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Force elements to match printing paper boundaries and size */
+  html, body {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Target main containers to use the entire printable page width */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    min-height: auto !important;
+    width: 100% !important;
+    flex: none !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  /* Target the page’s outer div wrapper (p-4 pb-24 lg:p-8 lg:pb-8) */
+  main > div {
+    padding: 1.2cm !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Optimize print tables, borders, and prevent awkward row splittings */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
+    box-shadow: none !important;
+  }
+
+  .border, .border-b, .border-t, .border-l, .border-r {
+    border-color: #e2e8f0 !important;
+  }
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+/* Hide number input spinners (up/down arrows) globally */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+

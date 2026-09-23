@@ -1,0 +1,235 @@
+app/customer/add/page.tsx:52: [customers] const { error } = await supabase.from('customers').insert([dbData])
+app/customer/page.tsx:59: [customers] const [customersList, setCustomersList] = useState<Customer[]>([])
+app/customer/page.tsx:71: [customers] .from('customers')
+app/customer/page.tsx:103: [customers] console.error('Error fetching customers:', error)
+app/customer/page.tsx:104: [customers] toast.error('Failed to load customers')
+app/customer/page.tsx:127: [customers] .from('customers')
+app/customer/page.tsx:135: [customers] .from('customers')
+app/customer/page.tsx:175: [customers] .from('customers')
+app/customer/page.tsx:195: [customers] const filteredCustomers = customersList.filter(c => {
+app/customer/page.tsx:204: [customers] { label: 'Total Customers', value: customersList.length.toLocaleString(), color: 'bg-blue-500' },
+app/customer/page.tsx:205: [customers] { label: 'All-Time Orders', value: customersList.reduce((acc, c) => acc + (c.totalOrders || 0), 0).toLocaleString(), color: 'bg-amber-500' },
+app/customer/page.tsx:206: [customers] { label: 'Active Customers', value: customersList.filter(c => c.totalOrders > 0).length.toString(), color: 'bg-emerald-500' },
+app/customer/page.tsx:207: [customers] { label: 'Total Due', value: `৳${customersList.reduce((acc, c) => acc + (c.totalDue || 0), 0).toLocaleString()}`, color: 'bg-rose-500' },
+app/customer/page.tsx:411: [customers] No customers found matching your search.
+app/customer/page.tsx:593: [customers] .from('customers')
+app/customer/page.tsx:600: [customers] .from('customers')
+app/customer-statement/page.tsx:37: [customers] const [customers, setCustomers] = useState<Customer[]>([])
+app/customer-statement/page.tsx:59: [customers] // Fetch all customers for the dropdown
+app/customer-statement/page.tsx:83: [customers] .from('customers')
+app/customer-statement/page.tsx:104: [customers] .from('customers')
+app/customer-statement/page.tsx:162: [customers] const filteredCustomers = customers.filter(c =>
+app/customer-statement/page.tsx:263: [customers] <div className="p-5 text-center text-sm text-slate-500 italic">No customers found</div>
+app/furniture-category/page.tsx:45: [furniture_categories] .from('furniture_categories')
+app/furniture-category/page.tsx:95: [furniture_categories] .from('furniture_categories')
+app/furniture-category/page.tsx:110: [furniture_categories] .from('furniture_categories')
+app/furniture-category/page.tsx:138: [furniture_categories] .from('furniture_categories')
+app/furniture-inventory/page.tsx:62: [furniture_products] .from('furniture_products')
+app/furniture-inventory/page.tsx:92: [furniture_categories] .from('furniture_categories')
+app/furniture-inventory/page.tsx:220: [furniture_products] .from('furniture_products')
+app/furniture-inventory/page.tsx:227: [furniture_categories] .from('furniture_categories')
+app/furniture-inventory/page.tsx:259: [furniture_categories] .from('furniture_categories')
+app/furniture-inventory/page.tsx:342: [furniture_products] .from('furniture_products')
+app/furniture-inventory/page.tsx:404: [furniture_products] .from('furniture_products')
+app/furniture-inventory/page.tsx:413: [furniture_products] .from('furniture_products')
+app/furniture-inventory/page.tsx:458: [furniture_products] .from('furniture_products')
+app/invoice/page.tsx:103: [customers] .from('customers')
+app/invoice/page.tsx:182: [customers] .select('*, customers(photo)', { count: 'exact' })
+app/invoice/page.tsx:239: [customers] customerPhoto: inv.customers?.photo,
+app/invoice/page.tsx:334: [wood_products] const {error: errW} = await supabase.from('wood_products').update({ is_sold: false, stock: 1 }).eq('id', item.product_id)
+app/invoice/page.tsx:337: [furniture_products] const { data: p } = await supabase.from('furniture_products').select('stock').eq('id', item.product_id).single()
+app/invoice/page.tsx:339: [furniture_products] const {error: errF} = await supabase.from('furniture_products').update({ stock: (p.stock || 0) + item.quantity }).eq('id', item.product_id)
+app/invoice/page.tsx:356: [customers] const { data: customerData } = await supabase.from('customers').select('total_due').eq('name', invoice.customer).single()
+app/invoice/page.tsx:358: [customers] const {error: errCus} = await supabase.from('customers').update({ total_due: Math.max(0, (customerData.total_due || 0) - invoice.due) }).eq('name', invoice.customer)
+app/invoice/page.tsx:743: [customers] .from('customers')
+app/invoice/page.tsx:751: [customers] .from('customers')
+app/invoice/page.tsx:788: [customers] .from('customers')
+app/page.tsx:80: [customers] .from('customers')
+app/pos-furniture/page.tsx:78: [customers] const [customers, setCustomers] = useState<any[]>([])
+app/pos-furniture/page.tsx:89: [furniture_products] .from('furniture_products')
+app/pos-furniture/page.tsx:119: [furniture_categories] .from('furniture_categories')
+app/pos-furniture/page.tsx:133: [customers] const { data, error } = await supabase.from('customers').select('*')
+app/pos-furniture/page.tsx:188: [customers] const { error } = await supabase.from('customers').insert([{
+app/pos-furniture/page.tsx:288: [customers] const customerData = customers.find(c => c.name === selectedCustomer)
+app/pos-furniture/page.tsx:330: [furniture_products] .from('furniture_products')
+app/pos-furniture/page.tsx:344: [customers] .from('customers')
+app/pos-furniture/page.tsx:801: [customers] const cust = customers.find(c => c.name === selectedCustomer);
+app/pos-furniture/page.tsx:844: [customers] {customers
+app/pos-furniture/page.tsx:869: [customers] {customers.filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || c.phone.includes(customerSearchTerm)).length === 0 && (
+app/pos-furniture/page.tsx:871: [customers] No customers found
+app/pos-wood/page.tsx:49: [wood_categories] supabase.from('wood_categories').select('*'),
+app/pos-wood/page.tsx:50: [wood_sub_categories] supabase.from('wood_sub_categories').select('*'),
+app/pos-wood/page.tsx:51: [wood_tags] supabase.from('wood_tags').select('*')
+app/pos-wood/page.tsx:71: [wood_products] .from('wood_products')
+app/pos-wood/page.tsx:115: [customers] const [customers, setCustomers] = useState<any[]>([])
+app/pos-wood/page.tsx:194: [customers] const { data, error } = await supabase.from('customers').select('*')
+app/pos-wood/page.tsx:227: [customers] const { error } = await supabase.from('customers').insert([{
+app/pos-wood/page.tsx:378: [customers] const customerData = customers.find(c => c.name === selectedCustomer)
+app/pos-wood/page.tsx:450: [wood_products] .from('wood_products')
+app/pos-wood/page.tsx:461: [customers] .from('customers')
+app/pos-wood/page.tsx:578: [wood_products] .from('wood_products')
+app/pos-wood/page.tsx:614: [wood_products] .from('wood_products')
+app/pos-wood/page.tsx:934: [customers] const cust = customers.find(c => c.name === selectedCustomer);
+app/pos-wood/page.tsx:977: [customers] {customers
+app/pos-wood/page.tsx:1002: [customers] {customers.filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || c.phone.includes(customerSearchTerm)).length === 0 && (
+app/pos-wood/page.tsx:1004: [customers] No customers found
+app/pos-wood/page.tsx:1261: [customers] const customerData = customers.find(c => c.name === selectedCustomer)
+app/reports/page.tsx:96: [customers] const [customers, setCustomers] = useState<any[]>([])
+app/reports/page.tsx:134: [customers] // 1. Fetch products & customers (always fetch full catalogs to calculate accurate current stocks and details)
+app/reports/page.tsx:140: [customers] supabase.from('customers').select('*'),
+app/reports/page.tsx:141: [furniture_products] supabase.from('furniture_products').select('*'),
+app/reports/page.tsx:142: [wood_products] supabase.from('wood_products').select('*')
+app/reports/page.tsx:430: [customers] const dueCustomersList = customers.filter(c => Number(c.total_due || 0) > 0)
+app/reports/page.tsx:466: [customers] customers,
+app/reports/page.tsx:1265: [customers] {customers.length > 0 ? ((reportMetrics.dueCustomersCount / customers.length) * 100).toFixed(0) : 0}% of client base
+app/reports/page.tsx:1281: [customers] <span className="text-xs font-bold text-slate-400">{filteredDuesList.length} default customers</span>
+app/settings/page.tsx:754: [furniture_products] "furniture_products",
+app/settings/page.tsx:755: [wood_products] "wood_products",
+app/settings/page.tsx:756: [customers] "customers",
+app/settings/page.tsx:2155: [customers] and invoice summaries to customers.
+app/settings/page.tsx:2339: [customers] records including customers, products, invoices, and
+app/sms/page.tsx:44: [customers] const [customers, setCustomers] = useState<any[]>([])
+app/sms/page.tsx:104: [customers] const { data, error } = await supabase.from('customers').select('*').order('name');
+app/sms/page.tsx:107: [customers] console.error('Error fetching customers:', error);
+app/sms/page.tsx:150: [customers] const filteredCustomers = customers.filter(c =>
+app/solo-wood/page.tsx:50: [wood_products] .from('wood_products')
+app/solo-wood/page.tsx:84: [customers] const [customers, setCustomers] = useState<any[]>([])
+app/solo-wood/page.tsx:161: [customers] const { data, error } = await supabase.from('customers').select('*').order('name')
+app/solo-wood/page.tsx:200: [wood_tags] const { data, error } = await supabase.from('wood_tags').select('*').eq('status', 'Active')
+app/solo-wood/page.tsx:227: [customers] const { error } = await supabase.from('customers').insert([dbData])
+app/solo-wood/page.tsx:230: [customers] setCustomers([...customers, customer])
+app/solo-wood/page.tsx:354: [customers] const customerData = customers.find(c => c.name === selectedCustomer)
+app/solo-wood/page.tsx:427: [wood_products] .from('wood_products')
+app/solo-wood/page.tsx:437: [customers] operations.push(supabase.from('customers')
+app/solo-wood/page.tsx:557: [customers] const cust = customers.find(c => c.name === selectedCustomer);
+app/solo-wood/page.tsx:600: [customers] {customers
+app/solo-wood/page.tsx:625: [customers] {customers.filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || c.phone.includes(customerSearchTerm)).length === 0 && (
+app/solo-wood/page.tsx:627: [customers] No customers found
+app/solo-wood/page.tsx:902: [customers] const customerData = customers.find(c => c.name === selectedCustomer)
+app/transactions/page.tsx:30: [customers] .select('*, customers(name)')
+app/transactions/page.tsx:44: [customers] entity: t.customers?.name || 'Walk-in Customer'
+app/wood-category/page.tsx:24: [wood_products] .from('wood_products')
+app/wood-category/page.tsx:30: [wood_categories] supabase.from('wood_categories').select('*'),
+app/wood-category/page.tsx:31: [wood_sub_categories] supabase.from('wood_sub_categories').select('*')
+app/wood-category/page.tsx:83: [wood_categories] if (newCats.length > 0) await supabase.from('wood_categories').insert(newCats);
+app/wood-category/page.tsx:84: [wood_sub_categories] if (newSubs.length > 0) await supabase.from('wood_sub_categories').insert(newSubs);
+app/wood-category/page.tsx:89: [wood_categories] supabase.from('wood_categories').select('*').order('name'),
+app/wood-category/page.tsx:90: [wood_sub_categories] supabase.from('wood_sub_categories').select('*').order('name'),
+app/wood-category/page.tsx:91: [wood_tags] supabase.from('wood_tags').select('*').order('name'),
+app/wood-category/page.tsx:92: [wood_products] supabase.from('wood_products').select('category, car_no').eq('is_sold', false)
+app/wood-category/page.tsx:132: [wood_categories] if (duplicateCatIds.length > 0) supabase.from('wood_categories').delete().in('id', duplicateCatIds).then();
+app/wood-category/page.tsx:133: [wood_sub_categories] if (duplicateSubIds.length > 0) supabase.from('wood_sub_categories').delete().in('id', duplicateSubIds).then();
+app/wood-category/page.tsx:135: [wood_products] // Calculate enriched subcategories with item counts from wood_products
+app/wood-category/page.tsx:192: [wood_products] .from('wood_products')
+app/wood-category/page.tsx:240: [wood_categories] const { error } = await supabase.from('wood_categories').insert([newCat]);
+app/wood-category/page.tsx:270: [wood_categories] .from('wood_categories')
+app/wood-category/page.tsx:314: [wood_sub_categories] const { error } = await supabase.from('wood_sub_categories').insert([newSubCat]);
+app/wood-category/page.tsx:342: [wood_sub_categories] .from('wood_sub_categories')
+app/wood-category/page.tsx:375: [wood_tags] const { error } = await supabase.from('wood_tags').insert([tag]);
+app/wood-category/page.tsx:396: [wood_tags] .from('wood_tags')
+app/wood-category/page.tsx:425: [wood_categories] if (deleteConfirmation.type === 'category') table = 'wood_categories';
+app/wood-category/page.tsx:426: [wood_sub_categories] else if (deleteConfirmation.type === 'subCategory') table = 'wood_sub_categories';
+app/wood-category/page.tsx:427: [wood_tags] else if (deleteConfirmation.type === 'tag') table = 'wood_tags';
+app/wood-inventory/make-excel/page.tsx:54: [wood_categories] supabase.from('wood_categories').select('*').order('name'),
+app/wood-inventory/make-excel/page.tsx:55: [wood_sub_categories] supabase.from('wood_sub_categories').select('*').order('name'),
+app/wood-inventory/make-excel/page.tsx:56: [wood_tags] supabase.from('wood_tags').select('*').order('name'),
+app/wood-inventory/make-excel/page.tsx:57: [excel_temp_rows] supabase.from('excel_temp_rows').select('*').order('created_at', { ascending: true })
+app/wood-inventory/make-excel/page.tsx:209: [excel_temp_rows] const { error } = await supabase.from('excel_temp_rows').update({
+app/wood-inventory/make-excel/page.tsx:236: [excel_temp_rows] const { data, error } = await supabase.from('excel_temp_rows').insert([{
+app/wood-inventory/make-excel/page.tsx:285: [excel_temp_rows] const { error } = await supabase.from('excel_temp_rows').delete().eq('id', id);
+app/wood-inventory/make-excel/page.tsx:302: [excel_temp_rows] const { error } = await supabase.from('excel_temp_rows').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+app/wood-inventory/page.tsx:62: [wood_categories] supabase.from('wood_categories').select('*').order('name'),
+app/wood-inventory/page.tsx:63: [wood_sub_categories] supabase.from('wood_sub_categories').select('*').order('name'),
+app/wood-inventory/page.tsx:64: [wood_tags] supabase.from('wood_tags').select('*').order('name')
+app/wood-inventory/page.tsx:83: [wood_products] .from('wood_products')
+app/wood-inventory/page.tsx:130: [wood_products] .from('wood_products')
+app/wood-inventory/page.tsx:194: [wood_products] .from('wood_products')
+app/wood-inventory/page.tsx:253: [wood_products] const { error: insertError } = await supabase.from('wood_products').insert(importProducts);
+app/wood-inventory/page.tsx:330: [wood_products] .from('wood_products')
+app/wood-inventory/page.tsx:364: [wood_products] .from('wood_products')
+app/wood-inventory/page.tsx:372: [wood_products] .from('wood_products')
+app/wood-inventory/page.tsx:421: [wood_products] .from('wood_products')
+components/AddCustomerModal.tsx:70: [customers] const fileName = `customers/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+components/AddCustomerModal.tsx:111: [customers] if (formData.photo.includes('supabase.co/storage') && formData.photo.includes('logos/customers/')) {
+components/AddCustomerModal.tsx:117: [customers] .remove([`customers/${fileName}`])
+components/AddCustomerModal.tsx:162: [customers] .from('customers')
+components/BinModal.tsx:30: [wood_products] .from('wood_products')
+components/BinModal.tsx:52: [wood_products] .from('wood_products')
+components/BinModal.tsx:73: [wood_products] .from('wood_products')
+components/EditInvoiceModal.tsx:65: [customers] .from('customers')
+components/EditInvoiceModal.tsx:72: [customers] .from('customers')
+components/InvoiceModal.tsx:115: [customers] .from('customers')
+components/InvoicePrint.tsx:536: [customers] Just wanted to say thank you for your purchase. We&apos;re so lucky to have customers like you!
+components/InvoicePrint.tsx:750: [customers] Just wanted to say thank you for your purchase. We&apos;re so lucky to have customers like you!
+components/ProcessReturnModal.tsx:108: [customers] .from('customers')
+components/ProcessReturnModal.tsx:115: [customers] .from('customers')
+lib/supabase.ts:82: [customers] const { data, error } = await supabase.from('customers').select('id').limit(1);
+patch_invoice.js:29: [customers] .select('*, customers(photo)', { count: 'exact' })
+patch_invoice.js:86: [customers] customerPhoto: inv.customers?.photo,
+scan_tables.js:5: [furniture_products] 'furniture_products',
+scan_tables.js:6: [furniture_categories] 'furniture_categories',
+scan_tables.js:7: [excel_temp_rows] 'excel_temp_rows',
+scan_tables.js:8: [customers] 'customers',
+scan_tables.js:9: [wood_products] 'wood_products',
+scan_tables.js:10: [wood_sub_categories] 'wood_sub_categories',
+scan_tables.js:11: [wood_categories] 'wood_categories',
+scan_tables.js:12: [wood_tags] 'wood_tags'
+supabase-schema.sql:29: [customers] CREATE TABLE IF NOT EXISTS public.customers (
+supabase-schema.sql:68: [furniture_products] CREATE TABLE IF NOT EXISTS public.furniture_products (
+supabase-schema.sql:85: [wood_products] CREATE TABLE IF NOT EXISTS public.wood_products (
+supabase-schema.sql:105: [customers] customer_id TEXT REFERENCES public.customers(id),
+supabase-schema.sql:142: [customers] customer_id TEXT REFERENCES public.customers(id),
+supabase-schema.sql:155: [furniture_categories] CREATE TABLE IF NOT EXISTS public.furniture_categories (
+supabase-schema.sql:189: [furniture_products] -- furniture_products migrations
+supabase-schema.sql:190: [furniture_products] IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='furniture_products' AND column_name='buy_price' AND table_schema='public') THEN
+supabase-schema.sql:191: [furniture_products] ALTER TABLE public.furniture_products ADD COLUMN buy_price NUMERIC DEFAULT 0;
+supabase-schema.sql:193: [furniture_products] IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='furniture_products' AND column_name='sell_price' AND table_schema='public') THEN
+supabase-schema.sql:194: [furniture_products] ALTER TABLE public.furniture_products ADD COLUMN sell_price NUMERIC DEFAULT 0;
+supabase-schema.sql:196: [furniture_products] IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='furniture_products' AND column_name='size' AND table_schema='public') THEN
+supabase-schema.sql:197: [furniture_products] ALTER TABLE public.furniture_products ADD COLUMN size TEXT DEFAULT 'Standard';
+supabase-schema.sql:200: [furniture_categories] -- furniture_categories migration
+supabase-schema.sql:201: [furniture_categories] IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='furniture_categories' AND table_schema='public') THEN
+supabase-schema.sql:202: [furniture_categories] IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='furniture_categories' AND column_name='size' AND table_schema='public') THEN
+supabase-schema.sql:203: [furniture_categories] ALTER TABLE public.furniture_categories ADD COLUMN size TEXT DEFAULT 'Standard';
+supabase-schema.sql:216: [customers] UPDATE public.customers c
+supabase-schema.sql:226: [customers] UPDATE public.customers
+supabase-schema.sql:230: [customers] UPDATE public.customers
+supabase-schema.sql:234: [customers] UPDATE public.customers
+supabase-schema.sql:238: [customers] UPDATE public.customers
+supabase-schema.sql:254: [customers] ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+supabase-schema.sql:257: [furniture_products] ALTER TABLE public.furniture_products ENABLE ROW LEVEL SECURITY;
+supabase-schema.sql:258: [wood_products] ALTER TABLE public.wood_products ENABLE ROW LEVEL SECURITY;
+supabase-schema.sql:265: [customers] DROP POLICY IF EXISTS "Allow authenticated full access to customers" ON public.customers;
+supabase-schema.sql:266: [customers] DROP POLICY IF EXISTS "Allow public full access to customers" ON public.customers;
+supabase-schema.sql:267: [customers] CREATE POLICY "Allow public full access to customers" ON public.customers FOR ALL TO public USING (true) WITH CHECK (true);
+supabase-schema.sql:277: [furniture_products] DROP POLICY IF EXISTS "Allow authenticated full access to furniture_products" ON public.furniture_products;
+supabase-schema.sql:278: [furniture_products] DROP POLICY IF EXISTS "Allow public full access to furniture_products" ON public.furniture_products;
+supabase-schema.sql:279: [furniture_products] CREATE POLICY "Allow public full access to furniture_products" ON public.furniture_products FOR ALL TO public USING (true) WITH CHECK (true);
+supabase-schema.sql:281: [wood_products] DROP POLICY IF EXISTS "Allow authenticated full access to wood_products" ON public.wood_products;
+supabase-schema.sql:282: [wood_products] DROP POLICY IF EXISTS "Allow public full access to wood_products" ON public.wood_products;
+supabase-schema.sql:283: [wood_products] CREATE POLICY "Allow public full access to wood_products" ON public.wood_products FOR ALL TO public USING (true) WITH CHECK (true);
+supabase-schema.sql:314: [wood_categories] CREATE TABLE IF NOT EXISTS public.wood_categories (
+supabase-schema.sql:324: [wood_sub_categories] CREATE TABLE IF NOT EXISTS public.wood_sub_categories (
+supabase-schema.sql:326: [wood_categories] category_id TEXT REFERENCES public.wood_categories(id) ON DELETE CASCADE,
+supabase-schema.sql:334: [wood_tags] CREATE TABLE IF NOT EXISTS public.wood_tags (
+supabase-schema.sql:369: [customers] customer_id TEXT REFERENCES public.customers(id),
+supabase-schema.sql:452: [wood_categories] ALTER TABLE public.wood_categories ENABLE ROW LEVEL SECURITY;
+supabase-schema.sql:453: [wood_sub_categories] ALTER TABLE public.wood_sub_categories ENABLE ROW LEVEL SECURITY;
+supabase-schema.sql:454: [wood_tags] ALTER TABLE public.wood_tags ENABLE ROW LEVEL SECURITY;
+supabase-schema.sql:466: [wood_categories] DROP POLICY IF EXISTS "Allow authenticated full access to wood_categories" ON public.wood_categories;
+supabase-schema.sql:467: [wood_categories] DROP POLICY IF EXISTS "Allow public full access to wood_categories" ON public.wood_categories;
+supabase-schema.sql:468: [wood_categories] CREATE POLICY "Allow public full access to wood_categories" ON public.wood_categories FOR ALL TO public USING (true) WITH CHECK (true);
+supabase-schema.sql:470: [wood_sub_categories] DROP POLICY IF EXISTS "Allow authenticated full access to wood_sub_categories" ON public.wood_sub_categories;
+supabase-schema.sql:471: [wood_sub_categories] DROP POLICY IF EXISTS "Allow public full access to wood_sub_categories" ON public.wood_sub_categories;
+supabase-schema.sql:472: [wood_sub_categories] CREATE POLICY "Allow public full access to wood_sub_categories" ON public.wood_sub_categories FOR ALL TO public USING (true) WITH CHECK (true);
+supabase-schema.sql:474: [wood_tags] DROP POLICY IF EXISTS "Allow authenticated full access to wood_tags" ON public.wood_tags;
+supabase-schema.sql:475: [wood_tags] DROP POLICY IF EXISTS "Allow public full access to wood_tags" ON public.wood_tags;
+supabase-schema.sql:476: [wood_tags] CREATE POLICY "Allow public full access to wood_tags" ON public.wood_tags FOR ALL TO public USING (true) WITH CHECK (true);
+supabase-schema.sql:519: [furniture_categories] ALTER TABLE public.furniture_categories ENABLE ROW LEVEL SECURITY;
+supabase-schema.sql:520: [furniture_categories] DROP POLICY IF EXISTS "Allow public full access to furniture_categories" ON public.furniture_categories;
+supabase-schema.sql:521: [furniture_categories] CREATE POLICY "Allow public full access to furniture_categories" ON public.furniture_categories FOR ALL TO public USING (true) WITH CHECK (true);
+supabase-schema.sql:554: [excel_temp_rows] CREATE TABLE IF NOT EXISTS public.excel_temp_rows (
+supabase-schema.sql:568: [excel_temp_rows] ALTER TABLE public.excel_temp_rows ENABLE ROW LEVEL SECURITY;
+supabase-schema.sql:569: [excel_temp_rows] DROP POLICY IF EXISTS "Allow public full access to excel_temp_rows" ON public.excel_temp_rows;
+supabase-schema.sql:570: [excel_temp_rows] CREATE POLICY "Allow public full access to excel_temp_rows" ON public.excel_temp_rows FOR ALL TO public USING (true) WITH CHECK (true);
+test-tag-color.js:4: [wood_tags] const { data, error } = await supabase.from('wood_tags').select('color').limit(1);
