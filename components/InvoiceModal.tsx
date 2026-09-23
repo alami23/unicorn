@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { X, Printer, FileText, Layout, Smartphone, Package, User } from 'lucide-react'
+import { X, Printer, FileText, Layout, Smartphone, Package, User, Share2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import InvoicePrint from './InvoicePrint'
 import { supabase } from '@/lib/supabase'
-import { getDisplayInvoiceId } from '@/lib/invoice'
+import { getDisplayInvoiceId, generateInvoicePreviewUrl } from '@/lib/invoice'
+import { toast } from 'sonner'
 
 interface InvoiceModalProps {
   isOpen: boolean
@@ -351,6 +352,18 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     }
   }
 
+  const handleShareLink = () => {
+    if (!invoice) return;
+    const url = generateInvoicePreviewUrl(invoice);
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        toast.success('Invoice preview link copied to clipboard!');
+      }).catch(() => {
+        toast.error('Failed to copy link.');
+      });
+    }
+  };
+
   if (!invoice) return null
 
   return (
@@ -458,6 +471,13 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                     Auto Fit
                   </button>
                 </div>
+                <button 
+                  onClick={handleShareLink}
+                  className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 rounded-xl font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all text-xs sm:text-sm cursor-pointer"
+                  title="Copy Unique Preview URL"
+                >
+                  <Share2 size={16} /> Share Link
+                </button>
                 <button 
                   onClick={handlePrint}
                   className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-2.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl font-bold hover:bg-slate-800 dark:hover:bg-white transition-all shadow-lg shadow-slate-900/20"

@@ -46,7 +46,7 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
   }
 
   const userBiz = currentUserId ? settings?.business_by_user?.[currentUserId] : null;
-  const business = (userBiz && userBiz.name) ? userBiz : (settings?.business || {
+  const business = (userBiz && userBiz.name) ? userBiz : (settings?.business || invoice?.business || {
     name: '',
     address: '',
     email: '',

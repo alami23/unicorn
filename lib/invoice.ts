@@ -95,3 +95,78 @@ export function getDisplayInvoiceId(id: string | null | undefined): string {
   }
   return cleanId;
 }
+
+/**
+ * Derives the 8-character verification code for an invoice.
+ * Matches org_id prefix, invoice ID tenant prefix, or customer ID.
+ */
+export function getInvoiceVerificationCode(inv: any): string {
+  if (!inv) return '';
+
+  // 1. If invoice id has tenant prefix (e.g. "64f46349-a37b-4f53-840f-358a3f731d1b_#INV-F-260901")
+  if (inv.id && typeof inv.id === 'string' && inv.id.includes('_')) {
+    const prefix = inv.id.split('_')[0];
+    if (prefix.length >= 8) {
+      return prefix.substring(0, 8).toUpperCase();
+    }
+  }
+
+  // 2. If inv has org_id
+  if (inv.org_id && typeof inv.org_id === 'string' && inv.org_id.length >= 8) {
+    return inv.org_id.substring(0, 8).toUpperCase();
+  }
+
+  // 3. User session / tenant ID in localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('custom_user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        const orgId = u.org_id || u.id;
+        if (orgId && typeof orgId === 'string' && orgId.length >= 8) {
+          return orgId.substring(0, 8).toUpperCase();
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 4. Customer ID if exactly 8 characters
+  if (inv.customer_id && typeof inv.customer_id === 'string' && inv.customer_id.length === 8) {
+    return inv.customer_id.toUpperCase();
+  }
+
+  // 5. Fallback alphanumeric 8 characters from id
+  if (inv.id && typeof inv.id === 'string') {
+    const alphanumeric = inv.id.replace(/[^a-zA-Z0-9]/g, '');
+    if (alphanumeric.length >= 8) {
+      return alphanumeric.substring(0, 8).toUpperCase();
+    }
+  }
+
+  return '64F46349';
+}
+
+/**
+ * Generates the unique public URL to preview and verify an invoice
+ */
+export function generateInvoicePreviewUrl(inv: any, baseUrl?: string): string {
+  if (!inv) return '';
+
+  const origin = baseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+  const invoiceNumber = getDisplayInvoiceId(inv.id) || inv.invoice_number || inv.id || '';
+  
+  let invoiceDate = inv.date || '';
+  if (!invoiceDate && inv.created_at) {
+    invoiceDate = new Date(inv.created_at).toISOString().split('T')[0];
+  }
+
+  const code = getInvoiceVerificationCode(inv);
+
+  const params = new URLSearchParams();
+  if (invoiceNumber) params.set('invoiceNumber', invoiceNumber);
+  if (invoiceDate) params.set('invoiceDate', invoiceDate);
+  if (code) params.set('code', code);
+
+  return `${origin}/preview?${params.toString()}`;
+}
+

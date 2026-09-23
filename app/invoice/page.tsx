@@ -33,11 +33,12 @@ import { sendSMS } from '@/lib/sms'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { addNotification } from '@/lib/notifications'
-import { getDisplayInvoiceId } from '@/lib/invoice'
+import { getDisplayInvoiceId, getInvoiceVerificationCode, generateInvoicePreviewUrl } from '@/lib/invoice'
 import InvoiceModal from '@/components/InvoiceModal'
 import CreateInvoiceModal from '@/components/CreateInvoiceModal'
 import ReceivePaymentModal from '@/components/ReceivePaymentModal'
 import SendSMSModal from '@/components/SendSMSModal'
+import SendInvoiceModal from '@/components/SendInvoiceModal'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -123,6 +124,11 @@ function InvoicePageContent() {
   } | null>(null)
   const [invoiceToDelete, setInvoiceToDelete] = useState<any>(null)
   const [isFetchingItems, setIsFetchingItems] = useState(false)
+  const [sendInvoiceData, setSendInvoiceData] = useState<{
+    invoice: any
+    previewUrl: string
+    verificationCode: string
+  } | null>(null)
 
   // Cooldown timer interval: clean up or tick down active reminder cooldowns
   useEffect(() => {
@@ -530,46 +536,37 @@ function InvoicePageContent() {
     }
   }
 
-  const handleSendInvoice = async (inv: any) => {
+  const handleSendInvoice = (inv: any) => {
+    if (!inv) return
+
+    const verificationCode = getInvoiceVerificationCode(inv)
+    const previewUrl = generateInvoicePreviewUrl(inv)
+
+    // Automatically copy URL to clipboard for fast sharing
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(previewUrl).then(() => {
+        toast.success('Unique invoice preview link generated & copied to clipboard!')
+      }).catch(() => {
+        toast.success('Unique invoice preview link generated!')
+      })
+    } else {
+      toast.success('Unique invoice preview link generated!')
+    }
+
+    setSendInvoiceData({
+      invoice: inv,
+      previewUrl,
+      verificationCode
+    })
+  }
+
+  const handleSendInvoiceSms = async (phone: string, message: string): Promise<boolean> => {
     try {
-      let phoneToSend = inv.customerPhone
-      if (!phoneToSend && inv.customer && inv.customer !== 'Walk-in Customer') {
-        const { data: cust } = await supabase
-          .from('customer')
-          .select('phone')
-          .eq('name', inv.customer)
-          .maybeSingle()
-        if (cust?.phone) phoneToSend = cust.phone
-      }
-
-      if (!phoneToSend) {
-        toast.error('No phone number available for customer')
-        return
-      }
-
-      const { data: settingsData } = await supabase
-        .from('app_settings')
-        .select('settings')
-        .eq('id', 'global')
-        .single()
-      
-      const settings = settingsData?.settings as any
-      let currentUserId = null
-      if (typeof window !== 'undefined') {
-        try {
-          const stored = localStorage.getItem('custom_user')
-          if (stored) currentUserId = JSON.parse(stored).id
-        } catch (e) {}
-      }
-      const businessName = (currentUserId && settings?.business_by_user?.[currentUserId]?.name) || settings?.business?.name || 'Store'
-      const invoiceUrl = `${window.location.origin}/invoice/view/${encodeURIComponent(inv.id)}`
-      const msg = `Dear ${inv.customer}, here is your Invoice ${getDisplayInvoiceId(inv.id)} from ${businessName}. Total: ৳${Math.round(inv.amount).toLocaleString()}, Due: ৳${Math.round(inv.due).toLocaleString()}. View: ${invoiceUrl}`
-
-      await sendSMS(phoneToSend, msg)
-      toast.success('Invoice sent via SMS')
-    } catch (err) {
-      console.error('Failed to send invoice SMS:', err)
-      toast.error('Failed to send SMS')
+      await sendSMS(phone, message)
+      return true
+    } catch (err: any) {
+      console.error('Failed to send invoice preview SMS:', err)
+      throw new Error(err.message || 'Failed to send SMS')
     }
   }
 
@@ -1560,6 +1557,18 @@ function InvoicePageContent() {
             customerName={dueReminderData.customerName}
             customerPhone={dueReminderData.customerPhone}
             initialMessage={dueReminderData.initialMessage}
+          />
+        )}
+
+        {/* Send Invoice Preview Modal */}
+        {sendInvoiceData && (
+          <SendInvoiceModal
+            isOpen={!!sendInvoiceData}
+            onClose={() => setSendInvoiceData(null)}
+            invoice={sendInvoiceData.invoice}
+            previewUrl={sendInvoiceData.previewUrl}
+            verificationCode={sendInvoiceData.verificationCode}
+            onSendSms={handleSendInvoiceSms}
           />
         )}
       </div>

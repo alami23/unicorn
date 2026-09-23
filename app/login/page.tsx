@@ -24,8 +24,10 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
+import LoginInvoicePreviewer from '@/components/LoginInvoicePreviewer';
 
 type PageMode = 'login' | 'forgot_identify' | 'forgot_otp' | 'forgot_reset';
+type ViewMode = 'admin' | 'preview';
 
 export default function LoginPage() {
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -33,6 +35,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'preview' || params.get('invoiceNumber') || params.get('inv')) {
+        setViewMode('preview');
+      }
+    }
   }, []);
 
   const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'light';
@@ -49,6 +57,7 @@ export default function LoginPage() {
   const { login } = useAuth();
 
   // Recovery flow states
+  const [viewMode, setViewMode] = useState<ViewMode>('admin');
   const [mode, setMode] = useState<PageMode>('login');
   const [recoveryIdentifier, setRecoveryIdentifier] = useState('');
   const [matchedUser, setMatchedUser] = useState<any>(null);
@@ -293,13 +302,25 @@ export default function LoginPage() {
       <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 flex items-center gap-2.5">
         <button
           type="button"
-          className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
+          onClick={() => { setViewMode('admin'); setError(null); }}
+          className={cn(
+            "px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border",
+            viewMode === 'admin'
+              ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/25"
+              : "bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800"
+          )}
         >
           Admin
         </button>
         <button
           type="button"
-          className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
+          onClick={() => { setViewMode('preview'); setError(null); }}
+          className={cn(
+            "px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border",
+            viewMode === 'preview'
+              ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/25"
+              : "bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800"
+          )}
         >
           Preview
         </button>
@@ -325,11 +346,16 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-800 transition-colors duration-300"
-      >
+      {viewMode === 'preview' ? (
+        <div className="w-full flex items-center justify-center pt-10 sm:pt-0">
+          <LoginInvoicePreviewer onBackToLogin={() => setViewMode('admin')} />
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-800 transition-colors duration-300"
+        >
         <AnimatePresence mode="wait">
           {/* LOGIN SCREEN */}
           {mode === 'login' && (
@@ -663,6 +689,7 @@ export default function LoginPage() {
           )}
         </AnimatePresence>
       </motion.div>
+      )}
     </div>
   );
 }
