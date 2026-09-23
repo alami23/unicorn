@@ -148,19 +148,29 @@ export async function POST(req: NextRequest) {
       .eq('invoice_id', foundInvoice.id);
 
     // 4. Fetch business profile settings
-    const { data: settingsData } = await tenantClient
+    let businessSettings: any = null;
+    const { data: orgSettings } = await tenantClient
       .from('app_settings')
       .select('settings')
       .eq('id', foundOrgId)
-      .single();
+      .maybeSingle();
 
-    let businessSettings = settingsData?.settings?.business || {
-      name: 'Timber & Furniture ERP',
-      address: '',
-      email: '',
-      phone: '',
-      logo: ''
-    };
+    if (orgSettings?.settings?.business?.name) {
+      businessSettings = orgSettings.settings.business;
+    } else {
+      const { data: globalSettings } = await baseClient
+        .from('app_settings')
+        .select('settings')
+        .eq('id', 'global')
+        .maybeSingle();
+      businessSettings = globalSettings?.settings?.business || orgSettings?.settings?.business || {
+        name: 'Timber & Furniture ERP',
+        address: '',
+        email: '',
+        phone: '',
+        logo: ''
+      };
+    }
 
     // 5. Fetch transactions/payments
     const { data: transactionsData } = await tenantClient

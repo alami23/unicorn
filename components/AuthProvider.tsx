@@ -314,11 +314,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (loading || !isSupabaseConfigured) return;
 
-    const isAuthPage = pathname === '/login' || pathname === '/signup';
+    const isPublicPage = pathname === '/login' || pathname === '/signup' || pathname === '/preview' || pathname?.startsWith('/preview');
 
-    if (!user && !isAuthPage) {
+    if (!user && !isPublicPage) {
       router.replace('/login');
-    } else if (user && isAuthPage) {
+    } else if (user && (pathname === '/login' || pathname === '/signup')) {
       router.replace('/');
     }
   }, [user, loading, pathname, router]);
@@ -423,6 +423,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
+  const isPublicPage = isAuthPage || pathname === '/preview' || pathname?.startsWith('/preview');
 
   let renderContent: React.ReactNode = null;
 
@@ -434,7 +435,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         </div>
       </div>
     );
-  } else if (!user && !isAuthPage) {
+  } else if (!user && !isPublicPage) {
     // Unauthenticated user trying to access a protected route
     // Show loading spinner while redirecting to /login (prevents dashboard flash)
     renderContent = (
@@ -457,7 +458,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   } else {
-    // Authenticated on protected route OR unauthenticated on auth page
+    // Authenticated on protected route OR on public page (e.g. /preview, /login, /signup)
     renderContent = children;
   }
 
