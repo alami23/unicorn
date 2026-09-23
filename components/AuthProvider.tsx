@@ -318,6 +318,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (!user && !isAuthPage) {
       router.replace('/login');
+    } else if (user && isAuthPage) {
+      router.replace('/');
     }
   }, [user, loading, pathname, router]);
 

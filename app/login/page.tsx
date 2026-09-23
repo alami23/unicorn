@@ -325,10 +325,7 @@ export default function LoginPage() {
               transition={{ duration: 0.2 }}
             >
               <div className="flex flex-col items-center mb-8">
-                <div 
-                  style={{ backgroundColor: '#f63939' }}
-                  className="w-16 h-16 bg-[#f63939] rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-[#f63939]/20"
-                >
+                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/20">
                   <LogIn className="w-8 h-8 text-white" />
                 </div>
                 <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-display">Welcome Back</h1>

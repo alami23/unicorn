@@ -33,7 +33,7 @@ import { sendSMS } from '@/lib/sms'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { addNotification } from '@/lib/notifications'
-import { getDisplayInvoiceId, ensureInvoiceSecretToken, getInvoiceDateString, generatePublicInvoiceUrl } from '@/lib/invoice'
+import { getDisplayInvoiceId } from '@/lib/invoice'
 import InvoiceModal from '@/components/InvoiceModal'
 import CreateInvoiceModal from '@/components/CreateInvoiceModal'
 import ReceivePaymentModal from '@/components/ReceivePaymentModal'
@@ -225,23 +225,19 @@ function InvoicePageContent() {
 
       if (inv.id && !String(inv.id).startsWith('loc-')) {
         promises.push(
-          Promise.resolve(
-            supabase
-              .from('furniture_invoices')
-              .update(updatePayload as any)
-              .eq('id', inv.id)
-          )
+          supabase
+            .from('furniture_invoices')
+            .update(updatePayload as any)
+            .eq('id', inv.id)
         )
       }
 
       if (displayId) {
         promises.push(
-          Promise.resolve(
-            supabase
-              .from('furniture_invoices')
-              .update(updatePayload as any)
-              .eq('invoice_number', displayId)
-          )
+          supabase
+            .from('furniture_invoices')
+            .update(updatePayload as any)
+            .eq('invoice_number', displayId)
         )
       }
 
@@ -542,11 +538,10 @@ function InvoicePageContent() {
         if (cust?.phone) phoneToSend = cust.phone
       }
 
-      // Ensure 8-character security code is generated and saved in DB
-      const secretToken = await ensureInvoiceSecretToken(inv.id, inv.type || inv.originalType, inv.secret_token)
-      const invoiceDate = getInvoiceDateString(inv.date || inv.created_at)
-      const origin = typeof window !== 'undefined' ? window.location.origin : ''
-      const invoiceUrl = generatePublicInvoiceUrl(inv.id, invoiceDate, secretToken, origin)
+      if (!phoneToSend) {
+        toast.error('No phone number available for customer')
+        return
+      }
 
       const { data: settingsData } = await supabase
         .from('app_settings')
@@ -563,19 +558,11 @@ function InvoicePageContent() {
         } catch (e) {}
       }
       const businessName = (currentUserId && settings?.business_by_user?.[currentUserId]?.name) || settings?.business?.name || 'Store'
-      const msg = `Dear ${inv.customer}, here is your Invoice ${getDisplayInvoiceId(inv.id)} from ${businessName}. Total: ৳${Math.round(inv.amount).toLocaleString()}, Due: ৳${Math.round(inv.due).toLocaleString()}. View & Download: ${invoiceUrl}`
+      const invoiceUrl = `${window.location.origin}/invoice/view/${encodeURIComponent(inv.id)}`
+      const msg = `Dear ${inv.customer}, here is your Invoice ${getDisplayInvoiceId(inv.id)} from ${businessName}. Total: ৳${Math.round(inv.amount).toLocaleString()}, Due: ৳${Math.round(inv.due).toLocaleString()}. View: ${invoiceUrl}`
 
-      if (phoneToSend) {
-        await sendSMS(phoneToSend, msg)
-        toast.success(`Invoice sent via SMS to ${phoneToSend}`)
-      } else {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          await navigator.clipboard.writeText(invoiceUrl)
-          toast.info('No phone number found. Verified invoice URL copied to clipboard!')
-        } else {
-          toast.info('Verified invoice URL generated: ' + invoiceUrl)
-        }
-      }
+      await sendSMS(phoneToSend, msg)
+      toast.success('Invoice sent via SMS')
     } catch (err) {
       console.error('Failed to send invoice SMS:', err)
       toast.error('Failed to send SMS')
@@ -1206,30 +1193,10 @@ function InvoicePageContent() {
                         </div>
                       </div>
 
-                      {/* Corner element for Created By & Delivery Status in mobile and tablet views */}
-                      <div className="shrink-0 flex flex-col items-end gap-1.5">
-                        <div className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 text-slate-600 dark:text-slate-300" title={`Created by: ${inv.createdBy || 'Unassigned'}`}>
-                          <User size={11} className="text-slate-400 shrink-0" />
-                          <span className="font-medium truncate max-w-[85px] sm:max-w-[120px]">{inv.createdBy || 'Unassigned'}</span>
-                        </div>
-
-                        {inv.type === 'Furniture' && (
-                          inv.deliveryStatus === 'Delivered' ? (
-                            <span 
-                              title="Delivered"
-                              className="w-7 h-7 rounded-full flex items-center justify-center transition-colors bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                            >
-                              <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
-                            </span>
-                          ) : (
-                            <span 
-                              title="Pending Delivery"
-                              className="w-7 h-7 rounded-full flex items-center justify-center transition-colors bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                            >
-                              <Truck size={14} className="text-amber-600 dark:text-amber-400" />
-                            </span>
-                          )
-                        )}
+                      {/* Corner element for Created By in mobile and tablet views */}
+                      <div className="shrink-0 flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 text-slate-600 dark:text-slate-300" title={`Created by: ${inv.createdBy || 'Unassigned'}`}>
+                        <User size={11} className="text-slate-400 shrink-0" />
+                        <span className="font-medium truncate max-w-[85px] sm:max-w-[120px]">{inv.createdBy || 'Unassigned'}</span>
                       </div>
                     </div>
                     
@@ -1244,8 +1211,29 @@ function InvoicePageContent() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <button onClick={() => handleOpenPayment(inv)} disabled={isFetchingItems} className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-emerald-600 dark:text-emerald-400 disabled:opacity-50 hover:bg-emerald-100 transition-colors" title="Receive Payment"><DollarSign size={16} /></button>
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      {/* Delivery Status Badge at bottom-left corner */}
+                      <div className="flex items-center min-w-0">
+                        {inv.type === 'Furniture' && (
+                          inv.deliveryStatus === 'Delivered' ? (
+                            <span className="text-[10px] font-semibold px-2 py-1 rounded-md flex items-center gap-1 transition-colors shrink-0 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                              <CheckCircle2 size={11} className="text-emerald-600 dark:text-emerald-400" />
+                              Delivered
+                            </span>
+                          ) : (
+                            <span 
+                              title="Pending Delivery"
+                              className="w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                            >
+                              <Truck size={15} className="text-amber-600 dark:text-amber-400" />
+                            </span>
+                          )
+                        )}
+                      </div>
+
+                      {/* Action buttons with 'Receive Payment' placed directly to the right of bottom-left delivery badge */}
+                      <div className="flex items-center justify-end gap-2 shrink-0">
+                        <button onClick={() => handleOpenPayment(inv)} disabled={isFetchingItems} className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-emerald-600 dark:text-emerald-400 disabled:opacity-50 hover:bg-emerald-100 transition-colors" title="Receive Payment"><DollarSign size={16} /></button>
                         {Number(inv.due || 0) > 0 && (
                           <button 
                             onClick={() => handleSendDueReminder(inv)} 
@@ -1356,7 +1344,8 @@ function InvoicePageContent() {
                       </DropdownMenu>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
               </div>
             </>
           )}

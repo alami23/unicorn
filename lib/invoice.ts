@@ -1,104 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
 /**
- * Generates an 8-character random alphanumeric secret token
- */
-export function generateSecretToken(length: number = 8): string {
-  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
-  let token = '';
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    const bytes = new Uint8Array(length);
-    crypto.getRandomValues(bytes);
-    for (let i = 0; i < length; i++) {
-      token += chars[bytes[i] % chars.length];
-    }
-  } else {
-    for (let i = 0; i < length; i++) {
-      token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-  }
-  return token;
-}
-
-/**
- * Formats any date or ISO string into standard YYYY-MM-DD
- */
-export function getInvoiceDateString(dateVal?: string | Date | null): string {
-  if (!dateVal) {
-    return new Date().toISOString().split('T')[0];
-  }
-  try {
-    const d = new Date(dateVal);
-    if (isNaN(d.getTime())) {
-      const match = String(dateVal).match(/\d{4}-\d{2}-\d{2}/);
-      if (match) return match[0];
-      return new Date().toISOString().split('T')[0];
-    }
-    return d.toISOString().split('T')[0];
-  } catch {
-    return new Date().toISOString().split('T')[0];
-  }
-}
-
-/**
- * Generates the secure public invoice view URL
- */
-export function generatePublicInvoiceUrl(
-  invoiceId: string,
-  invoiceDate: string,
-  secretToken: string,
-  origin?: string
-): string {
-  const base = origin || (typeof window !== 'undefined' ? window.location.origin : '');
-  const cleanId = encodeURIComponent(invoiceId);
-  const cleanDate = encodeURIComponent(invoiceDate);
-  const cleanCode = encodeURIComponent(secretToken);
-  return `${base}/invoice/view?id=${cleanId}&date=${cleanDate}&code=${cleanCode}`;
-}
-
-/**
- * Ensures an invoice in Supabase has a valid 8-character secret_token.
- * If missing, generates one and saves to the database.
- */
-export async function ensureInvoiceSecretToken(
-  invoiceId: string,
-  type?: string,
-  existingToken?: string | null
-): Promise<string> {
-  if (existingToken && existingToken.length === 8) {
-    return existingToken;
-  }
-
-  const isWood = type?.toLowerCase() === 'wood' || 
-                 type?.toLowerCase() === 'solo_wood' || 
-                 invoiceId.includes('-W-');
-  const tableName = isWood ? 'wood_invoices' : 'furniture_invoices';
-
-  try {
-    const { data: inv } = await supabase
-      .from(tableName)
-      .select('secret_token, created_at')
-      .eq('id', invoiceId)
-      .maybeSingle();
-
-    if (inv?.secret_token && inv.secret_token.length === 8) {
-      return inv.secret_token;
-    }
-
-    const newToken = generateSecretToken(8);
-    await supabase
-      .from(tableName)
-      .update({ secret_token: newToken })
-      .eq('id', invoiceId);
-
-    return newToken;
-  } catch (err) {
-    console.error('Error ensuring invoice secret token:', err);
-    return generateSecretToken(8);
-  }
-}
-
-/**
  * Generates an invoice ID following the format:
  * - WOOD: #INV-W-260801
  * - FURNITURE: #INV-F-260801
@@ -193,4 +95,3 @@ export function getDisplayInvoiceId(id: string | null | undefined): string {
   }
   return cleanId;
 }
-

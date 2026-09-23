@@ -51,7 +51,7 @@ import { getDisplayInvoiceId } from '@/lib/invoice'
 import { toast } from 'sonner'
 
 const stats = [
-  { label: 'Total Sales', value: '৳0', change: '+0%', trend: 'up', icon: DollarSign, color: 'bg-[#fe9a58]' },
+  { label: 'Total Sales', value: '৳0', change: '+0%', trend: 'up', icon: DollarSign, color: 'bg-[#fe9a11]' },
   { label: 'Total Purchases', value: '৳0', change: '+0%', trend: 'up', icon: ShoppingBag, color: 'bg-slate-800' },
   { label: 'Total Customers', value: '0', change: '+0%', trend: 'up', icon: Users, color: 'bg-indigo-500' },
   { label: 'Due Collection', value: '৳0', change: '+0%', trend: 'down', icon: AlertCircle, color: 'bg-rose-500' },
@@ -395,7 +395,7 @@ function DashboardContent() {
       const totalPurchases = bills?.reduce((acc, current) => acc + Number(current.amount || 0), 0) || 0
 
       setLiveStats([
-        { label: 'Total Sales', value: `৳${totalSales.toLocaleString()}`, change: '+0%', trend: 'up', icon: DollarSign, color: 'bg-[#fe9a58]' },
+        { label: 'Total Sales', value: `৳${totalSales.toLocaleString()}`, change: '+0%', trend: 'up', icon: DollarSign, color: 'bg-[#fe9a11]' },
         { label: 'Total Purchases', value: `৳${totalPurchases.toLocaleString()}`, change: '+0%', trend: 'up', icon: ShoppingBag, color: 'bg-slate-800' },
         { label: 'Total Customers', value: (customerCount || 0).toLocaleString(), change: '+0%', trend: 'up', icon: Users, color: 'bg-indigo-500' },
         { label: 'Due Collection', value: `৳${totalDue.toLocaleString()}`, change: '+0%', trend: 'down', icon: AlertCircle, color: 'bg-rose-500' },

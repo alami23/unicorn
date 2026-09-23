@@ -12,7 +12,7 @@ import AlertPopup from '@/components/AlertPopup'
 import { sendSMS } from '@/lib/sms'
 import { supabase, getTenantId, getCurrentUser } from '@/lib/supabase'
 import { addNotification } from '@/lib/notifications'
-import { generateInvoiceId, getDisplayInvoiceId, generateSecretToken, generatePublicInvoiceUrl, getInvoiceDateString } from '@/lib/invoice'
+import { generateInvoiceId, getDisplayInvoiceId } from '@/lib/invoice'
 import { recordInvoiceCreator } from '@/lib/invoiceCache'
 import { toast } from 'sonner'
 
@@ -275,8 +275,6 @@ function POSFurnitureContent() {
       const currentUser = getCurrentUser();
       const creatorName = currentUser?.name || currentUser?.username || 'Staff';
       const creatorId = currentUser?.id || currentUser?.username || null;
-      const secretToken = generateSecretToken(8);
-      const invoiceDate = getInvoiceDateString(new Date());
 
       while (!insertSuccess && attempts < 50) {
         const invoicePayload: any = {
@@ -298,16 +296,14 @@ function POSFurnitureContent() {
           delivery_date: deliveryDate,
           delivery_status: 'Pending',
           created_by: creatorId,
-          created_by_name: creatorName,
-          secret_token: secretToken
+          created_by_name: creatorName
         };
 
         let { error: invError } = await supabase.from('furniture_invoices').insert([invoicePayload]);
 
-        if (invError && (invError.code === 'PGRST204' || invError.message?.includes('schema cache') || invError.message?.includes('created_by') || invError.message?.includes('secret_token'))) {
+        if (invError && (invError.code === 'PGRST204' || invError.message?.includes('schema cache') || invError.message?.includes('created_by'))) {
           delete invoicePayload.created_by;
           delete invoicePayload.created_by_name;
-          delete invoicePayload.secret_token;
           const retry = await supabase.from('furniture_invoices').insert([invoicePayload]);
           invError = retry.error;
         }
@@ -373,9 +369,7 @@ function POSFurnitureContent() {
 
       // 5. Send SMS
       if (selectedCustomer !== 'Walk-in Customer' && customerData?.phone) {
-        const origin = typeof window !== 'undefined' ? window.location.origin : ''
-        const invoiceUrl = generatePublicInvoiceUrl(finalInvoiceId, invoiceDate, secretToken, origin)
-        const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceId)} has been confirmed. Total: ৳${currentTotal.toLocaleString()}, Paid: ৳${paidAmount.toLocaleString()}. View invoice: ${invoiceUrl}`
+        const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceId)} has been confirmed. Total: ৳${currentTotal.toLocaleString()}, Paid: ৳${paidAmount.toLocaleString()}. Thank you for choosing FurniTrack!`
         sendSMS(customerData.phone, smsMessage).catch(err => console.error('SMS failed:', err))
       }
 
