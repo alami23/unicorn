@@ -119,13 +119,6 @@ export default function ShortLinkRedirectPage() {
                 <FileText className="w-4 h-4" />
                 <span>Go to Public Invoice Search</span>
               </Link>
-              <Link
-                href="/login"
-                className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <span>Staff Sign In</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
             </div>
           </div>
         )}
