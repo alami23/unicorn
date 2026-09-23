@@ -289,6 +289,22 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative transition-colors duration-300">
+      {/* Top Left Buttons */}
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 flex items-center gap-2.5">
+        <button
+          type="button"
+          className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
+        >
+          Admin
+        </button>
+        <button
+          type="button"
+          className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
+        >
+          Preview
+        </button>
+      </div>
+
       {/* Light Mode / Dark Mode Switcher */}
       <div id="login-theme-toggle-container" className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20">
         <div id="login-theme-toggle-group">
