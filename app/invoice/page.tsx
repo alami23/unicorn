@@ -33,7 +33,7 @@ import { sendSMS } from '@/lib/sms'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { addNotification } from '@/lib/notifications'
-import { getDisplayInvoiceId } from '@/lib/invoice'
+import { getDisplayInvoiceId, ensureInvoiceSecretToken, getInvoiceDateString, generatePublicInvoiceUrl } from '@/lib/invoice'
 import InvoiceModal from '@/components/InvoiceModal'
 import CreateInvoiceModal from '@/components/CreateInvoiceModal'
 import ReceivePaymentModal from '@/components/ReceivePaymentModal'
@@ -542,10 +542,11 @@ function InvoicePageContent() {
         if (cust?.phone) phoneToSend = cust.phone
       }
 
-      if (!phoneToSend) {
-        toast.error('No phone number available for customer')
-        return
-      }
+      // Ensure 8-character security code is generated and saved in DB
+      const secretToken = await ensureInvoiceSecretToken(inv.id, inv.type || inv.originalType, inv.secret_token)
+      const invoiceDate = getInvoiceDateString(inv.date || inv.created_at)
+      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const invoiceUrl = generatePublicInvoiceUrl(inv.id, invoiceDate, secretToken, origin)
 
       const { data: settingsData } = await supabase
         .from('app_settings')
@@ -562,11 +563,19 @@ function InvoicePageContent() {
         } catch (e) {}
       }
       const businessName = (currentUserId && settings?.business_by_user?.[currentUserId]?.name) || settings?.business?.name || 'Store'
-      const invoiceUrl = `${window.location.origin}/invoice/view/${encodeURIComponent(inv.id)}`
-      const msg = `Dear ${inv.customer}, here is your Invoice ${getDisplayInvoiceId(inv.id)} from ${businessName}. Total: ৳${Math.round(inv.amount).toLocaleString()}, Due: ৳${Math.round(inv.due).toLocaleString()}. View: ${invoiceUrl}`
+      const msg = `Dear ${inv.customer}, here is your Invoice ${getDisplayInvoiceId(inv.id)} from ${businessName}. Total: ৳${Math.round(inv.amount).toLocaleString()}, Due: ৳${Math.round(inv.due).toLocaleString()}. View & Download: ${invoiceUrl}`
 
-      await sendSMS(phoneToSend, msg)
-      toast.success('Invoice sent via SMS')
+      if (phoneToSend) {
+        await sendSMS(phoneToSend, msg)
+        toast.success(`Invoice sent via SMS to ${phoneToSend}`)
+      } else {
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          await navigator.clipboard.writeText(invoiceUrl)
+          toast.info('No phone number found. Verified invoice URL copied to clipboard!')
+        } else {
+          toast.info('Verified invoice URL generated: ' + invoiceUrl)
+        }
+      }
     } catch (err) {
       console.error('Failed to send invoice SMS:', err)
       toast.error('Failed to send SMS')

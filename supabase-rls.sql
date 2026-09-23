@@ -378,17 +378,80 @@ DROP POLICY IF EXISTS "Tenant isolation for furniture_category" ON public.furnit
 DROP POLICY IF EXISTS "Tenant isolation for make_excel_file" ON public.make_excel_file;
 DROP POLICY IF EXISTS "Tenant isolation for app_settings" ON public.app_settings;
 
--- 7. Create Enforced Multi-Tenancy RLS Policies
-CREATE POLICY "Tenant isolation for customer" ON public.customer FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
+-- 7. Create Enforced Multi-Tenancy RLS Policies with Public Share Preview Support
+CREATE POLICY "Tenant isolation for customer" ON public.customer FOR ALL TO public 
+USING (
+  (org_id::text = public.current_org_id()) 
+  OR EXISTS (
+    SELECT 1 FROM public.furniture_invoices fi 
+    WHERE (fi.customer_id = customer.id OR fi.customer_name = customer.name) 
+    AND fi.share_token IS NOT NULL
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.wood_invoices wi 
+    WHERE (wi.customer_id = customer.id OR wi.customer_name = customer.name) 
+    AND wi.share_token IS NOT NULL
+  )
+) 
+WITH CHECK (org_id::text = public.current_org_id());
+
 CREATE POLICY "Tenant isolation for staff" ON public.staff FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for bills" ON public.bills FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for furniture_inventory" ON public.furniture_inventory FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for wood_inventory" ON public.wood_inventory FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
-CREATE POLICY "Tenant isolation for furniture_invoices" ON public.furniture_invoices FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
-CREATE POLICY "Tenant isolation for wood_invoices" ON public.wood_invoices FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
-CREATE POLICY "Tenant isolation for furniture_invoice_items" ON public.furniture_invoice_items FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
-CREATE POLICY "Tenant isolation for wood_invoice_items" ON public.wood_invoice_items FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
-CREATE POLICY "Tenant isolation for transactions" ON public.transactions FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
+
+CREATE POLICY "Tenant isolation for furniture_invoices" ON public.furniture_invoices FOR ALL TO public 
+USING (
+  (org_id::text = public.current_org_id()) 
+  OR (share_token IS NOT NULL AND length(share_token) >= 6)
+) 
+WITH CHECK (org_id::text = public.current_org_id());
+
+CREATE POLICY "Tenant isolation for wood_invoices" ON public.wood_invoices FOR ALL TO public 
+USING (
+  (org_id::text = public.current_org_id()) 
+  OR (share_token IS NOT NULL AND length(share_token) >= 6)
+) 
+WITH CHECK (org_id::text = public.current_org_id());
+
+CREATE POLICY "Tenant isolation for furniture_invoice_items" ON public.furniture_invoice_items FOR ALL TO public 
+USING (
+  (org_id::text = public.current_org_id()) 
+  OR EXISTS (
+    SELECT 1 FROM public.furniture_invoices fi 
+    WHERE fi.id = furniture_invoice_items.invoice_id 
+    AND fi.share_token IS NOT NULL
+  )
+) 
+WITH CHECK (org_id::text = public.current_org_id());
+
+CREATE POLICY "Tenant isolation for wood_invoice_items" ON public.wood_invoice_items FOR ALL TO public 
+USING (
+  (org_id::text = public.current_org_id()) 
+  OR EXISTS (
+    SELECT 1 FROM public.wood_invoices wi 
+    WHERE wi.id = wood_invoice_items.invoice_id 
+    AND wi.share_token IS NOT NULL
+  )
+) 
+WITH CHECK (org_id::text = public.current_org_id());
+
+CREATE POLICY "Tenant isolation for transactions" ON public.transactions FOR ALL TO public 
+USING (
+  (org_id::text = public.current_org_id()) 
+  OR EXISTS (
+    SELECT 1 FROM public.furniture_invoices fi 
+    WHERE fi.id = transactions.ref 
+    AND fi.share_token IS NOT NULL
+  )
+  OR EXISTS (
+    SELECT 1 FROM public.wood_invoices wi 
+    WHERE wi.id = transactions.ref 
+    AND wi.share_token IS NOT NULL
+  )
+) 
+WITH CHECK (org_id::text = public.current_org_id());
+
 CREATE POLICY "Tenant isolation for wood_category" ON public.wood_category FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for wood_category_car" ON public.wood_category_car FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for wood_category_tag" ON public.wood_category_tag FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
@@ -468,8 +531,18 @@ CREATE POLICY "Restrict delete custom_users to super admin" ON public.custom_use
   public.current_user_role() = 'Super Admin'
 );
 
--- Migration commands for invoice creator columns
+-- Migration commands for invoice creator and share token columns
 ALTER TABLE public.furniture_invoices ADD COLUMN IF NOT EXISTS created_by TEXT;
 ALTER TABLE public.furniture_invoices ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+ALTER TABLE public.furniture_invoices ADD COLUMN IF NOT EXISTS share_token VARCHAR(8);
+
 ALTER TABLE public.wood_invoices ADD COLUMN IF NOT EXISTS created_by TEXT;
 ALTER TABLE public.wood_invoices ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+ALTER TABLE public.wood_invoices ADD COLUMN IF NOT EXISTS share_token VARCHAR(8);
+
+-- Add unique constraints & indexes on share_token
+CREATE UNIQUE INDEX IF NOT EXISTS idx_furniture_invoices_share_token ON public.furniture_invoices (share_token) WHERE share_token IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wood_invoices_share_token ON public.wood_invoices (share_token) WHERE share_token IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_furniture_invoices_public_lookup ON public.furniture_invoices (invoice_number, share_token);
+CREATE INDEX IF NOT EXISTS idx_wood_invoices_public_lookup ON public.wood_invoices (invoice_number, share_token);
+

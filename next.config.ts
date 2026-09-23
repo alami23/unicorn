@@ -39,6 +39,26 @@ const nextConfig: NextConfig = {
   },
   output: 'standalone',
   transpilePackages: ['motion'],
+  async rewrites() {
+    return [
+      {
+        source: '/i/:invoice_number/:invoice_date/:secret_token',
+        destination: '/:invoice_number/:invoice_date/:secret_token',
+      },
+      {
+        source: '/view/:invoice_number/:invoice_date/:secret_token',
+        destination: '/:invoice_number/:invoice_date/:secret_token',
+      },
+      {
+        source: '/share/:invoice_number/:invoice_date/:secret_token',
+        destination: '/:invoice_number/:invoice_date/:secret_token',
+      },
+      {
+        source: '/invoice/:invoice_number/:invoice_date/:secret_token',
+        destination: '/:invoice_number/:invoice_date/:secret_token',
+      },
+    ];
+  },
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
     // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

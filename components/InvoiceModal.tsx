@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { X, Printer, FileText, Layout, Smartphone, Package, User } from 'lucide-react'
+import { X, Printer, FileText, Layout, Smartphone, Package, User, Send, Link2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import InvoicePrint from './InvoicePrint'
 import { supabase } from '@/lib/supabase'
-import { getDisplayInvoiceId } from '@/lib/invoice'
+import { getDisplayInvoiceId, ensureInvoiceSecretToken, getInvoiceDateString, generatePublicInvoiceUrl } from '@/lib/invoice'
+import { toast } from 'sonner'
 
 interface InvoiceModalProps {
   isOpen: boolean
@@ -351,6 +352,36 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     }
   }
 
+  const [copiedLink, setCopiedLink] = useState(false)
+
+  const handleCopyPublicLink = async () => {
+    if (!invoice?.id) return
+    try {
+      const isWood = invoice.originalType?.toLowerCase() === 'wood' || 
+                     invoice.originalType?.toLowerCase() === 'solo_wood' || 
+                     invoice.type?.toLowerCase() === 'wood' || 
+                     invoice.type?.toLowerCase() === 'solo_wood' ||
+                     invoice.id?.includes('-W-')
+      const invType = isWood ? 'wood' : 'furniture'
+      const secretToken = await ensureInvoiceSecretToken(invoice.id, invType, invoice.secret_token)
+      const invDate = getInvoiceDateString(invoice.date || invoice.created_at)
+      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const url = generatePublicInvoiceUrl(invoice.id, invDate, secretToken, origin)
+
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url)
+        setCopiedLink(true)
+        toast.success('Secure verified invoice link copied to clipboard!')
+        setTimeout(() => setCopiedLink(false), 2500)
+      } else {
+        toast.info(url)
+      }
+    } catch (err) {
+      console.error('Failed to generate link:', err)
+      toast.error('Failed to generate verified link')
+    }
+  }
+
   if (!invoice) return null
 
   return (
@@ -458,6 +489,19 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                     Auto Fit
                   </button>
                 </div>
+                <button 
+                  onClick={handleCopyPublicLink}
+                  className={cn(
+                    "flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-bold transition-all border",
+                    copiedLink 
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20" 
+                      : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  )}
+                  title="Copy Secure Public Link"
+                >
+                  {copiedLink ? <Check size={16} /> : <Link2 size={16} className="text-blue-500" />}
+                  {copiedLink ? 'Link Copied!' : 'Copy Link'}
+                </button>
                 <button 
                   onClick={handlePrint}
                   className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-2.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl font-bold hover:bg-slate-800 dark:hover:bg-white transition-all shadow-lg shadow-slate-900/20"
