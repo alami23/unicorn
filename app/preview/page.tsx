@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import {
   FileCheck,
   ShieldCheck,
-  Download,
+  Printer,
   ZoomIn,
   ZoomOut,
   RotateCcw,
@@ -50,14 +50,13 @@ function PublicInvoicePreviewContent() {
   const [verifiedInvoice, setVerifiedInvoice] = useState<any | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
 
-  // Viewer options - rendered exclusively in A4 format
-  const selectedSize = 'A4' as const
+  // Viewer options
+  const [selectedSize, setSelectedSize] = useState<'A4' | 'A5' | 'POS' | 'Chalan'>('A4')
   const [zoom, setZoom] = useState(0.85)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   const printIframeRef = useRef<HTMLIFrameElement | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
-  const viewportContainerRef = useRef<HTMLDivElement>(null)
   const autoValidatedRef = useRef(false)
 
   // Core validation function against the database
@@ -215,32 +214,8 @@ function PublicInvoicePreviewContent() {
     }
   }
 
-  // Responsive Auto-Fit scale calculation for mobile, tablet, and desktop
-  const handleAutoFit = useCallback(() => {
-    if (!viewportContainerRef.current) return
-    const containerWidth = viewportContainerRef.current.clientWidth
-    const padding = containerWidth < 640 ? 16 : 48
-    const availableWidth = Math.max(280, containerWidth - padding)
-    // A4 width is 794px
-    const fitRatio = Number((availableWidth / 794).toFixed(2))
-    if (containerWidth < 850) {
-      // Scale down nicely on mobile / tablet
-      setZoom(Math.max(0.35, Math.min(1.0, fitRatio)))
-    } else {
-      setZoom(0.85)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (verifiedInvoice) {
-      handleAutoFit()
-      window.addEventListener('resize', handleAutoFit)
-      return () => window.removeEventListener('resize', handleAutoFit)
-    }
-  }, [verifiedInvoice, handleAutoFit])
-
-  // Direct Download / Save A4 PDF Handler
-  const handleDownloadPdf = useCallback(() => {
+  // Print / Save PDF Handler
+  const handlePrint = useCallback(() => {
     if (!verifiedInvoice) return
 
     const content = previewRef.current
@@ -252,8 +227,8 @@ function PublicInvoicePreviewContent() {
       iframe.style.position = 'fixed'
       iframe.style.right = '0'
       iframe.style.bottom = '0'
-      iframe.style.width = '1024px'
-      iframe.style.height = '768px'
+      iframe.style.width = '0'
+      iframe.style.height = '0'
       iframe.style.border = '0'
       iframe.style.visibility = 'hidden'
       document.body.appendChild(iframe)
@@ -277,11 +252,12 @@ function PublicInvoicePreviewContent() {
         }
       })
     } catch (e) {
-      console.error('Error copying styles for PDF download:', e)
+      console.error('Error copying styles for printing:', e)
     }
 
     const displayId = getDisplayInvoiceId(verifiedInvoice.id) || 'Invoice'
     const printTitle = `Invoice-${displayId}`
+    const dynamicHeight = content.offsetHeight + 20
 
     doc.open()
     doc.write(`
@@ -294,14 +270,14 @@ function PublicInvoicePreviewContent() {
             ${styles}
             @media print {
               @page {
-                size: A4 portrait;
+                size: ${selectedSize === 'POS' ? `80mm ${dynamicHeight}px` : (selectedSize === 'A5' ? 'A5' : 'A4')};
                 margin: 0;
               }
               body { 
                 margin: 0 !important; 
                 padding: 0 !important;
                 background: white !important;
-                width: 100% !important;
+                width: ${selectedSize === 'POS' ? '80mm' : 'auto'} !important;
               }
               * {
                 -webkit-print-color-adjust: exact !important;
@@ -312,16 +288,11 @@ function PublicInvoicePreviewContent() {
                 box-shadow: none !important; 
                 margin: 0 !important; 
                 border: none !important;
-                width: 100% !important;
+                width: ${selectedSize === 'POS' ? '80mm' : '100%'} !important;
                 max-width: none !important;
                 transform: none !important;
+                padding: ${selectedSize === 'POS' ? '0' : 'inherited'} !important;
               }
-              tr, .break-inside-avoid {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-              thead { display: table-header-group; }
-              tfoot { display: table-footer-group; }
             }
           </style>
         </head>
@@ -334,46 +305,54 @@ function PublicInvoicePreviewContent() {
     `)
     doc.close()
 
-    toast.info('Preparing PDF download...')
     setTimeout(() => {
-      try {
-        iframe?.contentWindow?.focus()
-        iframe?.contentWindow?.print()
-      } catch (err) {
-        window.print()
-      }
-    }, 400)
-  }, [verifiedInvoice])
+      iframe?.contentWindow?.focus()
+      iframe?.contentWindow?.print()
+    }, 500)
+  }, [verifiedInvoice, selectedSize])
 
   const handleReset = () => {
     setVerifiedInvoice(null)
     setError(null)
   }
 
+  // Determine width based on paper format
+  const originalWidth = selectedSize === 'POS' ? 302 : (selectedSize === 'A5' ? 559 : 794)
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans transition-colors duration-300">
       {/* Top Navigation Bar */}
       <header className="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 font-bold text-base sm:text-lg shrink-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 font-bold text-lg">
               TF
             </div>
-            <div className="min-w-0">
-              <span className="font-bold text-sm sm:text-base md:text-lg tracking-tight block leading-tight text-white truncate">
+            <div>
+              <span className="font-bold text-base sm:text-lg tracking-tight block leading-tight text-white">
                 {verifiedInvoice?.business?.name || 'Timber & Furniture ERP'}
               </span>
-              <span className="text-[10px] sm:text-[11px] text-emerald-400 font-medium flex items-center gap-1 truncate">
-                <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+              <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
                 Official Public Document Portal
               </span>
             </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors flex items-center gap-1.5 border border-slate-800"
+            >
+              <span>Staff Login</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col items-center justify-center p-2 sm:p-6 lg:p-8">
+      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8">
         <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center">
           <AnimatePresence mode="wait">
             {/* 1. INITIAL LOADING SKELETON WHILE AUTO-VALIDATING */}
@@ -407,65 +386,84 @@ function PublicInvoicePreviewContent() {
                 exit={{ opacity: 0, y: 15 }}
                 transition={{ duration: 0.25 }}
                 className={cn(
-                  "w-full bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-800 flex flex-col transition-all duration-300 overflow-hidden",
-                  isFullscreen ? "fixed inset-1 sm:inset-4 z-50 max-w-none h-[calc(100dvh-8px)] sm:h-[calc(100vh-32px)]" : "max-w-5xl h-[calc(100dvh-5rem)] sm:h-[88vh]"
+                  "w-full bg-slate-900 rounded-3xl shadow-2xl border border-slate-800 flex flex-col transition-all duration-300 overflow-hidden",
+                  isFullscreen ? "fixed inset-2 sm:inset-4 z-50 max-w-none h-[calc(100vh-16px)] sm:h-[calc(100vh-32px)]" : "max-w-5xl h-[88vh]"
                 )}
               >
                 {/* Document Top Header & Controls Toolbar */}
-                <div className="px-3 py-2.5 sm:px-6 sm:py-3.5 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 shrink-0">
-                  {/* Left: Invoice Identity & Search Another */}
-                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
+                  {/* Left: Invoice Identity */}
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={handleReset}
-                      className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-slate-800 shrink-0"
+                      className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-slate-800"
                       title="Verify another document"
                     >
-                      <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <Search className="w-4 h-4" />
                       <span className="hidden sm:inline">Search Another</span>
                     </button>
 
-                    <div className="h-4 w-px bg-slate-800 hidden sm:block shrink-0" />
+                    <div className="h-4 w-px bg-slate-800 hidden sm:block" />
 
-                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-emerald-950/70 border border-emerald-800/80 text-emerald-400 text-[10px] sm:text-xs font-semibold shrink-0">
-                        <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                        <span className="hidden xs:inline">Verified</span>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-800/80 text-emerald-400 text-xs font-semibold">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Verified from Database
                       </span>
-                      <span className="text-xs sm:text-sm font-bold text-white font-mono truncate">
+                      <span className="text-xs sm:text-sm font-bold text-white font-mono">
                         {getDisplayInvoiceId(verifiedInvoice.id)}
                       </span>
                     </div>
                   </div>
 
-                  {/* Right: Actions (Zoom, Share, Fullscreen, Direct Download PDF) */}
-                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  {/* Center: Format Switcher */}
+                  <div className="flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs font-semibold border border-slate-700/60">
+                    {(['A4', 'A5', 'POS', 'Chalan'] as const).map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setSelectedSize(size)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg transition-all cursor-pointer",
+                          selectedSize === size
+                            ? "bg-indigo-600 text-white shadow-sm font-bold"
+                            : "text-slate-400 hover:text-white"
+                        )}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Right: Actions (Zoom, Share, Print/Download) */}
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     {/* Zoom Controller */}
                     <div className="flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs border border-slate-700/60">
                       <button
                         type="button"
-                        onClick={() => setZoom(z => Math.max(0.35, Number((z - 0.1).toFixed(2))))}
-                        className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer"
+                        onClick={() => setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))}
+                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer"
                         title="Zoom Out"
                       >
                         <ZoomOut className="w-3.5 h-3.5" />
                       </button>
-                      <span className="px-1.5 sm:px-2 font-mono text-[10px] sm:text-[11px] text-slate-300 min-w-[34px] sm:min-w-[42px] text-center">
+                      <span className="px-2 font-mono text-[11px] text-slate-300 min-w-[42px] text-center">
                         {Math.round(zoom * 100)}%
                       </span>
                       <button
                         type="button"
                         onClick={() => setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))}
-                        className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer"
+                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer"
                         title="Zoom In"
                       >
                         <ZoomIn className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
-                        onClick={handleAutoFit}
-                        className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer"
-                        title="Fit to Screen"
+                        onClick={() => setZoom(0.85)}
+                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer"
+                        title="Reset Zoom"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
@@ -475,53 +473,49 @@ function PublicInvoicePreviewContent() {
                     <button
                       type="button"
                       onClick={handleCopyShareLink}
-                      className="p-1.5 sm:p-2 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="p-2 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                       title="Copy Public Link"
                     >
-                      {copiedLink ? <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                      {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
                     </button>
 
                     {/* Fullscreen Toggle */}
                     <button
                       type="button"
                       onClick={() => setIsFullscreen(f => !f)}
-                      className="p-1.5 sm:p-2 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors hidden sm:flex"
+                      className="p-2 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
                       title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
                     >
-                      {isFullscreen ? <Minimize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                      {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                     </button>
 
-                    {/* Direct Download PDF Button */}
+                    {/* Print / Download Button */}
                     <button
                       type="button"
-                      onClick={handleDownloadPdf}
-                      className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/25 text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 transition-all active:scale-95 cursor-pointer shrink-0"
-                      title="Download PDF"
+                      onClick={handlePrint}
+                      className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/25 text-xs sm:text-sm flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
                     >
-                      <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      <span>Download PDF</span>
+                      <Printer className="w-4 h-4" />
+                      <span>Download / Print PDF</span>
                     </button>
                   </div>
                 </div>
 
                 {/* PDF Document Viewport Area */}
-                <div
-                  ref={viewportContainerRef}
-                  className="flex-1 overflow-auto bg-slate-950/80 p-2 sm:p-6 lg:p-8 flex justify-center items-start"
-                >
+                <div className="flex-1 overflow-auto bg-slate-950/80 p-4 sm:p-8 flex justify-center items-start">
                   <div
                     style={{
-                      width: `${794 * zoom}px`,
-                      minHeight: `${1123 * zoom}px`,
+                      width: `${originalWidth * zoom}px`,
+                      minHeight: `${800 * zoom}px`,
                       position: 'relative'
                     }}
-                    className="transition-all duration-150 shadow-2xl rounded-sm bg-white shrink-0 mx-auto"
+                    className="transition-all duration-150 shadow-2xl rounded-sm bg-white"
                   >
                     <div
                       style={{
                         transform: `scale(${zoom})`,
                         transformOrigin: 'top left',
-                        width: '794px',
+                        width: `${originalWidth}px`,
                         position: 'absolute',
                         top: 0,
                         left: 0
@@ -536,12 +530,12 @@ function PublicInvoicePreviewContent() {
                 </div>
 
                 {/* Bottom Summary & Verification Footer Bar */}
-                <div className="px-4 py-2.5 sm:px-5 sm:py-3 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs">
+                <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                     <span>
                       Customer: <strong className="text-slate-200">{verifiedInvoice.customer}</strong>
                     </span>
-                    <span className="hidden xs:inline">•</span>
+                    <span>•</span>
                     <span>
                       Type: <strong className="text-slate-200">{verifiedInvoice.type}</strong>
                     </span>
@@ -560,9 +554,9 @@ function PublicInvoicePreviewContent() {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500">
-                    <Lock className="w-3 h-3 text-emerald-500 shrink-0" />
-                    <span>Official verified invoice (A4)</span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <Lock className="w-3 h-3 text-emerald-500" />
+                    <span>Official verified invoice record from database</span>
                   </div>
                 </div>
               </motion.div>
@@ -704,7 +698,7 @@ function PublicInvoicePreviewContent() {
                   </button>
 
                   {/* Helper Links */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-center text-xs">
+                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
                     <button
                       type="button"
                       onClick={handleFillSample}
@@ -713,6 +707,12 @@ function PublicInvoicePreviewContent() {
                       <Sparkles className="w-3.5 h-3.5" />
                       Fill Demo Sample (#INV-F-260901)
                     </button>
+                    <Link
+                      href="/login"
+                      className="text-slate-400 hover:text-slate-200"
+                    >
+                      Staff Sign In
+                    </Link>
                   </div>
                 </form>
               </motion.div>
