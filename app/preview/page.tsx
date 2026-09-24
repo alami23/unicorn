@@ -22,12 +22,12 @@ import {
   AlertCircle,
   Share2,
   Check,
-  ExternalLink,
-  ChevronRight,
   Lock,
-  Building2,
   CheckCircle2,
-  BadgeAlert
+  Package,
+  Layers,
+  Receipt,
+  ScanLine
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -52,12 +52,75 @@ function PublicInvoicePreviewContent() {
 
   // Viewer options
   const [selectedSize, setSelectedSize] = useState<'A4' | 'A5' | 'POS' | 'Chalan'>('A4')
-  const [zoom, setZoom] = useState(0.85)
+  const [zoom, setZoom] = useState(1.0)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [unscaledHeight, setUnscaledHeight] = useState<number>(1123)
 
   const printIframeRef = useRef<HTMLIFrameElement | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const autoValidatedRef = useRef(false)
+
+  // Measure content unscaled height dynamically to prevent truncation in A4 format
+  useEffect(() => {
+    if (!verifiedInvoice) return
+
+    const measure = () => {
+      if (previewRef.current) {
+        const height = previewRef.current.scrollHeight || previewRef.current.offsetHeight
+        if (height > 0) {
+          // Standard A4 aspect ratio height at 96 DPI is 1123px (297mm)
+          const standardA4Height = 1123
+          const minHeight = selectedSize === 'POS' ? 400 : (selectedSize === 'A5' ? 794 : standardA4Height)
+          setUnscaledHeight(Math.max(minHeight, height))
+        }
+      }
+    }
+
+    measure()
+    const t1 = setTimeout(measure, 100)
+    const t2 = setTimeout(measure, 300)
+    const t3 = setTimeout(measure, 600)
+
+    window.addEventListener('resize', measure)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
+      window.removeEventListener('resize', measure)
+    }
+  }, [verifiedInvoice, selectedSize])
+
+  // Auto-fit document to screen width
+  const handleAutoFit = useCallback(() => {
+    if (!containerRef.current) return
+    const containerWidth = containerRef.current.clientWidth - 48
+    let originalWidth = 794
+    if (selectedSize === 'A5') originalWidth = 559
+    else if (selectedSize === 'POS') originalWidth = 302
+
+    if (containerWidth > 0 && originalWidth > 0) {
+      const calculatedZoom = Math.min(1.15, Math.max(0.35, Number((containerWidth / originalWidth).toFixed(2))))
+      setZoom(calculatedZoom)
+    }
+  }, [selectedSize])
+
+  // Initialize responsive zoom when invoice loads
+  useEffect(() => {
+    if (!verifiedInvoice) return
+    if (typeof window !== 'undefined') {
+      const screenWidth = window.innerWidth
+      if (screenWidth < 640) {
+        // Mobile screens: fit standard A4 comfortably
+        const fitted = Math.min(0.9, Math.max(0.38, Number(((screenWidth - 32) / 794).toFixed(2))))
+        setZoom(fitted)
+      } else if (screenWidth < 1024) {
+        setZoom(0.85)
+      } else {
+        setZoom(1.0) // On desktop, show 100% crisp standard A4 document
+      }
+    }
+  }, [verifiedInvoice])
 
   // Core validation function against the database
   const validateInvoiceFromDatabase = useCallback(async (invNum: string, invDate: string, invCode: string) => {
@@ -127,7 +190,7 @@ function PublicInvoicePreviewContent() {
       let pInv = searchParams?.get('invoiceNumber') || searchParams?.get('inv') || searchParams?.get('invoice') || searchParams?.get('no') || ''
       let pDate = searchParams?.get('invoiceDate') || searchParams?.get('date') || ''
       let pCode = searchParams?.get('code') || searchParams?.get('c') || searchParams?.get('pin') || ''
-      let pSlug = searchParams?.get('s') || searchParams?.get('slug') || searchParams?.get('short') || ''
+      const pSlug = searchParams?.get('s') || searchParams?.get('slug') || searchParams?.get('short') || ''
 
       // Browser fallback in case searchParams wasn't immediately hydrated
       if ((!pInv || !pDate || !pCode || !pSlug) && typeof window !== 'undefined') {
@@ -135,7 +198,6 @@ function PublicInvoicePreviewContent() {
         if (!pInv) pInv = sp.get('invoiceNumber') || sp.get('inv') || sp.get('invoice') || sp.get('no') || ''
         if (!pDate) pDate = sp.get('invoiceDate') || sp.get('date') || ''
         if (!pCode) pCode = sp.get('code') || sp.get('c') || sp.get('pin') || ''
-        if (!pSlug) pSlug = sp.get('s') || sp.get('slug') || sp.get('short') || ''
       }
 
       // If a short slug was passed as ?s=slug, resolve it first
@@ -214,7 +276,7 @@ function PublicInvoicePreviewContent() {
     }
   }
 
-  // Print / Save PDF Handler
+  // Print / Save PDF Handler matching InvoiceModal layout
   const handlePrint = useCallback(() => {
     if (!verifiedInvoice) return
 
@@ -256,7 +318,7 @@ function PublicInvoicePreviewContent() {
     }
 
     const displayId = getDisplayInvoiceId(verifiedInvoice.id) || 'Invoice'
-    const printTitle = `Invoice-${displayId}`
+    const printTitle = `${selectedSize}-${displayId}`
     const dynamicHeight = content.offsetHeight + 20
 
     doc.open()
@@ -293,6 +355,12 @@ function PublicInvoicePreviewContent() {
                 transform: none !important;
                 padding: ${selectedSize === 'POS' ? '0' : 'inherited'} !important;
               }
+              tr, .break-inside-avoid {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              thead { display: table-header-group; }
+              tfoot { display: table-footer-group; }
             }
           </style>
         </head>
@@ -316,25 +384,30 @@ function PublicInvoicePreviewContent() {
     setError(null)
   }
 
-  // Determine width based on paper format
-  const originalWidth = selectedSize === 'POS' ? 302 : (selectedSize === 'A5' ? 559 : 794)
+  // Determine width based on paper format (standard A4: 794px)
+  let originalWidth = 794
+  if (selectedSize === 'A5') {
+    originalWidth = 559
+  } else if (selectedSize === 'POS') {
+    originalWidth = 302
+  }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans transition-colors duration-300">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       {/* Top Navigation Bar */}
-      <header className="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
+      <header className="w-full border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 font-bold text-lg">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 font-bold text-lg">
               TF
             </div>
             <div>
-              <span className="font-bold text-base sm:text-lg tracking-tight block leading-tight text-white">
+              <span className="font-bold text-base sm:text-lg tracking-tight block leading-tight text-slate-900 dark:text-white">
                 {verifiedInvoice?.business?.name || 'Timber & Furniture ERP'}
               </span>
-              <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                Official Public Document Portal
+                Verified Document Portal
               </span>
             </div>
           </div>
@@ -342,7 +415,7 @@ function PublicInvoicePreviewContent() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors flex items-center gap-1.5 border border-slate-800"
+              className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-800"
             >
               <span>Staff Login</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -352,8 +425,8 @@ function PublicInvoicePreviewContent() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8">
-        <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center">
+      <main className="flex-1 flex flex-col items-center justify-start p-2 sm:p-6 lg:p-8">
+        <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
           <AnimatePresence mode="wait">
             {/* 1. INITIAL LOADING SKELETON WHILE AUTO-VALIDATING */}
             {initialChecking && (
@@ -362,108 +435,153 @@ function PublicInvoicePreviewContent() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="w-full max-w-md bg-slate-900/90 rounded-3xl shadow-2xl p-8 border border-slate-800 flex flex-col items-center justify-center text-center my-12"
+                className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-8 border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center my-12"
               >
-                <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center mb-5 relative">
-                  <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                  <ShieldCheck className="w-5 h-5 absolute text-indigo-400" />
+                <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-5 relative">
+                  <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                  <ShieldCheck className="w-5 h-5 absolute text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <h3 className="text-lg font-bold text-white">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                   Verifying Invoice Authenticity
                 </h3>
-                <p className="text-xs text-slate-400 mt-2 max-w-xs leading-relaxed">
-                  Querying database records and cryptographically validating security code...
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 max-w-xs leading-relaxed">
+                  Validating cryptographic code and formatting official A4 document layout...
                 </p>
               </motion.div>
             )}
 
-            {/* 2. VERIFIED PDF VIEWER VIEW */}
+            {/* 2. VERIFIED A4 PDF DOCUMENT VIEW */}
             {!initialChecking && verifiedInvoice && (
               <motion.div
                 key="viewer"
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 15 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: 0.2 }}
                 className={cn(
-                  "w-full bg-slate-900 rounded-3xl shadow-2xl border border-slate-800 flex flex-col transition-all duration-300 overflow-hidden",
-                  isFullscreen ? "fixed inset-2 sm:inset-4 z-50 max-w-none h-[calc(100vh-16px)] sm:h-[calc(100vh-32px)]" : "max-w-5xl h-[88vh]"
+                  "w-full bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 overflow-hidden",
+                  isFullscreen ? "fixed inset-2 sm:inset-4 z-50 max-w-none h-[calc(100vh-16px)] sm:h-[calc(100vh-32px)]" : "max-w-5xl"
                 )}
               >
                 {/* Document Top Header & Controls Toolbar */}
-                <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
-                  {/* Left: Invoice Identity */}
-                  <div className="flex items-center gap-3">
+                <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                  {/* Left: Document Info & Search Another */}
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <button
                       type="button"
                       onClick={handleReset}
-                      className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-slate-800"
+                      className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-slate-200 dark:border-slate-700"
                       title="Verify another document"
                     >
                       <Search className="w-4 h-4" />
                       <span className="hidden sm:inline">Search Another</span>
                     </button>
 
-                    <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+                    <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 hidden sm:block" />
 
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-800/80 text-emerald-400 text-xs font-semibold">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        Verified from Database
+                        Verified A4 Invoice
                       </span>
-                      <span className="text-xs sm:text-sm font-bold text-white font-mono">
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white font-mono">
                         {getDisplayInvoiceId(verifiedInvoice.id)}
                       </span>
                     </div>
                   </div>
 
-                  {/* Center: Format Switcher */}
-                  <div className="flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs font-semibold border border-slate-700/60">
-                    {(['A4', 'A5', 'POS', 'Chalan'] as const).map((size) => (
-                      <button
-                        key={size}
-                        type="button"
-                        onClick={() => setSelectedSize(size)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-lg transition-all cursor-pointer",
-                          selectedSize === size
-                            ? "bg-indigo-600 text-white shadow-sm font-bold"
-                            : "text-slate-400 hover:text-white"
-                        )}
-                      >
-                        {size}
-                      </button>
-                    ))}
+                  {/* Center: Format Switcher (A4 default) */}
+                  <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSize('A4')}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer",
+                        selectedSize === 'A4'
+                          ? "bg-indigo-600 text-white shadow-sm font-bold"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      )}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>A4 Format</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSize('A5')}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer",
+                        selectedSize === 'A5'
+                          ? "bg-indigo-600 text-white shadow-sm font-bold"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      )}
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>A5</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSize('POS')}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer",
+                        selectedSize === 'POS'
+                          ? "bg-indigo-600 text-white shadow-sm font-bold"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      )}
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      <span>POS</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSize('Chalan')}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer",
+                        selectedSize === 'Chalan'
+                          ? "bg-amber-600 text-white shadow-sm font-bold"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      )}
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      <span>Chalan</span>
+                    </button>
                   </div>
 
                   {/* Right: Actions (Zoom, Share, Print/Download) */}
                   <div className="flex items-center gap-1.5 sm:gap-2">
                     {/* Zoom Controller */}
-                    <div className="flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs border border-slate-700/60">
+                    <div className="flex items-center bg-white dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
                       <button
                         type="button"
-                        onClick={() => setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer"
+                        onClick={() => setZoom(z => Math.max(0.35, Number((z - 0.1).toFixed(2))))}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
                         title="Zoom Out"
                       >
                         <ZoomOut className="w-3.5 h-3.5" />
                       </button>
-                      <span className="px-2 font-mono text-[11px] text-slate-300 min-w-[42px] text-center">
+                      <span className="px-2 font-mono text-[11px] text-slate-700 dark:text-slate-300 min-w-[42px] text-center font-bold">
                         {Math.round(zoom * 100)}%
                       </span>
                       <button
                         type="button"
                         onClick={() => setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer"
+                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
                         title="Zoom In"
                       >
                         <ZoomIn className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => setZoom(0.85)}
-                        className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer"
-                        title="Reset Zoom"
+                        onClick={handleAutoFit}
+                        className="px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-semibold cursor-pointer text-[10px] border-l border-slate-200 dark:border-slate-700"
+                        title="Auto Fit to Screen"
+                      >
+                        Fit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setZoom(1.0)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 cursor-pointer"
+                        title="Reset to 100%"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                       </button>
@@ -473,17 +591,17 @@ function PublicInvoicePreviewContent() {
                     <button
                       type="button"
                       onClick={handleCopyShareLink}
-                      className="p-2 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                       title="Copy Public Link"
                     >
-                      {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
+                      {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
                     </button>
 
                     {/* Fullscreen Toggle */}
                     <button
                       type="button"
                       onClick={() => setIsFullscreen(f => !f)}
-                      className="p-2 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
                       title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
                     >
                       {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -493,61 +611,68 @@ function PublicInvoicePreviewContent() {
                     <button
                       type="button"
                       onClick={handlePrint}
-                      className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/25 text-xs sm:text-sm flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+                      className="px-4 sm:px-6 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white font-bold rounded-xl shadow-md text-xs sm:text-sm flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
                     >
                       <Printer className="w-4 h-4" />
-                      <span>Download / Print PDF</span>
+                      <span>Print</span>
                     </button>
                   </div>
                 </div>
 
-                {/* PDF Document Viewport Area */}
-                <div className="flex-1 overflow-auto bg-slate-950/80 p-4 sm:p-8 flex justify-center items-start">
-                  <div
-                    style={{
-                      width: `${originalWidth * zoom}px`,
-                      minHeight: `${800 * zoom}px`,
-                      position: 'relative'
-                    }}
-                    className="transition-all duration-150 shadow-2xl rounded-sm bg-white"
-                  >
+                {/* Document Viewport - Clean Desktop Canvas */}
+                <div
+                  ref={containerRef}
+                  className="flex-1 overflow-auto bg-slate-200/70 dark:bg-slate-950 p-4 sm:p-8 flex justify-center items-start min-h-[500px]"
+                >
+                  <div className="min-w-max min-h-max flex items-start justify-center p-2">
+                    {/* A4 Document Paper Frame with Crisp Margins & Shadows */}
                     <div
                       style={{
-                        transform: `scale(${zoom})`,
-                        transformOrigin: 'top left',
-                        width: `${originalWidth}px`,
-                        position: 'absolute',
-                        top: 0,
-                        left: 0
+                        width: `${originalWidth * zoom}px`,
+                        height: `${unscaledHeight * zoom}px`,
+                        overflow: 'hidden',
+                        position: 'relative'
                       }}
-                      className="h-fit text-slate-900"
+                      className="transition-all duration-200 shadow-2xl rounded-sm bg-white border border-slate-300/80 dark:border-slate-800"
                     >
-                      <div ref={previewRef} id="printable-invoice" className="h-fit">
-                        <InvoicePrint invoice={verifiedInvoice} size={selectedSize} />
+                      <div
+                        style={{
+                          transform: `scale(${zoom})`,
+                          transformOrigin: 'top left',
+                          width: `${originalWidth}px`,
+                          position: 'absolute',
+                          top: 0,
+                          left: 0
+                        }}
+                        className="h-fit text-slate-900"
+                      >
+                        <div ref={previewRef} id="printable-invoice" className="h-fit">
+                          <InvoicePrint invoice={verifiedInvoice} size={selectedSize} />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Bottom Summary & Verification Footer Bar */}
-                <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                {/* Bottom Summary & Cryptographic Verification Footer */}
+                <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 flex flex-wrap items-center justify-between gap-3 shrink-0">
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                     <span>
-                      Customer: <strong className="text-slate-200">{verifiedInvoice.customer}</strong>
+                      Customer: <strong className="text-slate-900 dark:text-slate-100">{verifiedInvoice.customer}</strong>
                     </span>
                     <span>•</span>
                     <span>
-                      Type: <strong className="text-slate-200">{verifiedInvoice.type}</strong>
+                      Type: <strong className="text-slate-900 dark:text-slate-100">{verifiedInvoice.type}</strong>
                     </span>
                     <span>•</span>
                     <span>
-                      Total Bill: <strong className="text-emerald-400 font-bold">৳{Number(verifiedInvoice.total || 0).toLocaleString()}</strong>
+                      Total Bill: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">৳{Number(verifiedInvoice.total || 0).toLocaleString()}</strong>
                     </span>
                     <span>•</span>
                     <span>
                       Balance Due: <strong className={cn(
                         "font-bold",
-                        Number(verifiedInvoice.due || 0) > 0 ? "text-amber-400" : "text-emerald-400"
+                        Number(verifiedInvoice.due || 0) > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"
                       )}>
                         ৳{Number(verifiedInvoice.due || 0).toLocaleString()}
                       </strong>
@@ -555,14 +680,14 @@ function PublicInvoicePreviewContent() {
                   </div>
 
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                    <Lock className="w-3 h-3 text-emerald-500" />
-                    <span>Official verified invoice record from database</span>
+                    <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Cryptographically verified official A4 document</span>
                   </div>
                 </div>
               </motion.div>
             )}
 
-            {/* 3. PUBLIC MANUAL VERIFICATION FORM (Shown when no URL params or on manual reset/error) */}
+            {/* 3. PUBLIC MANUAL VERIFICATION FORM (Shown when no URL params or on manual reset) */}
             {!initialChecking && !verifiedInvoice && (
               <motion.div
                 key="form"
@@ -570,18 +695,18 @@ function PublicInvoicePreviewContent() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.2 }}
-                className="w-full max-w-lg bg-slate-900/90 rounded-3xl shadow-2xl p-6 sm:p-8 border border-slate-800 my-8"
+                className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 my-8"
               >
                 {/* Header */}
                 <div className="flex flex-col items-center text-center mb-6">
-                  <div className="w-16 h-16 bg-gradient-to-tr from-amber-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-indigo-500/20 text-white">
+                  <div className="w-16 h-16 bg-gradient-to-tr from-amber-600 to-indigo-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-indigo-600/20 text-white">
                     <FileCheck className="w-8 h-8" />
                   </div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-white font-display">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white font-display">
                     Invoice PDF Previewer
                   </h1>
-                  <p className="text-sm text-slate-400 mt-1 max-w-sm">
-                    Enter your invoice details to validate and display the official PDF directly from the database.
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+                    Enter invoice details to validate and display the official A4 document format directly from the database.
                   </p>
                 </div>
 
@@ -590,12 +715,12 @@ function PublicInvoicePreviewContent() {
                   <motion.div
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-5 p-3.5 sm:p-4 bg-rose-950/40 border border-rose-900/60 rounded-2xl flex items-start gap-3 text-rose-400 text-xs sm:text-sm font-medium"
+                    className="mb-5 p-3.5 sm:p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-2xl flex items-start gap-3 text-rose-700 dark:text-rose-400 text-xs sm:text-sm font-medium"
                   >
                     <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="font-semibold">Verification Unsuccessful</p>
-                      <p className="text-xs text-rose-400/90 mt-0.5">{error}</p>
+                      <p className="text-xs text-rose-600 dark:text-rose-400/90 mt-0.5">{error}</p>
                     </div>
                   </motion.div>
                 )}
@@ -604,12 +729,12 @@ function PublicInvoicePreviewContent() {
                 <form onSubmit={handleManualSubmit} className="space-y-4">
                   {/* Invoice Number */}
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm font-medium text-slate-300 flex items-center justify-between">
+                    <label className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center justify-between">
                       <span>Invoice Number</span>
-                      <span className="text-[11px] text-slate-500">e.g. #INV-F-260901</span>
+                      <span className="text-[11px] text-slate-400">e.g. #INV-F-260901</span>
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <FileText className="w-4 h-4" />
                       </div>
                       <input
@@ -618,19 +743,19 @@ function PublicInvoicePreviewContent() {
                         onChange={(e) => setInvoiceNumber(e.target.value)}
                         placeholder="#INV-F-260901 or #INV-W-260901"
                         required
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 font-medium transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 font-medium transition-all"
                       />
                     </div>
                   </div>
 
                   {/* Invoice Date */}
                   <div className="space-y-1.5">
-                    <label className="text-xs sm:text-sm font-medium text-slate-300 flex items-center justify-between">
+                    <label className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center justify-between">
                       <span>Invoice Date</span>
-                      <span className="text-[11px] text-slate-500">Date of issue</span>
+                      <span className="text-[11px] text-slate-400">Date of issue</span>
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <Calendar className="w-4 h-4" />
                       </div>
                       <input
@@ -638,7 +763,7 @@ function PublicInvoicePreviewContent() {
                         value={invoiceDate}
                         onChange={(e) => setInvoiceDate(e.target.value)}
                         required
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 font-medium transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 font-medium transition-all"
                       />
                     </div>
                   </div>
@@ -646,21 +771,21 @@ function PublicInvoicePreviewContent() {
                   {/* 8-Character Security Code */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs sm:text-sm font-medium text-slate-300 flex items-center gap-1.5">
+                      <label className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                         <span>8-Character Security Code</span>
-                        <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                        <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
                       </label>
                       <span className={cn(
                         "text-[11px] font-mono px-2 py-0.5 rounded-full border",
                         code.trim().length === 8
-                          ? "bg-emerald-950/50 text-emerald-400 border-emerald-800"
-                          : "bg-slate-800 text-slate-400 border-slate-700"
+                          ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700"
                       )}>
                         {code.trim().length} / 8 chars
                       </span>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <KeyRound className="w-4 h-4" />
                       </div>
                       <input
@@ -670,10 +795,10 @@ function PublicInvoicePreviewContent() {
                         onChange={(e) => setCode(e.target.value.toUpperCase())}
                         placeholder="e.g. 64F46349"
                         required
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 font-mono uppercase tracking-widest transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 font-mono uppercase tracking-widest transition-all"
                       />
                     </div>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
                       Found on your invoice document or in the SMS verification message.
                     </p>
                   </div>
@@ -682,34 +807,34 @@ function PublicInvoicePreviewContent() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 px-4 mt-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/25 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer active:scale-[0.99]"
+                    className="w-full py-3 px-4 mt-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-md shadow-indigo-600/20 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer active:scale-[0.99]"
                   >
                     {loading ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Validating from Database...</span>
+                        <span>Validating A4 Document...</span>
                       </>
                     ) : (
                       <>
-                        <Search className="w-4 h-4" />
-                        <span>Validate & View PDF</span>
+                        <ScanLine className="w-4 h-4" />
+                        <span>Validate & View A4 Invoice</span>
                       </>
                     )}
                   </button>
 
                   {/* Helper Links */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                     <button
                       type="button"
                       onClick={handleFillSample}
-                      className="text-indigo-400 hover:underline flex items-center gap-1 font-medium cursor-pointer"
+                      className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-medium cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
                       Fill Demo Sample (#INV-F-260901)
                     </button>
                     <Link
                       href="/login"
-                      className="text-slate-400 hover:text-slate-200"
+                      className="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                     >
                       Staff Sign In
                     </Link>
@@ -722,9 +847,9 @@ function PublicInvoicePreviewContent() {
       </main>
 
       {/* Subtle Footer */}
-      <footer className="w-full py-4 px-6 text-center text-xs text-slate-500 border-t border-slate-800/80 bg-slate-950/60">
+      <footer className="w-full py-4 px-6 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60">
         <p>
-          Secure End-to-End Invoice Verification • Protected by Multi-Tenant Cryptographic Validation
+          Official Invoice Document Verification • Protected by Multi-Tenant Cryptographic Validation
         </p>
       </footer>
     </div>
@@ -735,13 +860,13 @@ export default function PublicPreviewPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-6">
-          <div className="w-full max-w-md bg-slate-900 rounded-3xl shadow-2xl p-8 border border-slate-800 flex flex-col items-center justify-center text-center">
-            <div className="w-9 h-9 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-sm font-semibold text-slate-200">
-              Loading Invoice Document Portal...
+        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex items-center justify-center p-6">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-8 border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center">
+            <div className="w-9 h-9 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              Loading Verified Document Portal...
             </p>
-            <p className="text-xs text-slate-400 mt-1">Preparing public verification environment</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Preparing clean A4 document format</p>
           </div>
         </div>
       }

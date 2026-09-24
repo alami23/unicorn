@@ -37,7 +37,14 @@ export default function LoginPage() {
     setMounted(true);
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('view') === 'preview' || params.get('invoiceNumber') || params.get('inv')) {
+      if (
+        params.get('view') === 'preview' ||
+        params.get('invoiceNumber') ||
+        params.get('inv') ||
+        params.get('s') ||
+        params.get('slug') ||
+        params.get('short')
+      ) {
         setViewMode('preview');
       }
     }
@@ -296,6 +303,17 @@ export default function LoginPage() {
     }
   };
 
+  if (viewMode === 'preview') {
+    return (
+      <LoginInvoicePreviewer
+        onBackToLogin={() => {
+          setViewMode('admin');
+          setError(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative transition-colors duration-300">
       {/* Top Left Buttons */}
@@ -346,16 +364,11 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {viewMode === 'preview' ? (
-        <div className="w-full flex items-center justify-center pt-10 sm:pt-0">
-          <LoginInvoicePreviewer onBackToLogin={() => setViewMode('admin')} />
-        </div>
-      ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-800 transition-colors duration-300"
-        >
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-800 transition-colors duration-300"
+      >
         <AnimatePresence mode="wait">
           {/* LOGIN SCREEN */}
           {mode === 'login' && (
@@ -445,13 +458,25 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <div className="mt-8 text-center">
-                <p className="text-slate-500 dark:text-slate-400">
+              <div className="mt-8 text-center space-y-2.5">
+                <p className="text-slate-500 dark:text-slate-400 text-sm">
                   Don&apos;t have an account?{' '}
-                  <Link href="/signup" className="text-indigo-600 hover:text-indigo-700 font-semibold">
+                  <Link href="/signup" className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-semibold">
                     Create one
                   </Link>
                 </p>
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                    Customer verifying an invoice?{' '}
+                    <button
+                      type="button"
+                      onClick={() => { setViewMode('preview'); setError(null); }}
+                      className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline cursor-pointer"
+                    >
+                      Open Invoice Preview
+                    </button>
+                  </p>
+                </div>
               </div>
             </motion.div>
           )}
@@ -689,7 +714,6 @@ export default function LoginPage() {
           )}
         </AnimatePresence>
       </motion.div>
-      )}
     </div>
   );
 }
