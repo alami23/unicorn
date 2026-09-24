@@ -323,7 +323,7 @@ export default function LoginPage() {
           onClick={() => { setViewMode('admin'); setError(null); }}
           className={cn(
             "px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border",
-            viewMode === 'admin'
+            (viewMode as string) === 'admin'
               ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/25"
               : "bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800"
           )}
@@ -335,7 +335,7 @@ export default function LoginPage() {
           onClick={() => { setViewMode('preview'); setError(null); }}
           className={cn(
             "px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border",
-            viewMode === 'preview'
+            (viewMode as string) === 'preview'
               ? "bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/25"
               : "bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800"
           )}

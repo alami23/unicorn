@@ -17,16 +17,12 @@ import {
   FileText,
   KeyRound,
   Search,
-  ArrowRight,
   Sparkles,
   AlertCircle,
   Share2,
   Check,
   Lock,
   CheckCircle2,
-  Package,
-  Layers,
-  Receipt,
   ScanLine
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -50,8 +46,8 @@ function PublicInvoicePreviewContent() {
   const [verifiedInvoice, setVerifiedInvoice] = useState<any | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
 
-  // Viewer options
-  const [selectedSize, setSelectedSize] = useState<'A4' | 'A5' | 'POS' | 'Chalan'>('A4')
+  // Viewer options (exclusively A4 format)
+  const selectedSize = 'A4' as const
   const [zoom, setZoom] = useState(1.0)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [unscaledHeight, setUnscaledHeight] = useState<number>(1123)
@@ -71,7 +67,7 @@ function PublicInvoicePreviewContent() {
         if (height > 0) {
           // Standard A4 aspect ratio height at 96 DPI is 1123px (297mm)
           const standardA4Height = 1123
-          const minHeight = selectedSize === 'POS' ? 400 : (selectedSize === 'A5' ? 794 : standardA4Height)
+          const minHeight = standardA4Height
           setUnscaledHeight(Math.max(minHeight, height))
         }
       }
@@ -95,15 +91,13 @@ function PublicInvoicePreviewContent() {
   const handleAutoFit = useCallback(() => {
     if (!containerRef.current) return
     const containerWidth = containerRef.current.clientWidth - 48
-    let originalWidth = 794
-    if (selectedSize === 'A5') originalWidth = 559
-    else if (selectedSize === 'POS') originalWidth = 302
+    const originalWidth = 794
 
     if (containerWidth > 0 && originalWidth > 0) {
       const calculatedZoom = Math.min(1.15, Math.max(0.35, Number((containerWidth / originalWidth).toFixed(2))))
       setZoom(calculatedZoom)
     }
-  }, [selectedSize])
+  }, [])
 
   // Initialize responsive zoom when invoice loads
   useEffect(() => {
@@ -173,7 +167,6 @@ function PublicInvoicePreviewContent() {
       }
 
       setVerifiedInvoice(data.invoice)
-      setSelectedSize('A4')
     } catch (err: any) {
       setError(err.message || 'Invoice verification failed. Please verify the invoice number, date, and 8-character code.')
     } finally {
@@ -332,14 +325,14 @@ function PublicInvoicePreviewContent() {
             ${styles}
             @media print {
               @page {
-                size: ${selectedSize === 'POS' ? `80mm ${dynamicHeight}px` : (selectedSize === 'A5' ? 'A5' : 'A4')};
+                size: A4;
                 margin: 0;
               }
               body { 
                 margin: 0 !important; 
                 padding: 0 !important;
                 background: white !important;
-                width: ${selectedSize === 'POS' ? '80mm' : 'auto'} !important;
+                width: auto !important;
               }
               * {
                 -webkit-print-color-adjust: exact !important;
@@ -350,10 +343,10 @@ function PublicInvoicePreviewContent() {
                 box-shadow: none !important; 
                 margin: 0 !important; 
                 border: none !important;
-                width: ${selectedSize === 'POS' ? '80mm' : '100%'} !important;
+                width: 100% !important;
                 max-width: none !important;
                 transform: none !important;
-                padding: ${selectedSize === 'POS' ? '0' : 'inherited'} !important;
+                padding: 0 !important;
               }
               tr, .break-inside-avoid {
                 page-break-inside: avoid !important;
@@ -377,20 +370,15 @@ function PublicInvoicePreviewContent() {
       iframe?.contentWindow?.focus()
       iframe?.contentWindow?.print()
     }, 500)
-  }, [verifiedInvoice, selectedSize])
+  }, [verifiedInvoice])
 
   const handleReset = () => {
     setVerifiedInvoice(null)
     setError(null)
   }
 
-  // Determine width based on paper format (standard A4: 794px)
-  let originalWidth = 794
-  if (selectedSize === 'A5') {
-    originalWidth = 559
-  } else if (selectedSize === 'POS') {
-    originalWidth = 302
-  }
+  // Width for standard A4 format (794px at 96 DPI)
+  const originalWidth = 794
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
@@ -413,13 +401,6 @@ function PublicInvoicePreviewContent() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-800"
-            >
-              <span>Staff Login</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
           </div>
         </div>
       </header>
@@ -488,62 +469,6 @@ function PublicInvoicePreviewContent() {
                         {getDisplayInvoiceId(verifiedInvoice.id)}
                       </span>
                     </div>
-                  </div>
-
-                  {/* Center: Format Switcher (A4 default) */}
-                  <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSize('A4')}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer",
-                        selectedSize === 'A4'
-                          ? "bg-indigo-600 text-white shadow-sm font-bold"
-                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                      )}
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>A4 Format</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSize('A5')}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer",
-                        selectedSize === 'A5'
-                          ? "bg-indigo-600 text-white shadow-sm font-bold"
-                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                      )}
-                    >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>A5</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSize('POS')}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer",
-                        selectedSize === 'POS'
-                          ? "bg-indigo-600 text-white shadow-sm font-bold"
-                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                      )}
-                    >
-                      <Receipt className="w-3.5 h-3.5" />
-                      <span>POS</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSize('Chalan')}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer",
-                        selectedSize === 'Chalan'
-                          ? "bg-amber-600 text-white shadow-sm font-bold"
-                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                      )}
-                    >
-                      <Package className="w-3.5 h-3.5" />
-                      <span>Chalan</span>
-                    </button>
                   </div>
 
                   {/* Right: Actions (Zoom, Share, Print/Download) */}
@@ -654,31 +579,8 @@ function PublicInvoicePreviewContent() {
                   </div>
                 </div>
 
-                {/* Bottom Summary & Cryptographic Verification Footer */}
-                <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                    <span>
-                      Customer: <strong className="text-slate-900 dark:text-slate-100">{verifiedInvoice.customer}</strong>
-                    </span>
-                    <span>•</span>
-                    <span>
-                      Type: <strong className="text-slate-900 dark:text-slate-100">{verifiedInvoice.type}</strong>
-                    </span>
-                    <span>•</span>
-                    <span>
-                      Total Bill: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">৳{Number(verifiedInvoice.total || 0).toLocaleString()}</strong>
-                    </span>
-                    <span>•</span>
-                    <span>
-                      Balance Due: <strong className={cn(
-                        "font-bold",
-                        Number(verifiedInvoice.due || 0) > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"
-                      )}>
-                        ৳{Number(verifiedInvoice.due || 0).toLocaleString()}
-                      </strong>
-                    </span>
-                  </div>
-
+                {/* Bottom Cryptographic Verification Footer */}
+                <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 flex items-center justify-center sm:justify-end gap-3 shrink-0">
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
                     <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                     <span>Cryptographically verified official A4 document</span>
