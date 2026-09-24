@@ -503,8 +503,14 @@ function LoginInvoicePreviewerContent({
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8">
-        <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center">
+      <main className={cn(
+        "flex-1 flex flex-col items-center justify-center p-3 sm:p-6 transition-all duration-300",
+        verifiedInvoice ? "md:p-0 md:justify-start" : "md:p-8"
+      )}>
+        <div className={cn(
+          "w-full mx-auto flex flex-col items-center justify-center transition-all duration-300",
+          verifiedInvoice ? "max-w-6xl md:max-w-none md:w-full md:justify-start" : "max-w-6xl"
+        )}>
           <AnimatePresence mode="wait">
             {/* 1. INITIAL LOADING SKELETON WHILE AUTO-VALIDATING */}
             {initialChecking && (
@@ -547,11 +553,13 @@ function LoginInvoicePreviewerContent({
                 transition={{ duration: 0.25 }}
                 className={cn(
                   "w-full bg-slate-900 rounded-3xl shadow-2xl border border-slate-800 flex flex-col transition-all duration-300 overflow-hidden",
+                  // Desktop edge-to-edge layout: eliminate container box, internal scrollbar, borders, rounded corners, and shadow
+                  "md:max-w-none md:h-auto md:min-h-[calc(100vh-64px)] md:rounded-none md:border-0 md:shadow-none md:overflow-visible md:bg-slate-950",
                   isFullscreen ? "fixed inset-0 top-14 sm:top-16 z-40 max-w-none rounded-none border-0 h-[calc(100vh-56px)] sm:h-[calc(100vh-64px)]" : "max-w-5xl h-[88vh]"
                 )}
               >
                 {/* PDF Document Viewport Area */}
-                <div className="flex-1 overflow-auto bg-slate-950/80 p-4 sm:p-8 flex justify-center items-start">
+                <div className="flex-1 overflow-auto md:overflow-visible bg-slate-950/80 md:bg-slate-950 p-4 sm:p-8 md:py-8 md:px-0 flex justify-center items-start w-full">
                   <div
                     style={{
                       width: `${originalWidth * zoom}px`,
@@ -579,7 +587,7 @@ function LoginInvoicePreviewerContent({
                 </div>
 
                 {/* Bottom Verification Footer Bar */}
-                <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-400 flex items-center justify-center sm:justify-end gap-3 shrink-0">
+                <div className="px-5 py-3 md:px-8 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-400 flex items-center justify-center sm:justify-end gap-3 shrink-0 w-full">
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
                     <Lock className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Official verified invoice record from database</span>

@@ -406,8 +406,14 @@ function PublicInvoicePreviewContent() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col items-center justify-start p-2 sm:p-6 lg:p-8">
-        <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
+      <main className={cn(
+        "flex-1 flex flex-col items-center justify-start p-2 sm:p-6 transition-all duration-300",
+        verifiedInvoice ? "md:p-0" : "md:p-8"
+      )}>
+        <div className={cn(
+          "w-full mx-auto flex flex-col items-center transition-all duration-300",
+          verifiedInvoice ? "max-w-6xl md:max-w-none md:w-full" : "max-w-6xl"
+        )}>
           <AnimatePresence mode="wait">
             {/* 1. INITIAL LOADING SKELETON WHILE AUTO-VALIDATING */}
             {initialChecking && (
@@ -441,11 +447,13 @@ function PublicInvoicePreviewContent() {
                 transition={{ duration: 0.2 }}
                 className={cn(
                   "w-full bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 overflow-hidden",
+                  // Desktop edge-to-edge layout: eliminate container box, borders, rounded corners, shadows, and internal scrollbar
+                  "md:max-w-none md:rounded-none md:border-0 md:shadow-none md:overflow-visible",
                   isFullscreen ? "fixed inset-2 sm:inset-4 z-50 max-w-none h-[calc(100vh-16px)] sm:h-[calc(100vh-32px)]" : "max-w-5xl"
                 )}
               >
                 {/* Document Top Header & Controls Toolbar */}
-                <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div className="px-4 py-3 sm:px-6 sm:py-3.5 md:px-8 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-3 shrink-0 w-full">
                   {/* Left: Document Info & Search Another */}
                   <div className="flex items-center gap-2 sm:gap-3">
                     <button
@@ -547,9 +555,9 @@ function PublicInvoicePreviewContent() {
                 {/* Document Viewport - Clean Desktop Canvas */}
                 <div
                   ref={containerRef}
-                  className="flex-1 overflow-auto bg-slate-200/70 dark:bg-slate-950 p-4 sm:p-8 flex justify-center items-start min-h-[500px]"
+                  className="flex-1 overflow-auto md:overflow-visible bg-slate-200/70 dark:bg-slate-950 p-4 sm:p-8 md:py-8 md:px-0 flex justify-center items-start min-h-[500px] md:min-h-[calc(100vh-140px)] w-full"
                 >
-                  <div className="min-w-max min-h-max flex items-start justify-center p-2">
+                  <div className="min-w-max min-h-max flex items-start justify-center p-2 md:p-0">
                     {/* A4 Document Paper Frame with Crisp Margins & Shadows */}
                     <div
                       style={{
@@ -580,7 +588,7 @@ function PublicInvoicePreviewContent() {
                 </div>
 
                 {/* Bottom Cryptographic Verification Footer */}
-                <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 flex items-center justify-center sm:justify-end gap-3 shrink-0">
+                <div className="px-5 py-3 md:px-8 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 flex items-center justify-center sm:justify-end gap-3 shrink-0 w-full">
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
                     <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                     <span>Cryptographically verified official A4 document</span>
