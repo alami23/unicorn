@@ -360,7 +360,7 @@ function LoginInvoicePreviewerContent({
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans transition-colors duration-300 w-full">
       {/* Single Condensed Top Header Box */}
       <header className="w-full border-b border-slate-800 bg-slate-950/95 backdrop-blur-md sticky top-0 z-50 shadow-md">
-        <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4 overflow-x-auto no-scrollbar">
+        <div className="w-full px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Far Left: Business Name & Identity */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 font-bold text-xs sm:text-sm">
