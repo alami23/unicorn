@@ -63,60 +63,10 @@ function LoginInvoicePreviewerContent({
   const selectedSize = 'A4' as const
   const [zoom, setZoom] = useState(0.85)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [unscaledHeight, setUnscaledHeight] = useState<number>(1123)
 
   const printIframeRef = useRef<HTMLIFrameElement | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const autoValidatedRef = useRef(false)
-
-  // Measure content unscaled height dynamically to prevent truncation in A4 format
-  useEffect(() => {
-    if (!verifiedInvoice) return
-
-    const measure = () => {
-      if (previewRef.current) {
-        const height = previewRef.current.scrollHeight || previewRef.current.offsetHeight
-        if (height > 0) {
-          const standardA4Height = 1123
-          setUnscaledHeight(Math.max(standardA4Height, height))
-        }
-      }
-    }
-
-    measure()
-    const t1 = setTimeout(measure, 100)
-    const t2 = setTimeout(measure, 300)
-    const t3 = setTimeout(measure, 600)
-
-    window.addEventListener('resize', measure)
-    return () => {
-      clearTimeout(t1)
-      clearTimeout(t2)
-      clearTimeout(t3)
-      window.removeEventListener('resize', measure)
-    }
-  }, [verifiedInvoice, selectedSize])
-
-  // Auto-fit document edge to edge across screen width
-  const handleAutoFit = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      const screenWidth = window.innerWidth
-      const targetWidth = screenWidth < 800 ? screenWidth - 16 : screenWidth - 32
-      const calculatedZoom = Math.min(2.0, Math.max(0.35, Number((targetWidth / 794).toFixed(2))))
-      setZoom(calculatedZoom)
-    }
-  }, [])
-
-  // Initialize responsive zoom to span edge to edge across the page
-  useEffect(() => {
-    if (!verifiedInvoice) return
-    if (typeof window !== 'undefined') {
-      const screenWidth = window.innerWidth
-      const targetWidth = screenWidth < 800 ? screenWidth - 16 : Math.min(screenWidth - 32, 1200)
-      const fitted = Math.max(0.35, Number((targetWidth / 794).toFixed(2)))
-      setZoom(fitted)
-    }
-  }, [verifiedInvoice])
 
   // Core validation function against the database
   const validateInvoiceFromDatabase = useCallback(async (invNum: string, invDate: string, invCode: string) => {
@@ -483,7 +433,7 @@ function LoginInvoicePreviewerContent({
               <div className="flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs border border-slate-700/60 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setZoom(z => Math.max(0.35, Number((z - 0.1).toFixed(2))))}
+                  onClick={() => setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))}
                   className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
                   title="Zoom Out"
                 >
@@ -494,7 +444,7 @@ function LoginInvoicePreviewerContent({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setZoom(z => Math.min(2.0, Number((z + 0.1).toFixed(2))))}
+                  onClick={() => setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))}
                   className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
                   title="Zoom In"
                 >
@@ -502,17 +452,9 @@ function LoginInvoicePreviewerContent({
                 </button>
                 <button
                   type="button"
-                  onClick={handleAutoFit}
-                  className="px-2 py-1 rounded-lg hover:bg-slate-700 text-indigo-400 font-semibold cursor-pointer text-[10px] border-l border-slate-700/60"
-                  title="Auto Fit to Screen"
-                >
-                  Fit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoom(1.0)}
+                  onClick={() => setZoom(0.85)}
                   className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
-                  title="Reset to 100%"
+                  title="Reset Zoom"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                 </button>
@@ -561,14 +503,8 @@ function LoginInvoicePreviewerContent({
       </header>
 
       {/* Main Content Area */}
-      <main className={cn(
-        "flex-1 flex flex-col w-full",
-        verifiedInvoice ? "p-0 items-stretch justify-start" : "items-center justify-center p-3 sm:p-6 lg:p-8"
-      )}>
-        <div className={cn(
-          "w-full flex flex-col",
-          verifiedInvoice ? "items-stretch" : "max-w-6xl mx-auto items-center justify-center"
-        )}>
+      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 lg:p-8">
+        <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center">
           <AnimatePresence mode="wait">
             {/* 1. INITIAL LOADING SKELETON WHILE AUTO-VALIDATING */}
             {initialChecking && (
@@ -601,7 +537,7 @@ function LoginInvoicePreviewerContent({
               </motion.div>
             )}
 
-            {/* 2. VERIFIED PDF VIEWER VIEW (Edge-to-edge across entire page, no container box, no internal scrollbar) */}
+            {/* 2. VERIFIED PDF VIEWER VIEW */}
             {!initialChecking && verifiedInvoice && (
               <motion.div
                 key="viewer"
@@ -610,19 +546,19 @@ function LoginInvoicePreviewerContent({
                 exit={{ opacity: 0, y: 15 }}
                 transition={{ duration: 0.25 }}
                 className={cn(
-                  "w-full flex-1 flex flex-col transition-all duration-300",
-                  isFullscreen ? "fixed inset-0 top-14 sm:top-16 z-40 bg-slate-900" : ""
+                  "w-full bg-slate-900 rounded-3xl shadow-2xl border border-slate-800 flex flex-col transition-all duration-300 overflow-hidden",
+                  isFullscreen ? "fixed inset-0 top-14 sm:top-16 z-40 max-w-none rounded-none border-0 h-[calc(100vh-56px)] sm:h-[calc(100vh-64px)]" : "max-w-5xl h-[88vh]"
                 )}
               >
-                {/* Edge-to-edge invoice document viewport without container box and without internal scrollbar */}
-                <div className="w-full flex-1 flex justify-center items-start py-4 sm:py-8 px-1 sm:px-2 bg-slate-950/60">
+                {/* PDF Document Viewport Area */}
+                <div className="flex-1 overflow-auto bg-slate-950/80 p-4 sm:p-8 flex justify-center items-start">
                   <div
                     style={{
                       width: `${originalWidth * zoom}px`,
-                      height: `${unscaledHeight * zoom}px`,
+                      minHeight: `${800 * zoom}px`,
                       position: 'relative'
                     }}
-                    className="transition-all duration-150 bg-white"
+                    className="transition-all duration-150 shadow-2xl rounded-sm bg-white"
                   >
                     <div
                       style={{
@@ -643,18 +579,9 @@ function LoginInvoicePreviewerContent({
                 </div>
 
                 {/* Bottom Verification Footer Bar */}
-                <div className="w-full px-4 sm:px-8 py-3 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono text-slate-400">
-                      ID: {getDisplayInvoiceId(verifiedInvoice.id)}
-                    </span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-[11px] text-slate-400">
-                      Issued: {verifiedInvoice.date}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
-                    <Lock className="w-3.5 h-3.5" />
+                <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/90 text-xs text-slate-400 flex items-center justify-center sm:justify-end gap-3 shrink-0">
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <Lock className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Official verified invoice record from database</span>
                   </div>
                 </div>

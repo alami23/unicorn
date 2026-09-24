@@ -89,26 +89,30 @@ function PublicInvoicePreviewContent() {
 
   // Auto-fit document to screen width
   const handleAutoFit = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      const screenWidth = window.innerWidth
-      const targetWidth = screenWidth < 800 ? screenWidth - 16 : screenWidth - 32
-      const originalWidth = 794
+    if (!containerRef.current) return
+    const containerWidth = containerRef.current.clientWidth - 48
+    const originalWidth = 794
 
-      if (targetWidth > 0 && originalWidth > 0) {
-        const calculatedZoom = Math.min(2.0, Math.max(0.35, Number((targetWidth / originalWidth).toFixed(2))))
-        setZoom(calculatedZoom)
-      }
+    if (containerWidth > 0 && originalWidth > 0) {
+      const calculatedZoom = Math.min(1.15, Math.max(0.35, Number((containerWidth / originalWidth).toFixed(2))))
+      setZoom(calculatedZoom)
     }
   }, [])
 
-  // Initialize responsive zoom when invoice loads to span edge to edge
+  // Initialize responsive zoom when invoice loads
   useEffect(() => {
     if (!verifiedInvoice) return
     if (typeof window !== 'undefined') {
       const screenWidth = window.innerWidth
-      const targetWidth = screenWidth < 800 ? screenWidth - 16 : Math.min(screenWidth - 32, 1200)
-      const fitted = Math.max(0.35, Number((targetWidth / 794).toFixed(2)))
-      setZoom(fitted)
+      if (screenWidth < 640) {
+        // Mobile screens: fit standard A4 comfortably
+        const fitted = Math.min(0.9, Math.max(0.38, Number(((screenWidth - 32) / 794).toFixed(2))))
+        setZoom(fitted)
+      } else if (screenWidth < 1024) {
+        setZoom(0.85)
+      } else {
+        setZoom(1.0) // On desktop, show 100% crisp standard A4 document
+      }
     }
   }, [verifiedInvoice])
 
@@ -380,132 +384,30 @@ function PublicInvoicePreviewContent() {
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       {/* Top Navigation Bar */}
       <header className="w-full border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 shadow-xs">
-        <div className="w-full px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
-          {/* Far Left: Business Identity */}
-          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 font-bold text-sm sm:text-lg">
+        <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 font-bold text-lg">
               TF
             </div>
             <div>
-              <span className="font-bold text-xs sm:text-base md:text-lg tracking-tight block leading-tight text-slate-900 dark:text-white truncate max-w-[140px] sm:max-w-[200px] md:max-w-none">
+              <span className="font-bold text-base sm:text-lg tracking-tight block leading-tight text-slate-900 dark:text-white">
                 {verifiedInvoice?.business?.name || 'Timber & Furniture ERP'}
               </span>
-              <span className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Verified Document Portal
               </span>
             </div>
           </div>
 
-          {verifiedInvoice ? (
-            /* Integrated Controls in the Top Header Bar */
-            <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 shrink-0">
-              {/* Search Another */}
-              <button
-                type="button"
-                onClick={handleReset}
-                className="p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-slate-200 dark:border-slate-700"
-                title="Verify another document"
-              >
-                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="hidden md:inline">Search</span>
-              </button>
-
-              {/* Verified Badge */}
-              <div className="hidden sm:inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span className="font-mono">{getDisplayInvoiceId(verifiedInvoice.id)}</span>
-              </div>
-
-              {/* Zoom Controls */}
-              <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setZoom(z => Math.max(0.35, Number((z - 0.1).toFixed(2))))}
-                  className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
-                  title="Zoom Out"
-                >
-                  <ZoomOut className="w-3.5 h-3.5" />
-                </button>
-                <span className="px-1.5 font-mono text-[11px] text-slate-700 dark:text-slate-300 min-w-[38px] text-center font-bold">
-                  {Math.round(zoom * 100)}%
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setZoom(z => Math.min(2.0, Number((z + 0.1).toFixed(2))))}
-                  className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
-                  title="Zoom In"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAutoFit}
-                  className="px-2 py-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-semibold cursor-pointer text-[10px] border-l border-slate-200 dark:border-slate-700"
-                  title="Auto Fit to Screen"
-                >
-                  Fit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoom(1.0)}
-                  className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 cursor-pointer"
-                  title="Reset to 100%"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Share Link */}
-              <button
-                type="button"
-                onClick={handleCopyShareLink}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Copy Public Link"
-              >
-                {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
-              </button>
-
-              {/* Fullscreen Toggle */}
-              <button
-                type="button"
-                onClick={() => setIsFullscreen(f => !f)}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </button>
-
-              {/* Print / Download Button */}
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white font-bold rounded-xl shadow-md text-xs sm:text-sm flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-              >
-                <Printer className="w-4 h-4" />
-                <span className="hidden sm:inline">Print</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 font-medium">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                Official Document Portal
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+          </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className={cn(
-        "flex-1 flex flex-col w-full",
-        verifiedInvoice ? "p-0 items-stretch justify-start" : "items-center justify-start p-2 sm:p-6 lg:p-8"
-      )}>
-        <div className={cn(
-          "w-full flex flex-col",
-          verifiedInvoice ? "items-stretch" : "max-w-6xl mx-auto items-center"
-        )}>
+      <main className="flex-1 flex flex-col items-center justify-start p-2 sm:p-6 lg:p-8">
+        <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
           <AnimatePresence mode="wait">
             {/* 1. INITIAL LOADING SKELETON WHILE AUTO-VALIDATING */}
             {initialChecking && (
@@ -529,7 +431,7 @@ function PublicInvoicePreviewContent() {
               </motion.div>
             )}
 
-            {/* 2. VERIFIED A4 PDF DOCUMENT VIEW (Edge-to-edge across entire page, no container box, no internal scrollbar) */}
+            {/* 2. VERIFIED A4 PDF DOCUMENT VIEW */}
             {!initialChecking && verifiedInvoice && (
               <motion.div
                 key="viewer"
@@ -538,56 +440,147 @@ function PublicInvoicePreviewContent() {
                 exit={{ opacity: 0, y: 15 }}
                 transition={{ duration: 0.2 }}
                 className={cn(
-                  "w-full flex-1 flex flex-col transition-all duration-300",
-                  isFullscreen ? "fixed inset-0 top-14 sm:top-16 z-50 bg-slate-100 dark:bg-slate-950" : ""
+                  "w-full bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 overflow-hidden",
+                  isFullscreen ? "fixed inset-2 sm:inset-4 z-50 max-w-none h-[calc(100vh-16px)] sm:h-[calc(100vh-32px)]" : "max-w-5xl"
                 )}
               >
-                {/* Edge-to-edge invoice viewport without container box and without internal scrollbar */}
+                {/* Document Top Header & Controls Toolbar */}
+                <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                  {/* Left: Document Info & Search Another */}
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer border border-slate-200 dark:border-slate-700"
+                      title="Verify another document"
+                    >
+                      <Search className="w-4 h-4" />
+                      <span className="hidden sm:inline">Search Another</span>
+                    </button>
+
+                    <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 hidden sm:block" />
+
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Verified A4 Invoice
+                      </span>
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white font-mono">
+                        {getDisplayInvoiceId(verifiedInvoice.id)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right: Actions (Zoom, Share, Print/Download) */}
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    {/* Zoom Controller */}
+                    <div className="flex items-center bg-white dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setZoom(z => Math.max(0.35, Number((z - 0.1).toFixed(2))))}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="px-2 font-mono text-[11px] text-slate-700 dark:text-slate-300 min-w-[42px] text-center font-bold">
+                        {Math.round(zoom * 100)}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
+                        title="Zoom In"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAutoFit}
+                        className="px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-semibold cursor-pointer text-[10px] border-l border-slate-200 dark:border-slate-700"
+                        title="Auto Fit to Screen"
+                      >
+                        Fit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setZoom(1.0)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 cursor-pointer"
+                        title="Reset to 100%"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Copy Share Link */}
+                    <button
+                      type="button"
+                      onClick={handleCopyShareLink}
+                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Copy Public Link"
+                    >
+                      {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
+                    </button>
+
+                    {/* Fullscreen Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setIsFullscreen(f => !f)}
+                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                      title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                    >
+                      {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    </button>
+
+                    {/* Print / Download Button */}
+                    <button
+                      type="button"
+                      onClick={handlePrint}
+                      className="px-4 sm:px-6 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white font-bold rounded-xl shadow-md text-xs sm:text-sm flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>Print</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Document Viewport - Clean Desktop Canvas */}
                 <div
                   ref={containerRef}
-                  className="w-full flex-1 flex justify-center items-start py-4 sm:py-8 px-1 sm:px-2 bg-slate-100 dark:bg-slate-950"
+                  className="flex-1 overflow-auto bg-slate-200/70 dark:bg-slate-950 p-4 sm:p-8 flex justify-center items-start min-h-[500px]"
                 >
-                  <div
-                    style={{
-                      width: `${originalWidth * zoom}px`,
-                      height: `${unscaledHeight * zoom}px`,
-                      position: 'relative'
-                    }}
-                    className="transition-all duration-200 bg-white"
-                  >
+                  <div className="min-w-max min-h-max flex items-start justify-center p-2">
+                    {/* A4 Document Paper Frame with Crisp Margins & Shadows */}
                     <div
                       style={{
-                        transform: `scale(${zoom})`,
-                        transformOrigin: 'top left',
-                        width: `${originalWidth}px`,
-                        position: 'absolute',
-                        top: 0,
-                        left: 0
+                        width: `${originalWidth * zoom}px`,
+                        height: `${unscaledHeight * zoom}px`,
+                        overflow: 'hidden',
+                        position: 'relative'
                       }}
-                      className="h-fit text-slate-900"
+                      className="transition-all duration-200 shadow-2xl rounded-sm bg-white border border-slate-300/80 dark:border-slate-800"
                     >
-                      <div ref={previewRef} id="printable-invoice" className="h-fit">
-                        <InvoicePrint invoice={verifiedInvoice} size={selectedSize} />
+                      <div
+                        style={{
+                          transform: `scale(${zoom})`,
+                          transformOrigin: 'top left',
+                          width: `${originalWidth}px`,
+                          position: 'absolute',
+                          top: 0,
+                          left: 0
+                        }}
+                        className="h-fit text-slate-900"
+                      >
+                        <div ref={previewRef} id="printable-invoice" className="h-fit">
+                          <InvoicePrint invoice={verifiedInvoice} size={selectedSize} />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Bottom Cryptographic Verification Footer */}
-                <div className="w-full px-4 sm:px-8 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 flex flex-wrap items-center justify-between gap-3 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-slate-700 dark:text-slate-300 font-bold">
-                      {getDisplayInvoiceId(verifiedInvoice.id)}
-                    </span>
-                    <span>•</span>
-                    <span>{verifiedInvoice.date}</span>
-                    {verifiedInvoice.customer && (
-                      <>
-                        <span>•</span>
-                        <span className="truncate max-w-[200px]">{verifiedInvoice.customer}</span>
-                      </>
-                    )}
-                  </div>
+                <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-600 dark:text-slate-400 flex items-center justify-center sm:justify-end gap-3 shrink-0">
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
                     <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                     <span>Cryptographically verified official A4 document</span>
