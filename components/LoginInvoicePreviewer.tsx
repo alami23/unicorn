@@ -61,12 +61,70 @@ function LoginInvoicePreviewerContent({
 
   // Viewer options (exclusively A4 format)
   const selectedSize = 'A4' as const
-  const [zoom, setZoom] = useState(0.85)
+  const [zoom, setZoom] = useState(1.0)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [unscaledHeight, setUnscaledHeight] = useState<number>(1123)
 
   const printIframeRef = useRef<HTMLIFrameElement | null>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const autoValidatedRef = useRef(false)
+
+  // Measure unscaled document height to prevent any truncation
+  useEffect(() => {
+    if (!verifiedInvoice) return
+
+    const measure = () => {
+      if (previewRef.current) {
+        const height = previewRef.current.scrollHeight || previewRef.current.offsetHeight
+        if (height > 0) {
+          setUnscaledHeight(Math.max(1123, height))
+        }
+      }
+    }
+
+    measure()
+    const t1 = setTimeout(measure, 100)
+    const t2 = setTimeout(measure, 300)
+    const t3 = setTimeout(measure, 600)
+
+    window.addEventListener('resize', measure)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
+      window.removeEventListener('resize', measure)
+    }
+  }, [verifiedInvoice])
+
+  // Responsive zoom initialization
+  useEffect(() => {
+    if (!verifiedInvoice) return
+    if (typeof window !== 'undefined') {
+      const screenWidth = window.innerWidth
+      if (screenWidth < 640) {
+        const availableWidth = screenWidth - 24
+        const fitted = Math.min(1.0, Math.max(0.35, Number((availableWidth / 794).toFixed(2))))
+        setZoom(fitted)
+      } else if (screenWidth < 1024) {
+        const availableWidth = screenWidth - 48
+        const fitted = Math.min(1.0, Math.max(0.5, Number((availableWidth / 794).toFixed(2))))
+        setZoom(fitted)
+      } else {
+        setZoom(1.0)
+      }
+    }
+  }, [verifiedInvoice])
+
+  // Auto-fit document to screen width
+  const handleAutoFit = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const screenWidth = window.innerWidth
+    const padding = screenWidth < 640 ? 24 : 48
+    const availableWidth = Math.max(300, screenWidth - padding)
+    const calculatedZoom = Math.min(1.25, Math.max(0.35, Number((availableWidth / 794).toFixed(2))))
+    setZoom(calculatedZoom)
+    toast.success(`Zoom set to ${Math.round(calculatedZoom * 100)}% (Fit to Screen)`)
+  }, [])
 
   // Core validation function against the database
   const validateInvoiceFromDatabase = useCallback(async (invNum: string, invDate: string, invCode: string) => {
@@ -360,6 +418,7 @@ function LoginInvoicePreviewerContent({
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans transition-colors duration-300 w-full">
       {/* Single Condensed Top Header Box */}
       <header className="w-full border-b border-slate-800 bg-slate-950/95 backdrop-blur-md sticky top-0 z-50 shadow-md">
+        {/* Row 1: Brand & Search + Actions (Mobile & Desktop) */}
         <div className="w-full px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Far Left: Business Name & Identity */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
@@ -377,8 +436,8 @@ function LoginInvoicePreviewerContent({
           </div>
 
           {verifiedInvoice ? (
-            /* Integrated Controls in the Single Condensed Top Header Box */
-            <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 shrink-0">
+            /* Integrated Controls in the Top Header Box */
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
               {/* Search Bar */}
               <form onSubmit={handleQuickSearch} className="relative flex items-center shrink-0">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
@@ -401,15 +460,14 @@ function LoginInvoicePreviewerContent({
                 )}
               </form>
 
-              {/* Verification Status */}
-              <div className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-800/80 text-emerald-400 text-xs font-semibold shrink-0">
+              {/* Desktop Only: Verification Status */}
+              <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-800/80 text-emerald-400 text-xs font-semibold shrink-0">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-                <span className="hidden sm:inline">Verified from Database</span>
-                <span className="sm:hidden">Verified</span>
+                <span>Verified from Database</span>
               </div>
 
-              {/* Invoice Details */}
-              <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 font-medium shrink-0">
+              {/* Desktop Only: Invoice Details */}
+              <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 font-medium shrink-0">
                 <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                 <span className="font-mono font-bold text-white">
                   {getDisplayInvoiceId(verifiedInvoice.id)}
@@ -425,16 +483,13 @@ function LoginInvoicePreviewerContent({
                   </>
                 )}
               </div>
-              <div className="flex lg:hidden items-center px-2 py-1 rounded-lg bg-slate-800 text-[11px] font-mono font-bold text-white shrink-0">
-                <span>{getDisplayInvoiceId(verifiedInvoice.id)}</span>
-              </div>
 
-              {/* Zoom Controls */}
-              <div className="flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs border border-slate-700/60 shrink-0">
+              {/* Desktop Only: Zoom Controls */}
+              <div className="hidden lg:flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs border border-slate-700/60 shrink-0">
                 <button
                   type="button"
                   onClick={() => setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))}
-                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                   title="Zoom Out"
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
@@ -445,16 +500,24 @@ function LoginInvoicePreviewerContent({
                 <button
                   type="button"
                   onClick={() => setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))}
-                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                   title="Zoom In"
                 >
                   <ZoomIn className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setZoom(0.85)}
-                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors"
-                  title="Reset Zoom"
+                  onClick={handleAutoFit}
+                  className="px-2 py-1 rounded-lg hover:bg-slate-700 text-indigo-400 font-semibold cursor-pointer text-[10px] border-l border-slate-700/60 active:scale-95"
+                  title="Auto Fit to Screen"
+                >
+                  Fit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom(1.0)}
+                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
+                  title="Reset 100%"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                 </button>
@@ -464,7 +527,7 @@ function LoginInvoicePreviewerContent({
               <button
                 type="button"
                 onClick={handleCopyShareLink}
-                className="p-2 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                className="p-2 sm:p-2.5 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0 active:scale-95"
                 title="Copy Public Link"
               >
                 {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
@@ -474,7 +537,7 @@ function LoginInvoicePreviewerContent({
               <button
                 type="button"
                 onClick={() => setIsFullscreen(f => !f)}
-                className="p-2 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors shrink-0"
+                className="p-2 sm:p-2.5 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors shrink-0 active:scale-95"
                 title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -484,7 +547,7 @@ function LoginInvoicePreviewerContent({
               <button
                 type="button"
                 onClick={handlePrint}
-                className="px-3 sm:px-3.5 py-1.5 sm:py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
                 title="Download PDF or Print"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -500,6 +563,70 @@ function LoginInvoicePreviewerContent({
             </div>
           )}
         </div>
+
+        {/* Row 2 on Mobile/Tablet (< lg): Neatly organized Document ID + Zoom controls */}
+        {verifiedInvoice && (
+          <div className="lg:hidden w-full px-3 sm:px-6 py-2 bg-slate-950/95 border-t border-slate-800/80 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/70 border border-emerald-800/80 text-emerald-400 text-[11px] font-semibold shrink-0">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span>Verified</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof navigator !== 'undefined') {
+                    navigator.clipboard.writeText(getDisplayInvoiceId(verifiedInvoice.id))
+                    toast.success(`Copied Invoice ID: ${getDisplayInvoiceId(verifiedInvoice.id)}`)
+                  }
+                }}
+                className="font-mono text-xs font-bold text-white bg-slate-800/80 hover:bg-slate-700 px-2 py-0.5 rounded transition-colors truncate max-w-[130px] sm:max-w-[200px] cursor-pointer"
+                title="Click to copy Invoice ID"
+              >
+                {getDisplayInvoiceId(verifiedInvoice.id)}
+              </button>
+            </div>
+
+            {/* Mobile/Tablet Zoom controls */}
+            <div className="flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs border border-slate-700/60 shrink-0">
+              <button
+                type="button"
+                onClick={() => setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))}
+                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
+                title="Zoom Out"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="px-1.5 font-mono text-[11px] text-slate-300 min-w-[34px] text-center font-bold">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))}
+                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
+                title="Zoom In"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleAutoFit}
+                className="px-2 py-1 rounded-lg hover:bg-slate-700 text-indigo-400 font-semibold cursor-pointer text-[10px] border-l border-slate-700/60 active:scale-95"
+                title="Fit to Screen Width"
+              >
+                Fit
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom(1.0)}
+                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
+                title="Reset 100%"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content Area */}
@@ -558,29 +685,32 @@ function LoginInvoicePreviewerContent({
                   isFullscreen ? "fixed inset-0 top-14 sm:top-16 z-40 max-w-none rounded-none border-0 h-[calc(100vh-56px)] sm:h-[calc(100vh-64px)]" : "max-w-5xl h-[88vh]"
                 )}
               >
-                {/* PDF Document Viewport Area */}
-                <div className="flex-1 overflow-auto md:overflow-visible bg-slate-950/80 md:bg-slate-950 p-4 sm:p-8 md:py-8 md:px-0 flex justify-center items-start w-full">
-                  <div
-                    style={{
-                      width: `${originalWidth * zoom}px`,
-                      minHeight: `${800 * zoom}px`,
-                      position: 'relative'
-                    }}
-                    className="transition-all duration-150 shadow-2xl rounded-sm bg-white"
-                  >
+                {/* PDF Document Viewport Area - Centered Full-Width Canvas */}
+                <div className="flex-1 w-full bg-slate-950 py-6 sm:py-8 lg:py-12 px-2 sm:px-4 lg:px-8 flex justify-center items-start overflow-x-auto min-h-[calc(100vh-140px)]">
+                  <div className="flex flex-col items-center justify-start mx-auto transition-all duration-200">
                     <div
                       style={{
-                        transform: `scale(${zoom})`,
-                        transformOrigin: 'top left',
-                        width: `${originalWidth}px`,
-                        position: 'absolute',
-                        top: 0,
-                        left: 0
+                        width: `${originalWidth * zoom}px`,
+                        height: `${unscaledHeight * zoom}px`,
+                        overflow: 'hidden',
+                        position: 'relative'
                       }}
-                      className="h-fit text-slate-900"
+                      className="transition-all duration-150 shadow-[0_10px_35px_-5px_rgba(0,0,0,0.5),0_20px_45px_-10px_rgba(0,0,0,0.7)] rounded-sm bg-white border border-slate-700/60 ring-1 ring-white/10"
                     >
-                      <div ref={previewRef} id="printable-invoice" className="h-fit">
-                        <InvoicePrint invoice={verifiedInvoice} size={selectedSize} />
+                      <div
+                        style={{
+                          transform: `scale(${zoom})`,
+                          transformOrigin: 'top left',
+                          width: `${originalWidth}px`,
+                          position: 'absolute',
+                          top: 0,
+                          left: 0
+                        }}
+                        className="h-fit text-slate-900"
+                      >
+                        <div ref={previewRef} id="printable-invoice" className="h-fit">
+                          <InvoicePrint invoice={verifiedInvoice} size={selectedSize} />
+                        </div>
                       </div>
                     </div>
                   </div>
