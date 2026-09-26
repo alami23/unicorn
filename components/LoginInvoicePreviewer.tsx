@@ -437,29 +437,7 @@ function LoginInvoicePreviewerContent({
 
           {verifiedInvoice ? (
             /* Integrated Controls in the Top Header Box */
-            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-              {/* Search Bar */}
-              <form onSubmit={handleQuickSearch} className="relative flex items-center shrink-0">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search invoice #..."
-                  className="w-24 sm:w-32 md:w-40 pl-8 pr-6 py-1.5 bg-slate-850/90 border border-slate-700/80 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1.5 focus:ring-indigo-500 font-medium transition-all"
-                  title="Search invoice number or security code (Press Enter)"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 text-slate-400 hover:text-white text-xs cursor-pointer"
-                  >
-                    ×
-                  </button>
-                )}
-              </form>
-
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {/* Desktop Only: Verification Status */}
               <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-800/80 text-emerald-400 text-xs font-semibold shrink-0">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
@@ -523,35 +501,15 @@ function LoginInvoicePreviewerContent({
                 </button>
               </div>
 
-              {/* Share Button */}
-              <button
-                type="button"
-                onClick={handleCopyShareLink}
-                className="p-2 sm:p-2.5 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0 active:scale-95"
-                title="Copy Public Link"
-              >
-                {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
-              </button>
-
-              {/* Full-screen Mode Button */}
-              <button
-                type="button"
-                onClick={() => setIsFullscreen(f => !f)}
-                className="p-2 sm:p-2.5 rounded-xl border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors shrink-0 active:scale-95"
-                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-              >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </button>
-
-              {/* Download Button */}
+              {/* Download / Print Button (Significantly enlarged for Mobile & Tablet) */}
               <button
                 type="button"
                 onClick={handlePrint}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+                className="px-4 sm:px-6 lg:px-5 py-2 sm:py-2.5 lg:py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs sm:text-sm lg:text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95"
                 title="Download PDF or Print"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Download</span>
+                <Download className="w-4 h-4 sm:w-5 sm:h-5 lg:w-3.5 lg:h-3.5 shrink-0" />
+                <span className="font-bold tracking-tight">Download</span>
               </button>
             </div>
           ) : (
