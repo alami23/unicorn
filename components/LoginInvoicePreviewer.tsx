@@ -334,51 +334,30 @@ function LoginInvoicePreviewerContent({
 
     try {
       const { jsPDF } = await import('jspdf')
-      const html2canvas = (await import('html2canvas')).default
+      const { toPng } = await import('html-to-image')
 
-      // Create a temporary off-screen clone with 100% scale and exact 794px width for crisp rendering
-      const clone = content.cloneNode(true) as HTMLElement
-      clone.style.position = 'fixed'
-      clone.style.top = '-99999px'
-      clone.style.left = '-99999px'
-      clone.style.width = '794px'
-      clone.style.transform = 'none'
-      clone.style.margin = '0'
-      clone.style.padding = '0'
-      clone.style.boxShadow = 'none'
-      clone.style.backgroundColor = '#ffffff'
-      document.body.appendChild(clone)
-
-      // Ensure all images in clone are loaded
-      const images = Array.from(clone.querySelectorAll('img'))
-      await Promise.all(
-        images.map(img => {
-          if (img.complete) return Promise.resolve()
-          return new Promise(resolve => {
-            img.onload = resolve
-            img.onerror = resolve
-          })
-        })
-      )
-
-      // Render clone to high-resolution canvas (scale: 2.5 for crisp print quality)
-      const canvas = await html2canvas(clone, {
-        scale: 2.5,
-        useCORS: true,
-        allowTaint: true,
+      // Generate crisp image from the invoice DOM node using native browser rendering engine
+      const dataUrl = await toPng(content, {
+        quality: 0.98,
+        pixelRatio: 2.5,
         backgroundColor: '#ffffff',
-        logging: false,
         width: 794,
-        windowWidth: 794
+        style: {
+          transform: 'none',
+          transformOrigin: 'top left',
+          width: '794px',
+          margin: '0',
+          padding: '0'
+        }
       })
 
-      // Remove temporary clone from DOM
-      if (clone.parentNode) {
-        clone.parentNode.removeChild(clone)
-      }
+      const img = new Image()
+      img.src = dataUrl
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+      })
 
-      // Convert canvas to PDF
-      const imgData = canvas.toDataURL('image/jpeg', 0.98)
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -388,20 +367,20 @@ function LoginInvoicePreviewerContent({
 
       const pdfWidth = pdf.internal.pageSize.getWidth() // 210mm
       const pdfHeight = pdf.internal.pageSize.getHeight() // 297mm
-      const imgHeight = (canvas.height * pdfWidth) / canvas.width
+      const imgHeight = (img.naturalHeight * pdfWidth) / img.naturalWidth
 
       let heightLeft = imgHeight
       let position = 0
 
       // Add first page
-      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight, undefined, 'FAST')
+      pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight, undefined, 'FAST')
       heightLeft -= pdfHeight
 
       // Handle multi-page if document exceeds standard A4 height
       while (heightLeft > 2) {
         position = heightLeft - imgHeight
         pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight, undefined, 'FAST')
+        pdf.addImage(dataUrl, 'PNG', 0, position, pdfWidth, imgHeight, undefined, 'FAST')
         heightLeft -= pdfHeight
       }
 
