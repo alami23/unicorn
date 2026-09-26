@@ -317,102 +317,107 @@ function LoginInvoicePreviewerContent({
     }
   }
 
-  // Print / Save PDF Handler
-  const handlePrint = useCallback(() => {
-    if (!verifiedInvoice) return
+  const [downloading, setDownloading] = useState(false)
+
+  // Direct PDF Download Handler (without opening print dialog)
+  const handleDownloadPdf = useCallback(async () => {
+    if (!verifiedInvoice || downloading) return
 
     const content = previewRef.current
-    if (!content) return
-
-    let iframe = printIframeRef.current
-    if (!iframe) {
-      iframe = document.createElement('iframe')
-      iframe.style.position = 'fixed'
-      iframe.style.right = '0'
-      iframe.style.bottom = '0'
-      iframe.style.width = '0'
-      iframe.style.height = '0'
-      iframe.style.border = '0'
-      iframe.style.visibility = 'hidden'
-      document.body.appendChild(iframe)
-      printIframeRef.current = iframe
+    if (!content) {
+      toast.error('Invoice content is not ready')
+      return
     }
 
-    const doc = iframe.contentWindow?.document
-    if (!doc) return
+    setDownloading(true)
+    const toastId = toast.loading('Generating invoice PDF...')
 
-    let styles = ''
     try {
-      const styleSheets = Array.from(document.styleSheets)
-      styleSheets.forEach(sheet => {
-        try {
-          const rules = Array.from(sheet.cssRules)
-          rules.forEach(rule => {
-            styles += rule.cssText
+      const { jsPDF } = await import('jspdf')
+      const html2canvas = (await import('html2canvas')).default
+
+      // Create a temporary off-screen clone with 100% scale and exact 794px width for crisp rendering
+      const clone = content.cloneNode(true) as HTMLElement
+      clone.style.position = 'fixed'
+      clone.style.top = '-99999px'
+      clone.style.left = '-99999px'
+      clone.style.width = '794px'
+      clone.style.transform = 'none'
+      clone.style.margin = '0'
+      clone.style.padding = '0'
+      clone.style.boxShadow = 'none'
+      clone.style.backgroundColor = '#ffffff'
+      document.body.appendChild(clone)
+
+      // Ensure all images in clone are loaded
+      const images = Array.from(clone.querySelectorAll('img'))
+      await Promise.all(
+        images.map(img => {
+          if (img.complete) return Promise.resolve()
+          return new Promise(resolve => {
+            img.onload = resolve
+            img.onerror = resolve
           })
-        } catch {
-          // Ignore cross-origin stylesheet errors
-        }
+        })
+      )
+
+      // Render clone to high-resolution canvas (scale: 2.5 for crisp print quality)
+      const canvas = await html2canvas(clone, {
+        scale: 2.5,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: 794,
+        windowWidth: 794
       })
-    } catch (e) {
-      console.error('Error copying styles for printing:', e)
+
+      // Remove temporary clone from DOM
+      if (clone.parentNode) {
+        clone.parentNode.removeChild(clone)
+      }
+
+      // Convert canvas to PDF
+      const imgData = canvas.toDataURL('image/jpeg', 0.98)
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      })
+
+      const pdfWidth = pdf.internal.pageSize.getWidth() // 210mm
+      const pdfHeight = pdf.internal.pageSize.getHeight() // 297mm
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width
+
+      let heightLeft = imgHeight
+      let position = 0
+
+      // Add first page
+      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight, undefined, 'FAST')
+      heightLeft -= pdfHeight
+
+      // Handle multi-page if document exceeds standard A4 height
+      while (heightLeft > 2) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight, undefined, 'FAST')
+        heightLeft -= pdfHeight
+      }
+
+      const displayId = getDisplayInvoiceId(verifiedInvoice.id) || 'Invoice'
+      const fileName = `Invoice-${displayId}.pdf`
+
+      pdf.save(fileName)
+
+      toast.success(`Invoice ${displayId} downloaded as PDF!`, { id: toastId })
+    } catch (err: any) {
+      console.error('Failed to generate PDF directly:', err)
+      toast.error('Failed to generate PDF directly. Please try again.', { id: toastId })
+    } finally {
+      setDownloading(false)
     }
-
-    const displayId = getDisplayInvoiceId(verifiedInvoice.id) || 'Invoice'
-    const printTitle = `Invoice-${displayId}`
-    const dynamicHeight = content.offsetHeight + 20
-
-    doc.open()
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${printTitle}</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            ${styles}
-            @media print {
-              @page {
-                size: A4;
-                margin: 0;
-              }
-              body { 
-                margin: 0 !important; 
-                padding: 0 !important;
-                background: white !important;
-                width: auto !important;
-              }
-              * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-              .no-print { display: none !important; }
-              #printable-invoice { 
-                box-shadow: none !important; 
-                margin: 0 !important; 
-                border: none !important;
-                width: 100% !important;
-                max-width: none !important;
-                transform: none !important;
-                padding: 0 !important;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div id="printable-invoice">
-            ${content.innerHTML}
-          </div>
-        </body>
-      </html>
-    `)
-    doc.close()
-
-    setTimeout(() => {
-      iframe?.contentWindow?.focus()
-      iframe?.contentWindow?.print()
-    }, 500)
-  }, [verifiedInvoice])
+  }, [verifiedInvoice, downloading])
 
   const handleReset = () => {
     setVerifiedInvoice(null)
@@ -539,15 +544,27 @@ function LoginInvoicePreviewerContent({
                 </button>
               </div>
 
-              {/* Download / Print Button (Significantly enlarged for Mobile & Tablet) */}
+              {/* Download Button (Direct PDF generation without print dialog) */}
               <button
                 type="button"
-                onClick={handlePrint}
-                className="px-4 sm:px-6 lg:px-5 py-2 sm:py-2.5 lg:py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs sm:text-sm lg:text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95"
-                title="Download PDF or Print"
+                disabled={downloading}
+                onClick={handleDownloadPdf}
+                className={cn(
+                  "px-4 sm:px-6 lg:px-5 py-2 sm:py-2.5 lg:py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs sm:text-sm lg:text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95 disabled:opacity-75 disabled:cursor-wait",
+                )}
+                title="Download PDF"
               >
-                <Download className="w-4 h-4 sm:w-5 sm:h-5 lg:w-3.5 lg:h-3.5 shrink-0" />
-                <span className="font-bold tracking-tight">Download</span>
+                {downloading ? (
+                  <>
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 lg:w-3.5 lg:h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                    <span className="font-bold tracking-tight">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 sm:w-5 sm:h-5 lg:w-3.5 lg:h-3.5 shrink-0" />
+                    <span className="font-bold tracking-tight">Download</span>
+                  </>
+                )}
               </button>
             </div>
           ) : (
