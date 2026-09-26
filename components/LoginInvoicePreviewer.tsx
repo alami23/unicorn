@@ -69,6 +69,9 @@ function LoginInvoicePreviewerContent({
   const previewRef = useRef<HTMLDivElement>(null)
   const autoValidatedRef = useRef(false)
 
+  const containerRef = useRef<HTMLDivElement>(null)
+  const isManuallyZoomedRef = useRef(false)
+
   // Measure unscaled document height to prevent any truncation
   useEffect(() => {
     if (!verifiedInvoice) return
@@ -96,35 +99,58 @@ function LoginInvoicePreviewerContent({
     }
   }, [verifiedInvoice])
 
-  // Responsive zoom initialization
-  useEffect(() => {
-    if (!verifiedInvoice) return
-    if (typeof window !== 'undefined') {
-      const screenWidth = window.innerWidth
-      if (screenWidth < 640) {
-        const availableWidth = screenWidth - 24
-        const fitted = Math.min(1.0, Math.max(0.35, Number((availableWidth / 794).toFixed(2))))
-        setZoom(fitted)
-      } else if (screenWidth < 1024) {
-        const availableWidth = screenWidth - 48
-        const fitted = Math.min(1.0, Math.max(0.5, Number((availableWidth / 794).toFixed(2))))
-        setZoom(fitted)
-      } else {
-        setZoom(1.0)
-      }
-    }
-  }, [verifiedInvoice])
-
-  // Auto-fit document to screen width
-  const handleAutoFit = useCallback(() => {
+  // Responsive zoom calculation that fits ANY device screen width perfectly
+  const updateResponsiveZoom = useCallback((isManual = false) => {
     if (typeof window === 'undefined') return
     const screenWidth = window.innerWidth
-    const padding = screenWidth < 640 ? 24 : 48
-    const availableWidth = Math.max(300, screenWidth - padding)
-    const calculatedZoom = Math.min(1.25, Math.max(0.35, Number((availableWidth / 794).toFixed(2))))
-    setZoom(calculatedZoom)
-    toast.success(`Zoom set to ${Math.round(calculatedZoom * 100)}% (Fit to Screen)`)
+    const originalDocWidth = 794
+
+    // Determine clean padding based on viewport size
+    let padding = 32
+    if (screenWidth < 640) {
+      padding = 16 // minimal padding on mobile for maximum readability
+    } else if (screenWidth < 1024) {
+      padding = 32 // tablets
+    } else {
+      padding = 48 // desktops
+    }
+
+    const availableWidth = Math.max(280, screenWidth - padding)
+    let calculated = Number((availableWidth / originalDocWidth).toFixed(2))
+
+    if (screenWidth >= 1024) {
+      calculated = Math.min(1.0, Math.max(0.65, calculated))
+    } else {
+      calculated = Math.min(1.0, Math.max(0.35, calculated))
+    }
+
+    setZoom(calculated)
+    if (isManual) {
+      isManuallyZoomedRef.current = true
+      toast.success(`Zoom set to ${Math.round(calculated * 100)}% (Fit to Screen)`)
+    }
   }, [])
+
+  // Auto-fit on mount & on window resize dynamically
+  useEffect(() => {
+    if (!verifiedInvoice) return
+
+    updateResponsiveZoom(false)
+
+    const handleResize = () => {
+      if (!isManuallyZoomedRef.current) {
+        updateResponsiveZoom(false)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [verifiedInvoice, updateResponsiveZoom])
+
+  // Auto-fit document button action
+  const handleAutoFit = useCallback(() => {
+    updateResponsiveZoom(true)
+  }, [updateResponsiveZoom])
 
   // Core validation function against the database
   const validateInvoiceFromDatabase = useCallback(async (invNum: string, invDate: string, invCode: string) => {
@@ -466,7 +492,10 @@ function LoginInvoicePreviewerContent({
               <div className="hidden lg:flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs border border-slate-700/60 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))}
+                  onClick={() => {
+                    isManuallyZoomedRef.current = true
+                    setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))
+                  }}
                   className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                   title="Zoom Out"
                 >
@@ -477,7 +506,10 @@ function LoginInvoicePreviewerContent({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))}
+                  onClick={() => {
+                    isManuallyZoomedRef.current = true
+                    setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))
+                  }}
                   className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                   title="Zoom In"
                 >
@@ -485,7 +517,10 @@ function LoginInvoicePreviewerContent({
                 </button>
                 <button
                   type="button"
-                  onClick={handleAutoFit}
+                  onClick={() => {
+                    isManuallyZoomedRef.current = false
+                    handleAutoFit()
+                  }}
                   className="px-2 py-1 rounded-lg hover:bg-slate-700 text-indigo-400 font-semibold cursor-pointer text-[10px] border-l border-slate-700/60 active:scale-95"
                   title="Auto Fit to Screen"
                 >
@@ -493,7 +528,10 @@ function LoginInvoicePreviewerContent({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setZoom(1.0)}
+                  onClick={() => {
+                    isManuallyZoomedRef.current = true
+                    setZoom(1.0)
+                  }}
                   className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                   title="Reset 100%"
                 >
@@ -549,7 +587,10 @@ function LoginInvoicePreviewerContent({
             <div className="flex items-center bg-slate-800/90 rounded-xl p-0.5 text-xs border border-slate-700/60 shrink-0">
               <button
                 type="button"
-                onClick={() => setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))}
+                onClick={() => {
+                  isManuallyZoomedRef.current = true
+                  setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))
+                }}
                 className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                 title="Zoom Out"
               >
@@ -560,7 +601,10 @@ function LoginInvoicePreviewerContent({
               </span>
               <button
                 type="button"
-                onClick={() => setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))}
+                onClick={() => {
+                  isManuallyZoomedRef.current = true
+                  setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))
+                }}
                 className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                 title="Zoom In"
               >
@@ -568,7 +612,10 @@ function LoginInvoicePreviewerContent({
               </button>
               <button
                 type="button"
-                onClick={handleAutoFit}
+                onClick={() => {
+                  isManuallyZoomedRef.current = false
+                  handleAutoFit()
+                }}
                 className="px-2 py-1 rounded-lg hover:bg-slate-700 text-indigo-400 font-semibold cursor-pointer text-[10px] border-l border-slate-700/60 active:scale-95"
                 title="Fit to Screen Width"
               >
@@ -576,7 +623,10 @@ function LoginInvoicePreviewerContent({
               </button>
               <button
                 type="button"
-                onClick={() => setZoom(1.0)}
+                onClick={() => {
+                  isManuallyZoomedRef.current = true
+                  setZoom(1.0)
+                }}
                 className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                 title="Reset 100%"
               >
@@ -589,12 +639,12 @@ function LoginInvoicePreviewerContent({
 
       {/* Main Content Area */}
       <main className={cn(
-        "flex-1 flex flex-col items-center justify-center p-3 sm:p-6 transition-all duration-300",
-        verifiedInvoice ? "md:p-0 md:justify-start" : "md:p-8"
+        "flex-1 flex flex-col items-center justify-center w-full min-h-[calc(100vh-64px)] transition-all duration-300",
+        verifiedInvoice ? "p-0" : "p-4 sm:p-8"
       )}>
         <div className={cn(
-          "w-full mx-auto flex flex-col items-center justify-center transition-all duration-300",
-          verifiedInvoice ? "max-w-6xl md:max-w-none md:w-full md:justify-start" : "max-w-6xl"
+          "w-full mx-auto flex flex-col items-center justify-center flex-1",
+          verifiedInvoice ? "max-w-none" : "max-w-lg"
         )}>
           <AnimatePresence mode="wait">
             {/* 1. INITIAL LOADING SKELETON WHILE AUTO-VALIDATING */}
@@ -632,20 +682,18 @@ function LoginInvoicePreviewerContent({
             {!initialChecking && verifiedInvoice && (
               <motion.div
                 key="viewer"
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 15 }}
-                transition={{ duration: 0.25 }}
-                className={cn(
-                  "w-full bg-slate-900 rounded-3xl shadow-2xl border border-slate-800 flex flex-col transition-all duration-300 overflow-hidden",
-                  // Desktop edge-to-edge layout: eliminate container box, internal scrollbar, borders, rounded corners, and shadow
-                  "md:max-w-none md:h-auto md:min-h-[calc(100vh-64px)] md:rounded-none md:border-0 md:shadow-none md:overflow-visible md:bg-slate-950",
-                  isFullscreen ? "fixed inset-0 top-14 sm:top-16 z-40 max-w-none rounded-none border-0 h-[calc(100vh-56px)] sm:h-[calc(100vh-64px)]" : "max-w-5xl h-[88vh]"
-                )}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="w-full flex-1 flex flex-col items-center justify-center"
               >
-                {/* PDF Document Viewport Area - Centered Full-Width Canvas */}
-                <div className="flex-1 w-full bg-slate-950 py-6 sm:py-8 lg:py-12 px-2 sm:px-4 lg:px-8 flex justify-center items-start overflow-x-auto min-h-[calc(100vh-140px)]">
-                  <div className="flex flex-col items-center justify-start mx-auto transition-all duration-200">
+                {/* PDF Document Viewport Area - Centered Full-Width & Full-Height Canvas */}
+                <div
+                  ref={containerRef}
+                  className="flex-1 w-full bg-slate-950 py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-6 flex justify-center items-center overflow-auto min-h-[calc(100vh-125px)]"
+                >
+                  <div className="flex flex-col items-center justify-center my-auto mx-auto transition-all duration-200">
                     <div
                       style={{
                         width: `${originalWidth * zoom}px`,
@@ -653,7 +701,7 @@ function LoginInvoicePreviewerContent({
                         overflow: 'hidden',
                         position: 'relative'
                       }}
-                      className="transition-all duration-150 shadow-[0_10px_35px_-5px_rgba(0,0,0,0.5),0_20px_45px_-10px_rgba(0,0,0,0.7)] rounded-sm bg-white border border-slate-700/60 ring-1 ring-white/10"
+                      className="transition-all duration-150 shadow-[0_10px_35px_-5px_rgba(0,0,0,0.5),0_20px_45px_-10px_rgba(0,0,0,0.7)] rounded-sm bg-white border border-slate-700/60 ring-1 ring-white/10 mx-auto my-auto"
                     >
                       <div
                         style={{
