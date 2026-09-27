@@ -1,8 +1,8 @@
 'use client'
 
 import React from 'react'
-import LoginInvoicePreviewer from '@/components/LoginInvoicePreviewer'
+import SPreview from '@/components/SPreview'
 
 export default function DedicatedInvoicePreviewPage() {
-  return <LoginInvoicePreviewer />
+  return <SPreview />
 }

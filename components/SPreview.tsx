@@ -32,19 +32,19 @@ import { getDisplayInvoiceId, generateInvoicePreviewUrl } from '@/lib/invoice'
 import { shortenInvoiceUrl, decodeInvoiceToken } from '@/lib/shortener'
 import { toast } from 'sonner'
 
-interface LoginInvoicePreviewerProps {
+interface SPreviewProps {
   onBackToLogin?: () => void
   initialInvoiceNumber?: string
   initialInvoiceDate?: string
   initialCode?: string
 }
 
-function LoginInvoicePreviewerContent({
+function SPreviewContent({
   onBackToLogin,
   initialInvoiceNumber = '',
   initialInvoiceDate = '',
   initialCode = ''
-}: LoginInvoicePreviewerProps) {
+}: SPreviewProps) {
   const searchParams = useSearchParams()
 
   // Input states
@@ -957,7 +957,7 @@ function LoginInvoicePreviewerContent({
   )
 }
 
-export default function LoginInvoicePreviewer(props: LoginInvoicePreviewerProps) {
+export default function SPreview(props: SPreviewProps) {
   return (
     <Suspense
       fallback={
@@ -972,7 +972,7 @@ export default function LoginInvoicePreviewer(props: LoginInvoicePreviewerProps)
         </div>
       }
     >
-      <LoginInvoicePreviewerContent {...props} />
+      <SPreviewContent {...props} />
     </Suspense>
   )
 }

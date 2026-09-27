@@ -24,7 +24,7 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
-import LoginInvoicePreviewer from '@/components/LoginInvoicePreviewer';
+import SPreview from '@/components/SPreview';
 
 type PageMode = 'login' | 'forgot_identify' | 'forgot_otp' | 'forgot_reset';
 type ViewMode = 'admin' | 'preview';
@@ -305,7 +305,7 @@ export default function LoginPage() {
 
   if (viewMode === 'preview') {
     return (
-      <LoginInvoicePreviewer
+      <SPreview
         onBackToLogin={() => {
           setViewMode('admin');
           setError(null);
