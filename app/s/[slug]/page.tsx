@@ -116,7 +116,7 @@ export default function ShortLinkRedirectPage() {
             </p>
             <div className="flex flex-col gap-2 w-full">
               <Link
-                href="/s"
+                href="/login?view=preview"
                 className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
               >
                 <FileText className="w-4 h-4" />

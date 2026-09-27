@@ -309,6 +309,9 @@ export default function LoginPage() {
         onBackToLogin={() => {
           setViewMode('admin');
           setError(null);
+          if (typeof window !== 'undefined' && window.history) {
+            window.history.replaceState({}, '', '/login');
+          }
         }}
       />
     );
