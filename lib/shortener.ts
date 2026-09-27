@@ -90,7 +90,7 @@ export async function shortenInvoiceUrl(inv: any, baseUrl?: string): Promise<Sho
   if (invoiceDate) params.set('invoiceDate', invoiceDate)
   if (code) params.set('code', code)
 
-  const fullUrl = `${origin}/preview?${params.toString()}`
+  const fullUrl = `${origin}/s?${params.toString()}`
 
   try {
     const res = await fetch('/api/shorten', {

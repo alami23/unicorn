@@ -167,6 +167,6 @@ export function generateInvoicePreviewUrl(inv: any, baseUrl?: string): string {
   if (invoiceDate) params.set('invoiceDate', invoiceDate);
   if (code) params.set('code', code);
 
-  return `${origin}/preview?${params.toString()}`;
+  return `${origin}/s?${params.toString()}`;
 }
 
