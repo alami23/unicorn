@@ -28,11 +28,12 @@ export default function ShortLinkRedirectPage() {
         if (decoded) {
           setStatus('Forwarding to verified invoice...')
           const search = new URLSearchParams({
+            view: 'preview',
             invoiceNumber: decoded.invoiceNumber,
             invoiceDate: decoded.invoiceDate,
             code: decoded.code
           })
-          router.replace(`/s?${search.toString()}`)
+          router.replace(`/login?${search.toString()}`)
           return
         }
       }
@@ -45,11 +46,12 @@ export default function ShortLinkRedirectPage() {
           if (data.invoiceNumber && data.invoiceDate && data.code) {
             setStatus('Forwarding to verified invoice...')
             const search = new URLSearchParams({
+              view: 'preview',
               invoiceNumber: data.invoiceNumber,
               invoiceDate: data.invoiceDate,
               code: data.code
             })
-            router.replace(`/s?${search.toString()}`)
+            router.replace(`/login?${search.toString()}`)
             return
           }
         }
@@ -58,11 +60,12 @@ export default function ShortLinkRedirectPage() {
         const fallbackDecoded = decodeInvoiceToken(slug)
         if (fallbackDecoded) {
           const search = new URLSearchParams({
+            view: 'preview',
             invoiceNumber: fallbackDecoded.invoiceNumber,
             invoiceDate: fallbackDecoded.invoiceDate,
             code: fallbackDecoded.code
           })
-          router.replace(`/s?${search.toString()}`)
+          router.replace(`/login?${search.toString()}`)
           return
         }
 

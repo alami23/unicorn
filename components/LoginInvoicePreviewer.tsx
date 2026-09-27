@@ -23,7 +23,8 @@ import {
   Share2,
   Check,
   Lock,
-  Download
+  Download,
+  LogIn
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import InvoicePrint from './InvoicePrint'
@@ -431,18 +432,67 @@ function LoginInvoicePreviewerContent({
         {/* Row 1: Brand & Search + Actions (Mobile & Desktop) */}
         <div className="w-full px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Far Left: Business Name & Identity */}
-          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 font-bold text-xs sm:text-sm">
-              TF
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-xs sm:text-sm md:text-base tracking-tight block leading-tight text-white truncate max-w-[120px] sm:max-w-[180px] md:max-w-[240px]">
-                {verifiedInvoice?.business?.name || 'Timber & Furniture ERP'}
-              </span>
-              <span className="text-[10px] text-slate-400 hidden xl:inline leading-none">
-                Official Document Portal
-              </span>
-            </div>
+          {onBackToLogin ? (
+            <button
+              type="button"
+              onClick={onBackToLogin}
+              className="flex items-center gap-2.5 sm:gap-3 shrink-0 cursor-pointer text-left"
+              title="Return to Login"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 font-bold text-xs sm:text-sm">
+                TF
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-xs sm:text-sm md:text-base tracking-tight block leading-tight text-white truncate max-w-[120px] sm:max-w-[180px] md:max-w-[240px]">
+                  {verifiedInvoice?.business?.name || 'Timber & Furniture ERP'}
+                </span>
+                <span className="text-[10px] text-slate-400 hidden xl:inline leading-none">
+                  Official Document Portal
+                </span>
+              </div>
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              className="flex items-center gap-2.5 sm:gap-3 shrink-0 cursor-pointer"
+              title="Return to Login"
+            >
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 font-bold text-xs sm:text-sm">
+                TF
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-xs sm:text-sm md:text-base tracking-tight block leading-tight text-white truncate max-w-[120px] sm:max-w-[180px] md:max-w-[240px]">
+                  {verifiedInvoice?.business?.name || 'Timber & Furniture ERP'}
+                </span>
+                <span className="text-[10px] text-slate-400 hidden xl:inline leading-none">
+                  Official Document Portal
+                </span>
+              </div>
+            </Link>
+          )}
+
+          {/* Center: Login Button */}
+          <div className="flex items-center">
+            {onBackToLogin ? (
+              <button
+                type="button"
+                onClick={onBackToLogin}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-slate-700/80 bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                title="Staff Login"
+              >
+                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400" />
+                <span>Login</span>
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-slate-700/80 bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                title="Staff Login"
+              >
+                <LogIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400" />
+                <span>Login</span>
+              </Link>
+            )}
           </div>
 
           {verifiedInvoice ? (
