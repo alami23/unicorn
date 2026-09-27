@@ -28,12 +28,11 @@ export default function ShortLinkRedirectPage() {
         if (decoded) {
           setStatus('Forwarding to verified invoice...')
           const search = new URLSearchParams({
-            view: 'preview',
             invoiceNumber: decoded.invoiceNumber,
             invoiceDate: decoded.invoiceDate,
             code: decoded.code
           })
-          router.replace(`/login?${search.toString()}`)
+          router.replace(`/s?${search.toString()}`)
           return
         }
       }
@@ -46,12 +45,11 @@ export default function ShortLinkRedirectPage() {
           if (data.invoiceNumber && data.invoiceDate && data.code) {
             setStatus('Forwarding to verified invoice...')
             const search = new URLSearchParams({
-              view: 'preview',
               invoiceNumber: data.invoiceNumber,
               invoiceDate: data.invoiceDate,
               code: data.code
             })
-            router.replace(`/login?${search.toString()}`)
+            router.replace(`/s?${search.toString()}`)
             return
           }
         }
@@ -60,12 +58,11 @@ export default function ShortLinkRedirectPage() {
         const fallbackDecoded = decodeInvoiceToken(slug)
         if (fallbackDecoded) {
           const search = new URLSearchParams({
-            view: 'preview',
             invoiceNumber: fallbackDecoded.invoiceNumber,
             invoiceDate: fallbackDecoded.invoiceDate,
             code: fallbackDecoded.code
           })
-          router.replace(`/login?${search.toString()}`)
+          router.replace(`/s?${search.toString()}`)
           return
         }
 
@@ -116,7 +113,7 @@ export default function ShortLinkRedirectPage() {
             </p>
             <div className="flex flex-col gap-2 w-full">
               <Link
-                href="/login?view=preview"
+                href="/s"
                 className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors"
               >
                 <FileText className="w-4 h-4" />

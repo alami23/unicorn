@@ -163,11 +163,10 @@ export function generateInvoicePreviewUrl(inv: any, baseUrl?: string): string {
   const code = getInvoiceVerificationCode(inv);
 
   const params = new URLSearchParams();
-  params.set('view', 'preview');
   if (invoiceNumber) params.set('invoiceNumber', invoiceNumber);
   if (invoiceDate) params.set('invoiceDate', invoiceDate);
   if (code) params.set('code', code);
 
-  return `${origin}/login?${params.toString()}`;
+  return `${origin}/s?${params.toString()}`;
 }
 

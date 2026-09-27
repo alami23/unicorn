@@ -45,7 +45,10 @@ export default function LoginPage() {
         params.get('slug') ||
         params.get('short')
       ) {
-        setViewMode('preview');
+        // Forward to the dedicated /s preview page
+        params.delete('view');
+        const q = params.toString();
+        window.location.replace(q ? `/s?${q}` : '/s');
       }
     }
   }, []);
@@ -323,18 +326,16 @@ export default function LoginPage() {
       <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 flex items-center gap-2.5">
         <button
           type="button"
-          onClick={() => { setViewMode('admin'); setError(null); }}
-          className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/25"
+          className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md shadow-sm border bg-indigo-600 text-white border-indigo-600 shadow-indigo-500/25 cursor-default"
         >
           Admin
         </button>
-        <button
-          type="button"
-          onClick={() => { setViewMode('preview'); setError(null); }}
+        <Link
+          href="/s"
           className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800"
         >
           Preview
-        </button>
+        </Link>
       </div>
 
       {/* Light Mode / Dark Mode Switcher */}

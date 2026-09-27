@@ -86,12 +86,11 @@ export async function shortenInvoiceUrl(inv: any, baseUrl?: string): Promise<Sho
   const code = getInvoiceVerificationCode(inv)
 
   const params = new URLSearchParams()
-  params.set('view', 'preview')
   if (invoiceNumber) params.set('invoiceNumber', invoiceNumber)
   if (invoiceDate) params.set('invoiceDate', invoiceDate)
   if (code) params.set('code', code)
 
-  const fullUrl = `${origin}/login?${params.toString()}`
+  const fullUrl = `${origin}/s?${params.toString()}`
 
   try {
     const res = await fetch('/api/shorten', {
