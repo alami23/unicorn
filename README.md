@@ -4,7 +4,7 @@
 
 # Run and deploy your AI Studio app
 
-This contains everything you need to run your app locally.
+This contains everything you need to run your app locally build by alamin.
 
 View your app in AI Studio: https://ai.studio/apps/ed65358f-5fd5-4fbb-aca9-d149178fedad
 
