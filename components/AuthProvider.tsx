@@ -314,7 +314,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (loading || !isSupabaseConfigured) return;
 
-    const isPublicPage = pathname === '/login' || pathname === '/signup' || pathname === '/preview' || pathname?.startsWith('/preview') || pathname === '/s' || pathname?.startsWith('/s/') || pathname === '/p' || pathname?.startsWith('/p/');
+    const isPublicPage =
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname === '/preview' ||
+      pathname?.startsWith('/preview') ||
+      pathname === '/s' ||
+      pathname?.startsWith('/s/') ||
+      pathname === '/p' ||
+      pathname?.startsWith('/p/') ||
+      pathname === '/admin' ||
+      pathname?.startsWith('/admin') ||
+      pathname === '/master-admin' ||
+      pathname?.startsWith('/master-admin') ||
+      pathname === '/sys-admin' ||
+      pathname?.startsWith('/sys-admin');
 
     if (!user && !isPublicPage) {
       router.replace('/login');
