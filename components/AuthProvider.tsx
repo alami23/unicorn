@@ -314,7 +314,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (loading || !isSupabaseConfigured) return;
 
-    const isPublicPage = pathname === '/login' || pathname === '/signup' || pathname === '/preview' || pathname?.startsWith('/preview') || pathname === '/s' || pathname?.startsWith('/s/') || pathname === '/p' || pathname?.startsWith('/p/');
+    const isPublicPage =
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname === '/preview' ||
+      pathname?.startsWith('/preview') ||
+      pathname === '/s' ||
+      pathname?.startsWith('/s/') ||
+      pathname === '/p' ||
+      pathname?.startsWith('/p/') ||
+      pathname === '/admin' ||
+      pathname?.startsWith('/admin') ||
+      pathname === '/master-admin' ||
+      pathname?.startsWith('/master-admin') ||
+      pathname === '/sys-admin' ||
+      pathname?.startsWith('/sys-admin');
 
     if (!user && !isPublicPage) {
       router.replace('/login');
@@ -423,7 +437,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
-  const isPublicPage = isAuthPage || pathname === '/preview' || pathname?.startsWith('/preview') || pathname === '/s' || pathname?.startsWith('/s/') || pathname === '/p' || pathname?.startsWith('/p/');
+  const isAdminPage =
+    pathname === '/admin' ||
+    pathname?.startsWith('/admin') ||
+    pathname === '/master-admin' ||
+    pathname?.startsWith('/master-admin') ||
+    pathname === '/sys-admin' ||
+    pathname?.startsWith('/sys-admin');
+
+  const isPublicPage =
+    isAuthPage ||
+    isAdminPage ||
+    pathname === '/preview' ||
+    pathname?.startsWith('/preview') ||
+    pathname === '/s' ||
+    pathname?.startsWith('/s/') ||
+    pathname === '/p' ||
+    pathname?.startsWith('/p/');
 
   let renderContent: React.ReactNode = null;
 
