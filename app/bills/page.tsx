@@ -494,17 +494,27 @@ function BillsContent() {
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
-            {/* Save Vendor Button */}
+            {/* Category Manager Button */}
+            <button
+              type="button"
+              onClick={handleCreateCategory}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all shadow-sm active:scale-95 cursor-pointer"
+            >
+              <FolderPlus size={16} className="text-indigo-600" />
+              <span>Category Manager</span>
+            </button>
+
+            {/* Save Vendor Button (Icon Style) */}
             <button
               type="button"
               onClick={() => {
                 setEditingVendor(null)
                 setIsVendorModalOpen(true)
               }}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all shadow-sm active:scale-95 cursor-pointer"
+              className="p-2.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all shadow-sm active:scale-95 cursor-pointer"
+              title="Add New Vendor"
             >
-              <Building2 size={16} className="text-amber-600" />
-              <span>Add Vendor</span>
+              <UserPlus size={20} className="text-amber-600" />
             </button>
 
             {/* Add Bill Button */}
@@ -1179,16 +1189,7 @@ function BillsContent() {
 
                     {/* Category */}
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Category</label>
-                        <button
-                          type="button"
-                          onClick={handleCreateCategory}
-                          className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <Plus size={10} /> Create Category
-                        </button>
-                      </div>
+                      <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Category</label>
                       <div className="relative">
                         <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <select 
