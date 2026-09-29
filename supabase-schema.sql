@@ -57,6 +57,24 @@ CREATE TABLE IF NOT EXISTS public.bills (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 4b. Vendors Table (Suppliers & Vendor Profiles)
+CREATE TABLE IF NOT EXISTS public.vendors (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  photo TEXT,
+  org_id UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow authenticated full access to vendors" ON public.vendors;
+DROP POLICY IF EXISTS "Allow public full access to vendors" ON public.vendors;
+CREATE POLICY "Allow public full access to vendors" ON public.vendors FOR ALL TO public USING (true) WITH CHECK (true);
+
+
 -- 5. Furniture Products Table
 CREATE TABLE IF NOT EXISTS public.furniture_inventory (
   id SERIAL PRIMARY KEY,

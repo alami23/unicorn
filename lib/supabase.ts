@@ -155,6 +155,7 @@ const TENANT_TABLES = [
   'customer',
   'staff',
   'bills',
+  'vendors',
   'furniture_inventory',
   'wood_inventory',
   'furniture_invoices',

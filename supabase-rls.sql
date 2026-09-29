@@ -53,6 +53,17 @@ CREATE TABLE IF NOT EXISTS public.bills (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS public.vendors (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  photo TEXT,
+  org_id UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS public.furniture_inventory (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -244,6 +255,7 @@ ALTER TABLE public.custom_users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'Supe
 ALTER TABLE public.customer ADD COLUMN IF NOT EXISTS org_id UUID;
 ALTER TABLE public.staff ADD COLUMN IF NOT EXISTS org_id UUID;
 ALTER TABLE public.bills ADD COLUMN IF NOT EXISTS org_id UUID;
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS org_id UUID;
 ALTER TABLE public.furniture_inventory ADD COLUMN IF NOT EXISTS org_id UUID;
 ALTER TABLE public.wood_inventory ADD COLUMN IF NOT EXISTS org_id UUID;
 ALTER TABLE public.furniture_invoices ADD COLUMN IF NOT EXISTS invoice_number TEXT;
@@ -277,6 +289,7 @@ BEGIN
   UPDATE public.customer SET org_id = default_org_id WHERE org_id IS NULL;
   UPDATE public.staff SET org_id = default_org_id WHERE org_id IS NULL;
   UPDATE public.bills SET org_id = default_org_id WHERE org_id IS NULL;
+  UPDATE public.vendors SET org_id = default_org_id WHERE org_id IS NULL;
   UPDATE public.furniture_inventory SET org_id = default_org_id WHERE org_id IS NULL;
   UPDATE public.wood_inventory SET org_id = default_org_id WHERE org_id IS NULL;
   UPDATE public.furniture_invoices SET org_id = default_org_id WHERE org_id IS NULL;
@@ -325,6 +338,7 @@ $$ LANGUAGE sql STABLE;
 ALTER TABLE public.customer ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.furniture_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wood_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.furniture_invoices ENABLE ROW LEVEL SECURITY;
@@ -344,6 +358,7 @@ ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public full access to customer" ON public.customer;
 DROP POLICY IF EXISTS "Allow public full access to staff" ON public.staff;
 DROP POLICY IF EXISTS "Allow public full access to bills" ON public.bills;
+DROP POLICY IF EXISTS "Allow public full access to vendors" ON public.vendors;
 DROP POLICY IF EXISTS "Allow public full access to furniture_inventory" ON public.furniture_inventory;
 DROP POLICY IF EXISTS "Allow public full access to wood_inventory" ON public.wood_inventory;
 DROP POLICY IF EXISTS "Allow all access to furniture_invoices" ON public.furniture_invoices;
@@ -363,6 +378,7 @@ DROP POLICY IF EXISTS "Allow public full access to app_settings" ON public.app_s
 DROP POLICY IF EXISTS "Tenant isolation for customer" ON public.customer;
 DROP POLICY IF EXISTS "Tenant isolation for staff" ON public.staff;
 DROP POLICY IF EXISTS "Tenant isolation for bills" ON public.bills;
+DROP POLICY IF EXISTS "Tenant isolation for vendors" ON public.vendors;
 DROP POLICY IF EXISTS "Tenant isolation for furniture_inventory" ON public.furniture_inventory;
 DROP POLICY IF EXISTS "Tenant isolation for wood_inventory" ON public.wood_inventory;
 DROP POLICY IF EXISTS "Tenant isolation for furniture_invoices" ON public.furniture_invoices;
@@ -382,6 +398,7 @@ DROP POLICY IF EXISTS "Tenant isolation for app_settings" ON public.app_settings
 CREATE POLICY "Tenant isolation for customer" ON public.customer FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for staff" ON public.staff FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for bills" ON public.bills FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
+CREATE POLICY "Tenant isolation for vendors" ON public.vendors FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for furniture_inventory" ON public.furniture_inventory FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for wood_inventory" ON public.wood_inventory FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for furniture_invoices" ON public.furniture_invoices FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
