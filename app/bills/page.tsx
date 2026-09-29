@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import Image from 'next/image'
 import SaveVendorModal, { Vendor } from '@/components/SaveVendorModal'
+import CategoryManagerModal from '@/components/CategoryManagerModal'
 
 interface Bill {
   id: string
@@ -32,53 +33,11 @@ interface Bill {
   createdAt: string
 }
 
-const defaultInitialBills: Bill[] = [
-  { id: 'BILL-001', vendor: 'Timber Supply Co.', category: 'Wood Purchase', amount: 85000, date: '2024-03-20', status: 'Paid', note: 'Mahogany & Teak stock', createdAt: new Date().toISOString() },
-  { id: 'BILL-002', vendor: 'Hardware World', category: 'Accessories', amount: 12500, date: '2024-03-19', status: 'Pending', note: 'Hinges and handles', createdAt: new Date().toISOString() },
-  { id: 'BILL-003', vendor: 'City Electric', category: 'Utility', amount: 4500, date: '2024-03-15', status: 'Paid', note: 'Workshop electricity', createdAt: new Date().toISOString() },
-  { id: 'BILL-004', vendor: 'Workshop Rent', category: 'Rent', amount: 25000, date: '2024-03-01', status: 'Paid', note: 'March 2024 rent', createdAt: new Date().toISOString() },
-]
+const defaultInitialBills: Bill[] = []
 
-const initialDemoVendors: Vendor[] = [
-  {
-    id: 'VEND-001',
-    name: 'Timber Supply Co.',
-    phone: '+880 1711 223344',
-    email: 'info@timbersupply.com',
-    address: 'Plot 14, Wood Market, Gabtoli, Dhaka',
-    photo: null,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'VEND-002',
-    name: 'Hardware World',
-    phone: '+880 1819 887766',
-    email: 'sales@hardwareworld.com',
-    address: 'Shop 23, Nawabpur Road, Old Dhaka',
-    photo: null,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'VEND-003',
-    name: 'City Electric',
-    phone: '+880 1912 334455',
-    email: 'contact@cityelectric.com',
-    address: 'Gulshan 1, Dhaka',
-    photo: null,
-    created_at: new Date().toISOString()
-  },
-  {
-    id: 'VEND-004',
-    name: 'Workshop Rent',
-    phone: '+880 1515 990011',
-    email: 'landlord@property.com',
-    address: 'Badda Workshop Complex, Dhaka',
-    photo: null,
-    created_at: new Date().toISOString()
-  }
-]
+const initialDemoVendors: Vendor[] = []
 
-const initialExpenseCategories = ['Wood Purchase', 'Accessories', 'Utility', 'Rent', 'Wages', 'Transport', 'Marketing', 'Maintenance', 'Other']
+const initialExpenseCategories: string[] = []
 
 function BillsContent() {
   const [bills, setBills] = useState<Bill[]>([])
@@ -108,6 +67,9 @@ function BillsContent() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null)
   const [isDeleteVendorModalOpen, setIsDeleteVendorModalOpen] = useState(false)
   const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null)
+
+  // Category Modal
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
   // New Bill State
   const [newBill, setNewBill] = useState<Omit<Bill, 'id' | 'createdAt'>>({
@@ -176,15 +138,12 @@ function BillsContent() {
         }
       }
 
-      // 3. Fallback to initial demo vendors if still empty
+      // 3. Fallback to empty if still empty
       if (loadedVendors.length === 0) {
-        loadedVendors = initialDemoVendors
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('app_saved_vendors', JSON.stringify(initialDemoVendors))
-        }
+        setVendors([])
+      } else {
+        setVendors(loadedVendors)
       }
-
-      setVendors(loadedVendors)
     } catch (err) {
       console.error('Error fetching vendors:', err)
     }
@@ -212,12 +171,11 @@ function BillsContent() {
           createdAt: b.created_at
         })))
       } else {
-        // Fallback to default initial bills if table is empty
-        setBills(defaultInitialBills)
+        setBills([])
       }
     } catch (error) {
-      console.warn('Notice loading bills from Supabase, using initial state:', error)
-      setBills(defaultInitialBills)
+      console.warn('Notice loading bills from Supabase:', error)
+      setBills([])
     } finally {
       setIsLoading(false)
     }
@@ -234,37 +192,25 @@ function BillsContent() {
         try {
           const parsed = JSON.parse(savedCategories)
           if (Array.isArray(parsed)) {
-            // Merge initial with saved, removing duplicates
-            const merged = Array.from(new Set([...initialExpenseCategories, ...parsed]))
-            setCategories(merged)
+            setCategories(parsed)
+          } else {
+            setCategories([])
           }
         } catch (e) {
           console.error('Error parsing categories from localStorage', e)
+          setCategories([])
         }
+      } else {
+        setCategories([])
       }
     }
   }, [isMounted, fetchBills, fetchVendors])
 
-  const handleCreateCategory = () => {
-    const newCat = prompt('Enter new category name:')
-    if (newCat && newCat.trim()) {
-      const trimmed = newCat.trim()
-      if (categories.includes(trimmed)) {
-        toast.error('Category already exists')
-        return
-      }
-      const updated = [...categories, trimmed]
-      setCategories(updated)
-      localStorage.setItem('app_expense_categories', JSON.stringify(updated.filter(c => !initialExpenseCategories.includes(c))))
-      toast.success('Category created')
-      
-      // Select it for the new bill if adding
-      if (isAddModalOpen) {
-        setNewBill(prev => ({ ...prev, category: trimmed }))
-      } else if (isEditModalOpen && editingBill) {
-        setEditingBill(prev => prev ? ({ ...prev, category: trimmed }) : null)
-      }
-    }
+  const handleUpdateCategories = (updatedCategories: string[]) => {
+    setCategories(updatedCategories)
+    // Only save the custom ones back to localStorage
+    const customOnes = updatedCategories.filter(c => !initialExpenseCategories.includes(c))
+    localStorage.setItem('app_expense_categories', JSON.stringify(customOnes))
   }
 
   // Map of vendors for quick lookup by name
@@ -497,7 +443,7 @@ function BillsContent() {
             {/* Category Manager Button */}
             <button
               type="button"
-              onClick={handleCreateCategory}
+              onClick={() => setIsCategoryModalOpen(true)}
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all shadow-sm active:scale-95 cursor-pointer"
             >
               <FolderPlus size={16} className="text-indigo-600" />
@@ -1298,6 +1244,15 @@ function BillsContent() {
           }}
           onSave={handleVendorSaved}
           initialData={editingVendor}
+        />
+
+        {/* Category Manager Modal */}
+        <CategoryManagerModal
+          isOpen={isCategoryModalOpen}
+          onClose={() => setIsCategoryModalOpen(false)}
+          categories={categories}
+          initialCategories={initialExpenseCategories}
+          onUpdate={handleUpdateCategories}
         />
 
         {/* Delete Bill Confirmation Modal */}
