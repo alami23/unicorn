@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import Image from 'next/image'
 import SaveVendorModal, { Vendor } from '@/components/SaveVendorModal'
 import CategoryManagerModal from '@/components/CategoryManagerModal'
+import VendorsListModal from '@/components/VendorsListModal'
 
 interface Bill {
   id: string
@@ -46,14 +47,10 @@ function BillsContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMounted, setIsMounted] = useState(false)
 
-  // View tabs: 'bills' | 'vendors'
-  const [activeTab, setActiveTab] = useState<'bills' | 'vendors'>('bills')
-
   // Search & filter states
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
   const [selectedStatus, setSelectedStatus] = useState<string>('All')
-  const [vendorSearch, setVendorSearch] = useState('')
   
   // Bill Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -67,6 +64,7 @@ function BillsContent() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null)
   const [isDeleteVendorModalOpen, setIsDeleteVendorModalOpen] = useState(false)
   const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null)
+  const [isVendorsListModalOpen, setIsVendorsListModalOpen] = useState(false)
 
   // Category Modal
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
@@ -232,17 +230,6 @@ function BillsContent() {
       return matchesSearch && matchesCategory && matchesStatus
     })
   }, [bills, searchTerm, selectedCategory, selectedStatus])
-
-  // Filtered vendors
-  const filteredVendors = useMemo(() => {
-    return vendors.filter(v => {
-      const q = vendorSearch.toLowerCase()
-      return v.name.toLowerCase().includes(q) ||
-             v.phone.toLowerCase().includes(q) ||
-             v.email.toLowerCase().includes(q) ||
-             v.address.toLowerCase().includes(q)
-    })
-  }, [vendors, vendorSearch])
 
   // Overall statistics
   const stats = useMemo(() => {
@@ -440,6 +427,19 @@ function BillsContent() {
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Saved Vendors Button (placed to the left of Category Manager) */}
+            <button
+              type="button"
+              onClick={() => setIsVendorsListModalOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all shadow-sm active:scale-95 cursor-pointer"
+            >
+              <Building2 size={16} className="text-amber-600" />
+              <span>Saved Vendors</span>
+              <span className="px-1.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                {vendors.length}
+              </span>
+            </button>
+
             {/* Category Manager Button */}
             <button
               type="button"
@@ -490,55 +490,9 @@ function BillsContent() {
           ))}
         </div>
 
-        {/* Tab Switcher: Bills vs Vendors */}
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('bills')}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all cursor-pointer",
-                activeTab === 'bills'
-                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              )}
-            >
-              <Receipt size={16} />
-              <span>Bills & Expenses</span>
-              <span className={cn(
-                "px-2 py-0.5 text-xs rounded-full",
-                activeTab === 'bills' ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-              )}>
-                {bills.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('vendors')}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all cursor-pointer",
-                activeTab === 'vendors'
-                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              )}
-            >
-              <Building2 size={16} />
-              <span>Saved Vendors</span>
-              <span className={cn(
-                "px-2 py-0.5 text-xs rounded-full",
-                activeTab === 'vendors' ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-              )}>
-                {vendors.length}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* TAB 1: Bills & Expenses */}
-        {activeTab === 'bills' && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            {/* Filters Bar */}
+        {/* Main Content: Bills & Expenses Table */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          {/* Filters Bar */}
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-4 md:space-y-0 md:flex md:items-center md:gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -763,186 +717,7 @@ function BillsContent() {
                 </button>
               </div>
             )}
-          </div>
-        )}
-
-        {/* TAB 2: Saved Vendors Directory */}
-        {activeTab === 'vendors' && (
-          <div className="space-y-4">
-            {/* Vendor search & Quick Add */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search vendors by name, phone, email, address..."
-                  value={vendorSearch}
-                  onChange={(e) => setVendorSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-sm dark:text-slate-100 focus:ring-2 focus:ring-amber-500/20"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingVendor(null)
-                  setIsVendorModalOpen(true)
-                }}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-all shadow-md shadow-amber-600/20 active:scale-95 whitespace-nowrap cursor-pointer"
-              >
-                <Plus size={16} />
-                <span>Save New Vendor</span>
-              </button>
-            </div>
-
-            {/* Vendor Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredVendors.map((vendor) => {
-                const vendorBills = bills.filter(b => b.vendor.toLowerCase().trim() === vendor.name.toLowerCase().trim())
-                const totalSpent = vendorBills.reduce((acc, b) => acc + b.amount, 0)
-
-                return (
-                  <div
-                    key={vendor.id}
-                    className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-amber-400/50 dark:hover:border-amber-600/50 transition-all space-y-4 flex flex-col justify-between"
-                  >
-                    <div>
-                      {/* Top Bar: Logo & Actions */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="relative w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/60 flex items-center justify-center overflow-hidden shrink-0">
-                            {vendor.photo ? (
-                              <Image
-                                src={vendor.photo}
-                                alt={vendor.name}
-                                fill
-                                className="object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <Building2 size={24} className="text-amber-600 dark:text-amber-400" />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
-                              {vendor.name}
-                            </h3>
-                            <span className="text-[11px] text-slate-400 font-mono">
-                              {vendor.id}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingVendor(vendor)
-                              setIsVendorModalOpen(true)
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                            title="Edit Vendor"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setVendorToDelete(vendor)
-                              setIsDeleteVendorModalOpen(true)
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
-                            title="Delete Vendor"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Contact Info */}
-                      <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                        {vendor.phone && (
-                          <div className="flex items-center gap-2">
-                            <Phone size={13} className="text-slate-400 shrink-0" />
-                            <a href={`tel:${vendor.phone}`} className="hover:underline font-medium">
-                              {vendor.phone}
-                            </a>
-                          </div>
-                        )}
-                        {vendor.email && (
-                          <div className="flex items-center gap-2">
-                            <Mail size={13} className="text-slate-400 shrink-0" />
-                            <a href={`mailto:${vendor.email}`} className="hover:underline font-medium truncate">
-                              {vendor.email}
-                            </a>
-                          </div>
-                        )}
-                        {vendor.address && (
-                          <div className="flex items-start gap-2">
-                            <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
-                            <span className="line-clamp-2 leading-relaxed">
-                              {vendor.address}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Footer Stats & Quick Bill */}
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                          Total Spent
-                        </span>
-                        <span className="text-sm font-bold text-slate-900 dark:text-white">
-                          ৳{totalSpent.toLocaleString()}
-                        </span>
-                        <span className="text-[11px] text-slate-400 ml-1">
-                          ({vendorBills.length} bills)
-                        </span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewBill(prev => ({ ...prev, vendor: vendor.name }))
-                          setIsAddModalOpen(true)
-                        }}
-                        className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white dark:hover:bg-amber-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 active:scale-95"
-                      >
-                        <span>Bill Vendor</span>
-                        <ArrowRight size={12} />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {filteredVendors.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 px-6 text-center text-slate-500 dark:text-slate-400 space-y-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
-                <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/30 text-amber-600 flex items-center justify-center">
-                  <Building2 size={32} />
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-slate-700 dark:text-slate-200">No vendors found</p>
-                  <p className="text-sm max-w-xs mx-auto mt-1">
-                    Save vendor details including name, contact info, and logo for simplified billing.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingVendor(null)
-                    setIsVendorModalOpen(true)
-                  }}
-                  className="px-5 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-all shadow-md shadow-amber-600/20 active:scale-95"
-                >
-                  Save First Vendor
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        </div>
 
         {/* Add/Edit Bill Modal */}
         <AnimatePresence>
@@ -1076,43 +851,6 @@ function BillsContent() {
                           <UserPlus size={18} />
                         </button>
                       </div>
-
-                      {/* Selected Vendor Info Preview Card */}
-                      {(() => {
-                        const currentVendorName = isAddModalOpen ? newBill.vendor : editingBill?.vendor || ''
-                        const matched = vendorMap.get(currentVendorName.toLowerCase().trim())
-                        if (!matched) return null
-
-                        return (
-                          <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2.5">
-                              <div className="relative w-8 h-8 rounded-lg bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800/60 overflow-hidden flex items-center justify-center shrink-0">
-                                {matched.photo ? (
-                                  <Image src={matched.photo} alt={matched.name} fill className="object-cover" referrerPolicy="no-referrer" />
-                                ) : (
-                                  <Building2 size={16} className="text-amber-600" />
-                                )}
-                              </div>
-                              <div>
-                                <p className="font-bold text-slate-800 dark:text-slate-200">{matched.name}</p>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[240px]">
-                                  {matched.phone ? `${matched.phone} • ` : ''}{matched.address || matched.email || 'Saved Vendor Profile'}
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingVendor(matched)
-                                setIsVendorModalOpen(true)
-                              }}
-                              className="text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline px-2 py-1"
-                            >
-                              Edit Info
-                            </button>
-                          </div>
-                        )
-                      })()}
                     </div>
 
                     {/* Amount */}
@@ -1253,6 +991,31 @@ function BillsContent() {
           categories={categories}
           initialCategories={initialExpenseCategories}
           onUpdate={handleUpdateCategories}
+        />
+
+        {/* Saved Vendors List Modal */}
+        <VendorsListModal
+          isOpen={isVendorsListModalOpen}
+          onClose={() => setIsVendorsListModalOpen(false)}
+          vendors={vendors}
+          bills={bills}
+          onAddVendor={() => {
+            setEditingVendor(null)
+            setIsVendorModalOpen(true)
+          }}
+          onEditVendor={(vendor) => {
+            setEditingVendor(vendor)
+            setIsVendorModalOpen(true)
+          }}
+          onDeleteVendor={(vendor) => {
+            setVendorToDelete(vendor)
+            setIsDeleteVendorModalOpen(true)
+          }}
+          onBillVendor={(vendorName) => {
+            setIsVendorsListModalOpen(false)
+            setNewBill(prev => ({ ...prev, vendor: vendorName }))
+            setIsAddModalOpen(true)
+          }}
         />
 
         {/* Delete Bill Confirmation Modal */}

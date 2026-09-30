@@ -74,6 +74,20 @@ DROP POLICY IF EXISTS "Allow authenticated full access to vendors" ON public.ven
 DROP POLICY IF EXISTS "Allow public full access to vendors" ON public.vendors;
 CREATE POLICY "Allow public full access to vendors" ON public.vendors FOR ALL TO public USING (true) WITH CHECK (true);
 
+-- 4c. Categories Table (Expense Categories for Bills & Expenses)
+CREATE TABLE IF NOT EXISTS public.categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  org_id UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow authenticated full access to categories" ON public.categories;
+DROP POLICY IF EXISTS "Allow public full access to categories" ON public.categories;
+CREATE POLICY "Allow public full access to categories" ON public.categories FOR ALL TO public USING (true) WITH CHECK (true);
+
 
 -- 5. Furniture Products Table
 CREATE TABLE IF NOT EXISTS public.furniture_inventory (

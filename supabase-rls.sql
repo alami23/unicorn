@@ -64,6 +64,14 @@ CREATE TABLE IF NOT EXISTS public.vendors (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS public.categories (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  org_id UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS public.furniture_inventory (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -339,6 +347,7 @@ ALTER TABLE public.customer ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.furniture_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wood_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.furniture_invoices ENABLE ROW LEVEL SECURITY;
@@ -359,6 +368,7 @@ DROP POLICY IF EXISTS "Allow public full access to customer" ON public.customer;
 DROP POLICY IF EXISTS "Allow public full access to staff" ON public.staff;
 DROP POLICY IF EXISTS "Allow public full access to bills" ON public.bills;
 DROP POLICY IF EXISTS "Allow public full access to vendors" ON public.vendors;
+DROP POLICY IF EXISTS "Allow public full access to categories" ON public.categories;
 DROP POLICY IF EXISTS "Allow public full access to furniture_inventory" ON public.furniture_inventory;
 DROP POLICY IF EXISTS "Allow public full access to wood_inventory" ON public.wood_inventory;
 DROP POLICY IF EXISTS "Allow all access to furniture_invoices" ON public.furniture_invoices;
@@ -379,6 +389,7 @@ DROP POLICY IF EXISTS "Tenant isolation for customer" ON public.customer;
 DROP POLICY IF EXISTS "Tenant isolation for staff" ON public.staff;
 DROP POLICY IF EXISTS "Tenant isolation for bills" ON public.bills;
 DROP POLICY IF EXISTS "Tenant isolation for vendors" ON public.vendors;
+DROP POLICY IF EXISTS "Tenant isolation for categories" ON public.categories;
 DROP POLICY IF EXISTS "Tenant isolation for furniture_inventory" ON public.furniture_inventory;
 DROP POLICY IF EXISTS "Tenant isolation for wood_inventory" ON public.wood_inventory;
 DROP POLICY IF EXISTS "Tenant isolation for furniture_invoices" ON public.furniture_invoices;
@@ -399,6 +410,7 @@ CREATE POLICY "Tenant isolation for customer" ON public.customer FOR ALL TO publ
 CREATE POLICY "Tenant isolation for staff" ON public.staff FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for bills" ON public.bills FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for vendors" ON public.vendors FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
+CREATE POLICY "Tenant isolation for categories" ON public.categories FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for furniture_inventory" ON public.furniture_inventory FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for wood_inventory" ON public.wood_inventory FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
 CREATE POLICY "Tenant isolation for furniture_invoices" ON public.furniture_invoices FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());

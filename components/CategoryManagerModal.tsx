@@ -248,7 +248,7 @@ export default function CategoryManagerModal({
                     </div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">Delete Category?</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                      Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-slate-200">"{categories[deleteIndex]}"</span>?
+                      Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-slate-200">&quot;{categories[deleteIndex]}&quot;</span>?
                     </p>
                     <div className="flex gap-3">
                       <button
