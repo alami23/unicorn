@@ -457,6 +457,54 @@ function InvoicePageContent() {
     }
   }
 
+  const handleEditInvoice = async (inv: any) => {
+    setIsFetchingItems(true)
+    try {
+      const isWood = inv.originalType?.toLowerCase() === 'wood' || 
+                     inv.originalType?.toLowerCase() === 'solo_wood' || 
+                     inv.type?.toLowerCase() === 'wood' || 
+                     inv.type?.toLowerCase() === 'solo_wood' ||
+                     inv.id?.includes('-W-')
+      const itemsTable = isWood ? 'wood_invoice_items' : 'furniture_invoice_items'
+
+      const { data: items } = await supabase
+        .from(itemsTable)
+        .select('*')
+        .eq('invoice_id', inv.id)
+        .order('id', { ascending: true })
+
+      let customerDetails = null
+      let oldDue = 0
+      if (inv.customer && inv.customer !== 'Walk-in Customer') {
+        const { data: customerData } = await supabase
+          .from('customer')
+          .select('total_due, phone, address')
+          .eq('name', inv.customer)
+          .maybeSingle()
+        
+        if (customerData) {
+          customerDetails = customerData
+          oldDue = Math.max(0, (customerData.total_due || 0) - (inv.due || 0))
+        }
+      }
+
+      setSelectedInvoice({
+        ...inv,
+        items: items || [],
+        oldDue,
+        customerPhone: inv.customerPhone || customerDetails?.phone || '',
+        customerAddress: inv.customerAddress || customerDetails?.address || ''
+      })
+      setIsEditModalOpen(true)
+    } catch (err) {
+      console.error('Error preparing invoice for edit:', err)
+      setSelectedInvoice(inv)
+      setIsEditModalOpen(true)
+    } finally {
+      setIsFetchingItems(false)
+    }
+  }
+
   const handleDeleteInvoice = async (inv: any) => {
     try {
       const isWood = inv.originalType?.toLowerCase() === 'wood' || 
@@ -1112,13 +1160,10 @@ function InvoicePageContent() {
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuItem 
-                                  onClick={() => {
-                                    setSelectedInvoice(inv)
-                                    setIsEditModalOpen(true)
-                                  }}
-                                  className="gap-3"
+                                  onClick={() => handleEditInvoice(inv)}
+                                  className="gap-3 cursor-pointer"
                                 >
-                                  <Edit size={16} className="text-slate-400" /> Edit
+                                  <Edit size={16} className="text-amber-600" /> Edit
                                 </DropdownMenuItem>
                                 {inv.type === 'Furniture' && (
                                   <DropdownMenuItem
@@ -1313,13 +1358,10 @@ function InvoicePageContent() {
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem 
-                            onClick={() => {
-                              setSelectedInvoice(inv)
-                              setIsEditModalOpen(true)
-                            }}
-                            className="gap-3"
+                            onClick={() => handleEditInvoice(inv)}
+                            className="gap-3 cursor-pointer"
                           >
-                            <Edit size={16} className="text-slate-400" /> Edit
+                            <Edit size={16} className="text-amber-600" /> Edit
                           </DropdownMenuItem>
                           {inv.type === 'Furniture' && (
                             <DropdownMenuItem
