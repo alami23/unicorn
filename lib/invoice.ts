@@ -78,9 +78,10 @@ export async function generateInvoiceId(
 
 /**
  * Utility to strip the org_id / UUID prefix from an invoice ID for display purposes
+ * and format strictly as #INV-W-260902 or #INV-F-260902.
  * E.g. "3f820b..._#INV-F-260902" -> "#INV-F-260902"
  */
-export function getDisplayInvoiceId(id: string | null | undefined): string {
+export function getDisplayInvoiceId(id: string | null | undefined, isWoodHint?: boolean): string {
   if (!id) return '';
   const idStr = String(id).trim();
   if (!idStr || idStr === '-' || idStr === 'N/A') return idStr;
@@ -88,12 +89,115 @@ export function getDisplayInvoiceId(id: string | null | undefined): string {
   const parts = idStr.split('_');
   const invPart = parts.find(p => p.startsWith('#INV') || p.startsWith('INV'));
   const rawId = invPart || (parts.length > 1 ? parts.slice(1).join('_') : parts[0]);
-  const cleanId = rawId.replace(/^#+/, '');
+  let cleanId = rawId.replace(/^#+/, '').toUpperCase();
 
-  if (cleanId.startsWith('INV') || rawId.startsWith('#')) {
+  if (cleanId.startsWith('INV-')) {
     return `#${cleanId}`;
   }
+  if (cleanId.startsWith('INV')) {
+    const rest = cleanId.slice(3).replace(/^-+/, '');
+    return `#INV-${rest}`;
+  }
+  if (cleanId.startsWith('W-') || cleanId.startsWith('WOOD-')) {
+    const rest = cleanId.replace(/^(W|WOOD)-+/, '');
+    return `#INV-W-${rest}`;
+  }
+  if (cleanId.startsWith('F-') || cleanId.startsWith('FURNITURE-')) {
+    const rest = cleanId.replace(/^(F|FURNITURE)-+/, '');
+    return `#INV-F-${rest}`;
+  }
+
+  // If rawId started with '#' or looks like standard digits
+  if (rawId.startsWith('#')) {
+    return `#${cleanId}`;
+  }
+
+  // If hint is available and cleanId has 6 digits
+  if (isWoodHint !== undefined && /^\d{6}$/.test(cleanId)) {
+    return `#INV-${isWoodHint ? 'W' : 'F'}-${cleanId}`;
+  }
+
   return cleanId;
+}
+
+/**
+ * Validates if an invoice ID strictly matches the standard pattern #INV-W-260902 or #INV-F-260902
+ */
+export function isValidInvoiceIdFormat(id: string | null | undefined): boolean {
+  if (!id) return false;
+  return /^#INV-[WF]-\d{6}$/i.test(id.trim());
+}
+
+/**
+ * Normalizes any invoice ID into strict #INV-W-260902 or #INV-F-260902 format
+ */
+export function normalizeInvoiceIdFormat(
+  rawId: string | null | undefined,
+  isWood: boolean = false,
+  fallbackDate?: string
+): string {
+  if (!rawId) {
+    const d = fallbackDate ? new Date(fallbackDate) : new Date();
+    const yy = !isNaN(d.getTime()) ? d.getFullYear().toString().slice(-2) : '26';
+    const mm = !isNaN(d.getTime()) ? (d.getMonth() + 1).toString().padStart(2, '0') : '09';
+    return `#INV-${isWood ? 'W' : 'F'}-${yy}${mm}01`;
+  }
+
+  let str = String(rawId).trim();
+
+  // Strip tenant prefix if present (e.g. "tenantId_#INV-W-260902")
+  if (str.includes('_')) {
+    const parts = str.split('_');
+    const invPart = parts.find(p => p.startsWith('#INV') || p.startsWith('INV') || p.startsWith('#'));
+    str = invPart || parts[parts.length - 1];
+  }
+
+  str = str.toUpperCase();
+
+  // 1. Strict standard match #INV-W-260902 or INV-W-260902
+  const standardMatch = str.match(/#?INV-([WF])-(\d{6})/i);
+  if (standardMatch) {
+    const typeLetter = standardMatch[1].toUpperCase();
+    const digits = standardMatch[2];
+    return `#INV-${typeLetter}-${digits}`;
+  }
+
+  // 2. Standard match with variable digits (e.g. #INV-W-1001 or #INV-W-2609001)
+  const flexibleMatch = str.match(/#?INV-([WF])-(\d+)/i);
+  if (flexibleMatch) {
+    const typeLetter = flexibleMatch[1].toUpperCase();
+    const digits = flexibleMatch[2];
+    if (digits.length === 6) {
+      return `#INV-${typeLetter}-${digits}`;
+    }
+    const d = fallbackDate ? new Date(fallbackDate) : new Date();
+    const yy = !isNaN(d.getTime()) ? d.getFullYear().toString().slice(-2) : '26';
+    const mm = !isNaN(d.getTime()) ? (d.getMonth() + 1).toString().padStart(2, '0') : '09';
+    const serial = digits.slice(-2).padStart(2, '0');
+    return `#INV-${typeLetter}-${yy}${mm}${serial}`;
+  }
+
+  // 3. Wood or Furniture prefix without INV (e.g. #W-260902 or W-260902)
+  const typeMatch = str.match(/#?([WF])-(\d{6})/i);
+  if (typeMatch) {
+    const typeLetter = typeMatch[1].toUpperCase();
+    return `#INV-${typeLetter}-${typeMatch[2]}`;
+  }
+
+  // 4. Digits only (e.g. "260902")
+  const digitsOnly = str.replace(/\D/g, '');
+  const typeLetter = isWood ? 'W' : 'F';
+  if (digitsOnly.length === 6) {
+    return `#INV-${typeLetter}-${digitsOnly}`;
+  }
+
+  // Fallback with current or invoice date
+  const d = fallbackDate ? new Date(fallbackDate) : new Date();
+  const yy = !isNaN(d.getTime()) ? d.getFullYear().toString().slice(-2) : '26';
+  const mm = !isNaN(d.getTime()) ? (d.getMonth() + 1).toString().padStart(2, '0') : '09';
+  const serial = (digitsOnly ? digitsOnly.slice(-2) : '01').padStart(2, '0');
+
+  return `#INV-${typeLetter}-${yy}${mm}${serial}`;
 }
 
 /**

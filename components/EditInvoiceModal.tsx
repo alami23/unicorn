@@ -11,7 +11,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { addNotification } from '@/lib/notifications'
-import { getDisplayInvoiceId } from '@/lib/invoice'
+import { getDisplayInvoiceId, normalizeInvoiceIdFormat, isValidInvoiceIdFormat } from '@/lib/invoice'
 import { fetchOrgUsers, recordInvoiceCreator } from '@/lib/invoiceCache'
 import { cn, parseDateSafe } from '@/lib/utils'
 
@@ -65,6 +65,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   const [deliveryStatus, setDeliveryStatus] = useState<'Pending' | 'Delivered'>('Pending')
   const [createdBy, setCreatedBy] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('Cash')
+
+  // Original IDs tracking to safely handle tenant prefixes & modifications
+  const originalDisplayIdRef = useRef<string>('')
+  const originalDbIdRef = useRef<string>('')
 
   // Items
   const [items, setItems] = useState<EditableItem[]>([])
@@ -206,7 +210,17 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     setCustomerPhone(invoice.customerPhone || invoice.customer_phone || '')
     setCustomerAddress(invoice.customerAddress || invoice.customer_address || '')
     setInvoiceDate(invoice.date ? invoice.date.split('T')[0] : new Date().toISOString().split('T')[0])
-    setInvoiceId(invoice.id || '')
+    
+    // Strictly format Invoice ID to #INV-W-260902 (Wood) or #INV-F-260902 (Furniture)
+    const initialDisplayId = normalizeInvoiceIdFormat(
+      invoice.invoice_number || invoice.id,
+      isWood,
+      invoice.date || invoice.created_at
+    )
+    setInvoiceId(initialDisplayId)
+    originalDisplayIdRef.current = initialDisplayId
+    originalDbIdRef.current = invoice.id || ''
+
     setDeliveryDate(invoice.deliveryDate || invoice.delivery_date || '')
     setDeliveryStatus((invoice.deliveryStatus || invoice.delivery_status || 'Pending') as 'Pending' | 'Delivered')
     setCreatedBy(invoice.createdBy && invoice.createdBy !== 'Unassigned' ? invoice.createdBy : (invoice.created_by_name || ''))
@@ -448,22 +462,38 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         created_by_name: creatorNameVal
       }
 
-      const finalInvoiceId = invoiceId.trim()
-      if (finalInvoiceId !== invoice.id) {
+      // Validate and normalize Invoice ID strictly to #INV-W-260902 format
+      const trimmedId = invoiceId.trim()
+      const cleanDisplayId = normalizeInvoiceIdFormat(trimmedId, isWood, invoiceDate)
+
+      if (!isValidInvoiceIdFormat(cleanDisplayId)) {
+        toast.error(`Invoice ID must be in format ${isWood ? '#INV-W-260902' : '#INV-F-260902'}`)
+        setIsSubmitting(false)
+        return
+      }
+
+      const isIdChanged = cleanDisplayId !== originalDisplayIdRef.current
+      let targetDbId = invoice.id
+
+      if (isIdChanged) {
+        const tenantPrefix = (invoice.id && invoice.id.includes('_')) ? invoice.id.split('_')[0] + '_' : ''
+        targetDbId = tenantPrefix ? `${tenantPrefix}${cleanDisplayId}` : cleanDisplayId
+
         const { data: existing } = await supabase
           .from(invoiceTable)
           .select('id')
-          .eq('id', finalInvoiceId)
+          .or(`id.eq.${targetDbId},id.eq.${cleanDisplayId},invoice_number.eq.${cleanDisplayId}`)
           .maybeSingle()
         
-        if (existing) {
-          toast.error(`Invoice ID "${finalInvoiceId}" already exists.`)
+        if (existing && existing.id !== invoice.id) {
+          toast.error(`Invoice ID "${cleanDisplayId}" already exists. Please use a unique number.`)
           setIsSubmitting(false)
           return
         }
-        invoiceUpdatePayload.id = finalInvoiceId
-        const parts = finalInvoiceId.split('_')
-        invoiceUpdatePayload.invoice_number = parts.length > 1 ? parts[1] : finalInvoiceId
+        invoiceUpdatePayload.id = targetDbId
+        invoiceUpdatePayload.invoice_number = cleanDisplayId
+      } else {
+        invoiceUpdatePayload.invoice_number = cleanDisplayId
       }
 
       if (invoiceDate) invoiceUpdatePayload.created_at = new Date(invoiceDate).toISOString()
@@ -487,7 +517,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
       if (isWood) {
         const woodItemsToInsert = items.map(item => ({
-          invoice_id: finalInvoiceId,
+          invoice_id: targetDbId,
           product_type: 'wood',
           product_id: item.product_id || 0,
           name: (item.treeNo || item.name || '').trim(),
@@ -503,7 +533,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         if (insertItemsErr) throw insertItemsErr
       } else {
         const furnitureItemsToInsert = items.map(item => ({
-          invoice_id: finalInvoiceId,
+          invoice_id: targetDbId,
           product_type: 'furniture',
           product_id: item.product_id || null,
           name: (item.name || '').trim(),
@@ -513,6 +543,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         }))
         const { error: insertItemsErr } = await supabase.from(itemsTable).insert(furnitureItemsToInsert)
         if (insertItemsErr) throw insertItemsErr
+      }
+
+      // Update transactions reference if invoice ID was changed
+      if (isIdChanged && targetDbId !== invoice.id) {
+        await supabase
+          .from('transactions')
+          .update({ ref: targetDbId })
+          .eq('ref', invoice.id)
       }
 
       const previousDueRecorded = Number(invoice.due || invoice.due_amount || 0)
@@ -541,8 +579,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         await recordInvoiceCreator(invoice.id, creatorNameVal, creatorIdVal || undefined)
       }
 
-      addNotification('invoice_update', 'Invoice Updated', `Invoice ${getDisplayInvoiceId(invoice.id)} was modified.`)
-      toast.success('Invoice updated successfully!')
+      addNotification('invoice_update', 'Invoice Updated', `Invoice ${cleanDisplayId} was modified.`)
+      toast.success(`Invoice ${cleanDisplayId} updated successfully!`)
       onSave()
       onClose()
     } catch (err: any) {
@@ -572,7 +610,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
               </div>
               <div>
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  Edit Invoice <span className="text-amber-600 dark:text-amber-400 font-mono">#{getDisplayInvoiceId(invoiceId)}</span>
+                  Edit Invoice <span className="text-amber-600 dark:text-amber-400 font-mono">{getDisplayInvoiceId(invoiceId || invoice?.id, isWood)}</span>
                 </h2>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className={cn(
@@ -612,44 +650,72 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Form Area */}
                 <div className="lg:col-span-2 space-y-8">
-                  {/* Basic Info Section */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5 ml-1">
-                        <Hash size={12} /> Invoice ID
-                      </label>
-                      <input 
-                        type="text" 
-                        value={invoiceId} 
-                        onChange={e => setInvoiceId(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5 ml-1">
-                        <Calendar size={12} /> Invoice Date
-                      </label>
-                      <input 
-                        type="date" 
-                        value={invoiceDate} 
-                        onChange={e => setInvoiceDate(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                      />
-                    </div>
-                  </div>
+                  {/* Top Metadata Card: Invoice Core & Customer Context */}
+                  <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 space-y-5">
+                    {/* Header Row: Invoice ID, Invoice Date, Staff Assignment */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* 1. Invoice ID (Editable and Validated) */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between ml-1">
+                          <span className="flex items-center gap-1.5">
+                            <Hash size={13} className="text-slate-400" /> Invoice ID
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {isWood ? '#INV-W-YYMMSS' : '#INV-F-YYMMSS'}
+                          </span>
+                        </label>
+                        <input 
+                          type="text" 
+                          value={invoiceId} 
+                          onChange={e => {
+                            let val = e.target.value.toUpperCase()
+                            if (val && !val.startsWith('#')) {
+                              val = '#' + val.replace(/^#+/, '')
+                            }
+                            setInvoiceId(val)
+                          }}
+                          onBlur={() => {
+                            if (invoiceId.trim()) {
+                              setInvoiceId(normalizeInvoiceIdFormat(invoiceId, isWood, invoiceDate))
+                            }
+                          }}
+                          placeholder={isWood ? '#INV-W-260902' : '#INV-F-260902'}
+                          className={cn(
+                            "w-full bg-white dark:bg-slate-800 border rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold outline-none transition-all",
+                            isValidInvoiceIdFormat(invoiceId)
+                              ? "border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                              : "border-rose-400 dark:border-rose-600 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                          )}
+                        />
+                        {!isValidInvoiceIdFormat(invoiceId) && (
+                          <p className="text-[10px] font-medium text-rose-500 ml-1">
+                            Format required: {isWood ? '#INV-W-260902' : '#INV-F-260902'}
+                          </p>
+                        )}
+                      </div>
 
-                  {/* Staff / Created By Selection */}
-                  <div className="bg-slate-50 dark:bg-slate-800/30 rounded-3xl p-5 border border-slate-100 dark:border-slate-800">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
-                      <User size={16} className="text-blue-500" /> Staff Assignment
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider ml-1">Created By / Assigned Staff</label>
+                      {/* 2. Invoice Date (Editable) */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 ml-1">
+                          <Calendar size={13} className="text-slate-400" /> Invoice Date
+                        </label>
+                        <input 
+                          type="date" 
+                          value={invoiceDate} 
+                          onChange={e => setInvoiceDate(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                        />
+                      </div>
+
+                      {/* 3. Staff Assignment ("Created By / Assigned Staff") */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 ml-1">
+                          <User size={13} className="text-blue-500" /> Created By / Assigned Staff
+                        </label>
                         <select 
                           value={createdBy}
                           onChange={e => setCreatedBy(e.target.value)}
-                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:border-amber-500"
+                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none focus:border-amber-500 cursor-pointer"
                         >
                           <option value="">Unassigned</option>
                           {users.map(u => (
@@ -657,85 +723,110 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           ))}
                         </select>
                       </div>
-                      <div className="flex items-end">
-                         <p className="text-[10px] text-slate-400 italic px-2 pb-1">This staff member will be credited as the creator of this invoice record.</p>
-                      </div>
                     </div>
-                  </div>
 
-                  {/* Customer Section */}
-                  <div className="bg-slate-50 dark:bg-slate-800/30 rounded-3xl p-5 border border-slate-100 dark:border-slate-800">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
-                      <User size={16} className="text-amber-500" /> Customer Information
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="relative">
-                        <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider ml-1">Customer Name</label>
-                        <div 
-                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold flex items-center justify-between cursor-pointer"
-                          onClick={() => setIsCustomerDropdownOpen(!isCustomerDropdownOpen)}
-                        >
-                          <span className="truncate">{customerName || 'Select Customer'}</span>
-                          <ChevronDown size={16} className={cn("transition-transform text-slate-400", isCustomerDropdownOpen && "rotate-180")} />
-                        </div>
-                        
-                        {isCustomerDropdownOpen && (
-                          <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[150] p-2 animate-in fade-in slide-in-from-top-2">
-                            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl mb-2">
-                              <Search size={14} className="text-slate-400" />
-                              <input
-                                type="text"
-                                value={customerSearchTerm}
-                                onChange={e => setCustomerSearchTerm(e.target.value)}
-                                placeholder="Search..."
-                                className="bg-transparent border-none outline-none text-sm w-full font-bold"
-                                autoFocus
-                              />
-                            </div>
-                            <div className="max-h-[250px] overflow-y-auto space-y-1 scrollbar-thin px-1">
-                              <div 
-                                className="p-3 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl cursor-pointer flex items-center gap-3 text-amber-600 font-bold text-sm"
-                                onClick={() => { setIsCustomerDropdownOpen(false); toast.info("Enter name manually.") }}
-                              >
-                                <UserPlus size={18} /> Add New Customer
-                              </div>
-                              <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-                              {filteredCustomers.map(c => (
-                                <div key={c.id} onClick={() => selectCustomer(c)} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl cursor-pointer group flex items-center justify-between">
-                                  <div>
-                                    <p className="text-sm font-bold group-hover:text-amber-600 transition-colors">{c.name}</p>
-                                    <p className="text-xs text-slate-500">{c.phone || 'No phone'}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-xs font-bold text-slate-400 group-hover:text-amber-500 transition-colors">৳{Math.round(c.total_due || 0)}</p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                    <div className="h-px bg-slate-200/80 dark:bg-slate-700/60" />
+
+                    {/* Customer Information: Streamlined, No Grid Headings, Prominent Name with Adjacent Phone and Address Below */}
+                    <div className="space-y-3 pt-1">
+                      {/* Top Row: Customer Name (Prominent) & Phone Number (Adjacent) */}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-start">
+                        {/* Customer Name Dropdown - Prominently Displayed */}
+                        <div className="md:col-span-7 lg:col-span-8 space-y-1 relative">
+                          <div className="flex items-center justify-between ml-1">
+                            <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                              <User size={13} className="text-amber-500" /> Customer Name
+                            </label>
+                            {oldDue > 0 && (
+                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded-full">
+                                Due: ৳{Math.round(oldDue).toLocaleString()}
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider ml-1">Phone Number</label>
-                        <div className="relative">
-                          <Phone size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                          <input 
-                            type="text" 
-                            value={customerPhone} 
-                            onChange={e => setCustomerPhone(e.target.value)}
-                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm font-bold outline-none focus:border-amber-500"
-                          />
+                          <div 
+                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold flex items-center justify-between cursor-pointer hover:border-amber-400 transition-colors shadow-sm"
+                            onClick={() => setIsCustomerDropdownOpen(!isCustomerDropdownOpen)}
+                          >
+                            <span className="truncate text-slate-900 dark:text-slate-100 font-bold">
+                              {customerName || 'Select Customer'}
+                            </span>
+                            <ChevronDown size={16} className={cn("transition-transform text-slate-400 shrink-0 ml-1", isCustomerDropdownOpen && "rotate-180")} />
+                          </div>
+                          
+                          {isCustomerDropdownOpen && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[150] p-2 animate-in fade-in slide-in-from-top-2">
+                              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl mb-2">
+                                <Search size={14} className="text-slate-400 shrink-0" />
+                                <input
+                                  type="text"
+                                  value={customerSearchTerm}
+                                  onChange={e => setCustomerSearchTerm(e.target.value)}
+                                  placeholder="Search customer name or phone..."
+                                  className="bg-transparent border-none outline-none text-sm w-full font-bold"
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="max-h-[240px] overflow-y-auto space-y-1 scrollbar-thin px-1">
+                                <div 
+                                  className="p-2.5 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl cursor-pointer flex items-center gap-2.5 text-amber-600 font-bold text-xs"
+                                  onClick={() => { setIsCustomerDropdownOpen(false); toast.info("Enter or select customer from master list.") }}
+                                >
+                                  <UserPlus size={16} /> Add / Enter Customer
+                                </div>
+                                <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
+                                {filteredCustomers.map(c => (
+                                  <div key={c.id} onClick={() => selectCustomer(c)} className="p-2.5 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl cursor-pointer group flex items-center justify-between">
+                                    <div className="min-w-0 pr-2">
+                                      <p className="text-sm font-bold group-hover:text-amber-600 transition-colors truncate">{c.name}</p>
+                                      <p className="text-xs text-slate-500 truncate">{c.phone || 'No phone'}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <p className="text-xs font-bold text-slate-400 group-hover:text-amber-500 transition-colors">৳{Math.round(c.total_due || 0)}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                                {filteredCustomers.length === 0 && (
+                                  <div className="py-4 text-center text-xs text-slate-400 font-semibold">
+                                    No customers found
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Customer Phone Number - Adjacent to Name */}
+                        <div className="md:col-span-5 lg:col-span-4 space-y-1">
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 ml-1">
+                            <Phone size={12} className="text-slate-400" /> Phone Number
+                          </label>
+                          <div className="relative">
+                            <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <input 
+                              type="text" 
+                              readOnly 
+                              disabled
+                              value={customerPhone || 'No phone registered'} 
+                              className="w-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-not-allowed select-none outline-none"
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider ml-1">Address / Delivery Location</label>
+
+                      {/* Bottom Row: Customer Address - Below Them */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 ml-1">
+                          <MapPin size={12} className="text-slate-400" /> Address / Location
+                        </label>
                         <div className="relative">
-                          <MapPin size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <MapPin size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                           <input 
                             type="text" 
-                            value={customerAddress} 
-                            onChange={e => setCustomerAddress(e.target.value)}
-                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm font-bold outline-none focus:border-amber-500"
+                            readOnly 
+                            disabled
+                            value={customerAddress || 'No address registered'} 
+                            title={customerAddress || 'No address registered'}
+                            className="w-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-not-allowed select-none outline-none truncate"
                           />
                         </div>
                       </div>
