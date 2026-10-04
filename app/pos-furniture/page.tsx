@@ -1067,6 +1067,12 @@ function POSFurnitureContent() {
                     placeholder="0"
                     value={paidAmount === 0 ? '' : paidAmount}
                     onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    ref={(el) => {
+                      if (el) {
+                        el.addEventListener('wheel', (e) => e.preventDefault(), { passive: false })
+                      }
+                    }}
                   />
                 </div>
                 <div className="flex justify-between text-rose-600 dark:text-rose-500 font-bold text-xs">

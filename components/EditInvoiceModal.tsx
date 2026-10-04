@@ -1054,7 +1054,13 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           type="number" 
                           value={paid ?? ''} 
                           onChange={e => setPaid(parseFloat(e.target.value) || 0)}
-                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-black text-emerald-600 outline-none focus:border-emerald-500"
+                          onWheel={e => e.currentTarget.blur()}
+                          ref={el => {
+                            if (el) {
+                              el.addEventListener('wheel', e => e.preventDefault(), { passive: false })
+                            }
+                          }}
+                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-black text-emerald-600 outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </div>
                       {!isWood && (

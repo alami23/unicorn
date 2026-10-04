@@ -857,7 +857,13 @@ function SoloWoodContent() {
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-emerald-600 dark:text-emerald-500 font-bold text-xs">Paid</span>
                   <input 
-                    ref={paidInputRef}
+                    ref={(el) => {
+                      // @ts-ignore
+                      paidInputRef.current = el
+                      if (el) {
+                        el.addEventListener('wheel', (e) => e.preventDefault(), { passive: false })
+                      }
+                    }}
                     type="number" 
                     inputMode="decimal"
                     enterKeyHint="send"
@@ -865,6 +871,7 @@ function SoloWoodContent() {
                     placeholder="0"
                     value={paidAmount === 0 ? '' : paidAmount}
                     onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.keyCode === 13) {
                         e.preventDefault()

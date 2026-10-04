@@ -173,8 +173,14 @@ export default function ReceivePaymentModal({ isOpen, onClose, customerName, cus
                         required
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
+                        ref={(el) => {
+                          if (el) {
+                            el.addEventListener('wheel', (e) => e.preventDefault(), { passive: false })
+                          }
+                        }}
                         placeholder="0.00"
-                        className="w-full pl-10 pr-24 py-4 bg-emerald-50/30 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl outline-none text-xl font-bold text-emerald-600 dark:text-emerald-400 focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                        className="w-full pl-10 pr-24 py-4 bg-emerald-50/30 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl outline-none text-xl font-bold text-emerald-600 dark:text-emerald-400 focus:ring-4 focus:ring-emerald-500/10 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button 
                         type="button"
