@@ -5,6 +5,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useRouter, usePathname } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
 import { preloadInvoicesBackground } from '@/lib/invoiceCache';
+import { setSynchronousSettings, preloadImage } from '@/lib/settingsCache';
 
 export interface CustomUser {
   id: string;
@@ -96,7 +97,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const storedBusinessLogoY = localStorage.getItem('business_logo_y');
       const storedBusinessLogoZoom = localStorage.getItem('business_logo_zoom');
       if (storedBusinessName) setBusinessName(storedBusinessName);
-      if (storedBusinessLogo) setBusinessLogo(storedBusinessLogo);
+      if (storedBusinessLogo) {
+        setBusinessLogo(storedBusinessLogo);
+        preloadImage(storedBusinessLogo);
+      }
       if (storedBusinessLogoX) setBusinessLogoX(parseInt(storedBusinessLogoX) || 50);
       if (storedBusinessLogoY) setBusinessLogoY(parseInt(storedBusinessLogoY) || 50);
       if (storedBusinessLogoZoom) setBusinessLogoZoom(parseInt(storedBusinessLogoZoom) || 100);
@@ -136,21 +140,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const bizLogoZoom = userBusiness.logoZoom ?? globalBusiness.logoZoom ?? 100;
 
           setBusinessName(bizName);
-          localStorage.setItem('business_name', bizName);
-
           setBusinessLogo(bizLogo);
-          localStorage.setItem('business_logo', bizLogo);
-
           setBusinessLogoX(bizLogoX);
-          localStorage.setItem('business_logo_x', bizLogoX.toString());
-
           setBusinessLogoY(bizLogoY);
-          localStorage.setItem('business_logo_y', bizLogoY.toString());
-
           setBusinessLogoZoom(bizLogoZoom);
-          localStorage.setItem('business_logo_zoom', bizLogoZoom.toString());
-
           setGlobalSettings(settings);
+
+          // Synchronously cache full settings and preload logo for instant rendering across all modals
+          setSynchronousSettings(settings, currentUserId);
         }
 
         // Fetch latest custom_users record if user is logged in

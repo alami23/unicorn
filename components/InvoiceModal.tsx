@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { getDisplayInvoiceId, generateInvoicePreviewUrl } from '@/lib/invoice'
 import { shortenInvoiceUrl } from '@/lib/shortener'
 import { toast } from 'sonner'
+import { preloadImage } from '@/lib/settingsCache'
 
 interface InvoiceModalProps {
   isOpen: boolean
@@ -20,15 +21,16 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
   const [selectedSize, setSelectedSize] = useState<'A4' | 'A5' | 'POS' | 'Chalan'>('A4')
   const [zoom, setZoom] = useState(0.8)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [localInvoice, setLocalInvoice] = useState<any>(null)
+  const [localInvoice, setLocalInvoice] = useState<any>(() => invoice || null)
   const [unscaledHeight, setUnscaledHeight] = useState(1123)
   const printableInvoiceRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (invoice) {
       setLocalInvoice(invoice)
-    } else {
-      setLocalInvoice(null)
+      if (invoice.business?.logo) {
+        preloadImage(invoice.business.logo)
+      }
     }
   }, [invoice])
 
@@ -519,7 +521,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                         overflow: 'hidden',
                         position: 'relative'
                       }} 
-                      className="transition-all duration-200 shadow-2xl rounded-lg bg-white"
+                      className="shadow-2xl rounded-lg bg-white"
                     >
                       <div 
                         style={{ 

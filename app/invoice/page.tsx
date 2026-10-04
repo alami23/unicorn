@@ -47,6 +47,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Suspense } from 'react'
 import { useInvoices } from '@/hooks/useInvoiceCache'
 import { invalidateInvoiceCache, FormattedInvoice } from '@/lib/invoiceCache'
+import { preloadImage, getSynchronousBusiness } from '@/lib/settingsCache'
 
 import {
   DropdownMenu,
@@ -342,33 +343,47 @@ function InvoicePageContent() {
 
   const handleOpenInvoice = async (invoice: any) => {
     setIsFetchingItems(true)
+    const biz = getSynchronousBusiness(invoice?.business)
+    if (biz.logo) preloadImage(biz.logo)
+
     try {
       const isWood = invoice.originalType?.toLowerCase() === 'wood' || 
                      invoice.originalType?.toLowerCase() === 'solo_wood' || 
                      invoice.type?.toLowerCase() === 'wood' || 
                      invoice.type?.toLowerCase() === 'solo_wood' ||
-                     invoice.id.includes('-W-')
+                     invoice.id?.includes('-W-')
       const itemsTable = isWood ? 'wood_invoice_items' : 'furniture_invoice_items'
 
-      const { data, error } = await supabase
-        .from(itemsTable)
-        .select('*')
-        .eq('invoice_id', invoice.id)
-      
-      if (error) throw error
-      
-      const { data: paymentsData } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('ref', invoice.id)
-        .gt('credit', 0)
-        .order('id', { ascending: true })
+      // Execute items, transactions, and customer details concurrently in parallel
+      const [itemsResult, paymentsResult, customerResult] = await Promise.all([
+        supabase
+          .from(itemsTable)
+          .select('*')
+          .eq('invoice_id', invoice.id),
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('ref', invoice.id)
+          .gt('credit', 0)
+          .order('id', { ascending: true }),
+        (invoice.customer && invoice.customer !== 'Walk-in Customer')
+          ? supabase
+              .from('customer')
+              .select('total_due, phone, address')
+              .eq('name', invoice.customer)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null })
+      ])
 
-      const payments: any[] = paymentsData?.map(t => ({
+      const data = itemsResult.data || []
+      const paymentsData = paymentsResult.data || []
+      const customerData = customerResult.data || null
+
+      const payments: any[] = paymentsData.map((t: any) => ({
         date: t.date,
         method: t.notes || 'Cash',
         amount: Number(t.credit)
-      })) || []
+      }))
 
       const totalRecordedPayments = payments.reduce((sum, p) => sum + p.amount, 0)
       if (invoice.paid > totalRecordedPayments) {
@@ -386,33 +401,24 @@ function InvoicePageContent() {
       })
 
       let oldDue = 0
-      let customerDetails = null
-      if (invoice.customer && invoice.customer !== 'Walk-in Customer') {
-        const { data: customerData } = await supabase
-          .from('customer')
-          .select('total_due, phone, address')
-          .eq('name', invoice.customer)
-          .single()
-        
-        if (customerData) {
-          customerDetails = customerData
-          oldDue = Math.max(0, (customerData.total_due || 0) - (invoice.due || 0))
-        }
+      if (customerData) {
+        oldDue = Math.max(0, (customerData.total_due || 0) - (invoice.due || 0))
       }
 
       setSelectedInvoice({ 
         ...invoice, 
-        items: data || [], 
+        business: biz,
+        items: data, 
         oldDue, 
         payments,
-        customerPhone: invoice.customerPhone || customerDetails?.phone,
-        customerAddress: invoice.customerAddress || customerDetails?.address
+        customerPhone: invoice.customerPhone || customerData?.phone,
+        customerAddress: invoice.customerAddress || customerData?.address
       })
       setIsInvoiceModalOpen(true)
     } catch (error) {
       console.error('Error fetching invoice items:', error)
       toast.error('Failed to load invoice items')
-      setSelectedInvoice({ ...invoice, items: [], oldDue: 0, payments: [] })
+      setSelectedInvoice({ ...invoice, business: biz, items: [], oldDue: 0, payments: [] })
       setIsInvoiceModalOpen(true)
     } finally {
       setIsFetchingItems(false)

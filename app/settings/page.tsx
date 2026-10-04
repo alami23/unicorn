@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
 import DashboardLayout from "@/components/DashboardLayout";
 import NextImage from "next/image";
 import { addNotification } from "@/lib/notifications";
+import { setSynchronousSettings } from "@/lib/settingsCache";
 import {
   Save,
   Building2,
@@ -745,6 +746,7 @@ function SettingsPageContent() {
         }
 
         setSettings(updatedSettings);
+        setSynchronousSettings(updatedSettings);
       }
     } catch (err) {
       console.warn("Supabase settings fetch failed:", err);
@@ -803,6 +805,7 @@ function SettingsPageContent() {
         if (settings.business?.logoZoom !== undefined) {
           localStorage.setItem('business_logo_zoom', (settings.business.logoZoom ?? 100).toString());
         }
+        setSynchronousSettings(settings);
       } catch (e) {
         console.warn('localStorage update failed:', e);
       }

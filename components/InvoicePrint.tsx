@@ -5,6 +5,7 @@ import QRCode from "react-qr-code"
 import { cn, parseDateSafe } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { getDisplayInvoiceId } from '@/lib/invoice'
+import { getSynchronousBusiness, getSynchronousSettings, setSynchronousSettings } from '@/lib/settingsCache'
 
 interface InvoicePrintProps {
   invoice: any
@@ -12,30 +13,10 @@ interface InvoicePrintProps {
 }
 
 export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
-  const [settings, setSettings] = useState<any>(null)
+  // Synchronous initialization ensures zero render delay on frame 0
+  const [settings, setSettings] = useState<any>(() => getSynchronousSettings())
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const { data } = await supabase
-          .from('app_settings')
-          .select('settings')
-          .eq('id', 'global')
-          .single()
-        
-        if (data && data.settings) {
-          setSettings(data.settings)
-        }
-      } catch (e) {
-        console.error('Failed to fetch settings from Supabase', e)
-      }
-    }
-    fetchSettings()
-  }, [])
-
-  if (!invoice) return null
-
-  let currentUserId = null;
+  let currentUserId: string | null = null;
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem('custom_user');
@@ -45,14 +26,38 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
     } catch (e) {}
   }
 
+  useEffect(() => {
+    let isMounted = true
+    const fetchSettings = async () => {
+      try {
+        const { data } = await supabase
+          .from('app_settings')
+          .select('settings')
+          .eq('id', 'global')
+          .maybeSingle()
+        
+        if (isMounted && data && data.settings) {
+          setSettings(data.settings)
+          setSynchronousSettings(data.settings, currentUserId || undefined)
+        }
+      } catch (e) {
+        console.error('Failed to fetch settings from Supabase', e)
+      }
+    }
+    fetchSettings()
+    return () => { isMounted = false }
+  }, [currentUserId])
+
+  if (!invoice) return null
+
+  // Synchronously compute business profile with 0ms delay
+  const syncFallbackBiz = getSynchronousBusiness(invoice?.business)
   const userBiz = currentUserId ? settings?.business_by_user?.[currentUserId] : null;
-  const business = (userBiz && userBiz.name) ? userBiz : (settings?.business || invoice?.business || {
-    name: '',
-    address: '',
-    email: '',
-    phone: '',
-    logo: ''
-  });
+  const business = (userBiz && userBiz.name)
+    ? { ...syncFallbackBiz, ...userBiz }
+    : (settings?.business?.name
+        ? { ...syncFallbackBiz, ...settings.business }
+        : syncFallbackBiz);
 
   const isPOS = size?.toLowerCase() === 'pos'
   const isA5 = size?.toLowerCase() === 'a5'
@@ -404,6 +409,8 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
                     <img 
                       src={business.logo} 
                       alt="Logo" 
+                      loading="eager"
+                      decoding="sync"
                       className="w-full h-full object-cover"
                       style={{
                         objectPosition: `${business.logoX ?? 50}% ${business.logoY ?? 50}%`,
