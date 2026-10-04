@@ -512,16 +512,18 @@ function CustomerPageContent() {
                         >
                           <FileText size={18} />
                         </Link>
-                        <button 
-                          onClick={() => {
-                            setSmsCustomer({ id: cus.id, name: cus.name, phone: cus.phone, totalDue: cus.totalDue })
-                            setIsPaymentModalOpen(true)
-                          }}
-                          className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-                          title="Receive Payment"
-                        >
-                          <DollarSign size={18} />
-                        </button>
+                        {Number(cus.totalDue || 0) > 0 && (
+                          <button
+                            onClick={() => {
+                              setSmsCustomer({ id: cus.id, name: cus.name, phone: cus.phone, totalDue: cus.totalDue })
+                              setIsPaymentModalOpen(true)
+                            }}
+                            className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:text-emerald-400 transition-colors"
+                            title="Receive Payment"
+                          >
+                            <DollarSign size={18} />
+                          </button>
+                        )}
                         {Number(cus.totalDue || 0) > 0 && (
                           <button 
                             onClick={() => handleSendDueReminder(cus)}
@@ -700,7 +702,9 @@ function CustomerPageContent() {
                     <Phone size={16} />
                   </a>
                   <Link href={`/customer-statement?id=${cus.id}`} className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-amber-600 dark:text-amber-400" title="View Statement"><FileText size={16} /></Link>
-                  <button onClick={() => { setSmsCustomer({ id: cus.id, name: cus.name, phone: cus.phone, totalDue: cus.totalDue }); setIsPaymentModalOpen(true) }} className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-emerald-600 dark:text-emerald-400" title="Receive Payment"><DollarSign size={16} /></button>
+                  {Number(cus.totalDue || 0) > 0 && (
+                    <button onClick={() => { setSmsCustomer({ id: cus.id, name: cus.name, phone: cus.phone, totalDue: cus.totalDue }); setIsPaymentModalOpen(true) }} className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-emerald-600 dark:text-emerald-400" title="Receive Payment"><DollarSign size={16} /></button>
+                  )}
                   {Number(cus.totalDue || 0) > 0 && (
                     <button 
                       onClick={() => handleSendDueReminder(cus)} 

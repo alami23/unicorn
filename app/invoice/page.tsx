@@ -437,6 +437,10 @@ function InvoicePageContent() {
   }, [invoices, searchParams])
 
   const handleOpenPayment = async (invoice: any) => {
+    if (invoice.status === 'Paid' || Number(invoice.due || 0) <= 0) {
+      toast.info('This invoice is already fully paid with zero due.')
+      return
+    }
     try {
       let customerDetails = null
       if (invoice.customer && invoice.customer !== 'Walk-in Customer') {
@@ -1118,14 +1122,16 @@ function InvoicePageContent() {
                                 )}
                               </button>
                             )}
-                            <button 
-                              onClick={() => handleOpenPayment(inv)}
-                              disabled={isFetchingItems}
-                              className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg text-emerald-500 hover:text-emerald-600 transition-colors disabled:opacity-50"
-                              title="Receive Payment"
-                            >
-                              <DollarSign size={18} />
-                            </button>
+                            {!(inv.status === 'Paid' || Number(inv.due || 0) <= 0) && (
+                              <button 
+                                onClick={() => handleOpenPayment(inv)}
+                                disabled={isFetchingItems}
+                                className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg text-emerald-500 hover:text-emerald-600 transition-colors disabled:opacity-50"
+                                title="Receive Payment"
+                              >
+                                <DollarSign size={18} />
+                              </button>
+                            )}
                             <button 
                               onClick={() => handleOpenInvoice(inv)}
                               disabled={isFetchingItems}
@@ -1307,7 +1313,9 @@ function InvoicePageContent() {
                     </div>
 
                     <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <button onClick={() => handleOpenPayment(inv)} disabled={isFetchingItems} className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-emerald-600 dark:text-emerald-400 disabled:opacity-50 hover:bg-emerald-100 transition-colors" title="Receive Payment"><DollarSign size={16} /></button>
+                      {!(inv.status === 'Paid' || Number(inv.due || 0) <= 0) && (
+                        <button onClick={() => handleOpenPayment(inv)} disabled={isFetchingItems} className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-emerald-600 dark:text-emerald-400 disabled:opacity-50 hover:bg-emerald-100 transition-colors" title="Receive Payment"><DollarSign size={16} /></button>
+                      )}
                         {Number(inv.due || 0) > 0 && (
                           <button 
                             onClick={() => handleSendDueReminder(inv)} 
