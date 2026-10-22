@@ -6,7 +6,7 @@ import {
   X, Save, User, Plus, Trash2, Calendar, DollarSign, Phone, MapPin, 
   Truck, Tag, AlertCircle, Loader2, Check, Search, ChevronDown, 
   UserPlus, FileText, CornerDownRight, Hash, Edit3, 
-  Copy, ArrowUp, ArrowDown, Eraser
+  Copy, ArrowUp, ArrowDown, Eraser, ArrowUpDown
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -27,6 +27,7 @@ interface EditableItem {
   product_id?: number | null
   product_type?: string
   name: string
+  description?: string
   quantity: number
   unit?: string
   price: number
@@ -39,6 +40,7 @@ interface EditableItem {
   cft?: number
   tag?: string
   isStock?: boolean
+  marked?: boolean
 }
 
 export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: EditInvoiceModalProps) {
@@ -80,7 +82,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   const [paid, setPaid] = useState<number>(0)
   const [oldDue, setOldDue] = useState<number>(0)
 
-  // Type detector
+  // Type detector & sales method
   const isWood = useMemo(() => {
     if (!invoice) return false
     return (
@@ -88,9 +90,28 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       invoice.originalType?.toLowerCase() === 'solo_wood' || 
       invoice.type?.toLowerCase() === 'wood' || 
       invoice.type?.toLowerCase() === 'solo_wood' ||
-      invoice.id?.includes('-W-')
+      invoice.sales_method?.toLowerCase() === 'pos wood' ||
+      invoice.sales_method?.toLowerCase() === 'wood' ||
+      invoice.id?.includes('-W-') ||
+      invoice.invoice_number?.includes('-W-')
     )
   }, [invoice])
+
+  const isPOSWood = useMemo(() => {
+    if (!invoice) return false
+    const methodStr = (invoice.sales_method || invoice.salesMethod || invoice.originalType || invoice.type || '').toLowerCase()
+    const idStr = (invoice.invoice_number || invoice.id || invoiceId || '').toUpperCase()
+    return isWood || methodStr.includes('wood') || idStr.includes('-W-')
+  }, [invoice, isWood, invoiceId])
+
+  interface SavedTag {
+    id: string | number
+    name: string
+    sell_price: number
+    color?: string
+  }
+
+  const [savedTags, setSavedTags] = useState<SavedTag[]>([])
 
   // Fetch initial data
   useEffect(() => {
@@ -121,6 +142,22 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
             stock: Number(p.stock || 0)
           })))
         }
+
+        if (isWood) {
+          const { data: tagData } = await supabase
+            .from('wood_category_tag')
+            .select('*')
+            .order('name', { ascending: true })
+
+          if (tagData && tagData.length > 0) {
+            setSavedTags(tagData.map((t: any) => ({
+              id: t.id,
+              name: t.name,
+              sell_price: Number(t.sell_price ?? t.sellPrice ?? t.price ?? 0),
+              color: t.color
+            })))
+          }
+        }
       } catch (e) {
         console.warn('Failed to fetch initial data:', e)
       }
@@ -135,6 +172,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       product_id: null,
       product_type: woodMode ? 'wood' : 'furniture',
       name: '',
+      description: '',
       quantity: 1,
       unit: woodMode ? 'CFT' : 'PCS',
       price: 0,
@@ -144,8 +182,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       width: 0,
       length: 0,
       cft: 0,
-      tag: '-',
-      isStock: false
+      tag: '',
+      isStock: false,
+      marked: false
     }
   }, [])
 
@@ -163,6 +202,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         product_id: item.product_id || item.productId || null,
         product_type: item.product_type || (woodMode ? 'wood' : 'furniture'),
         name: item.name || item.treeNo || item.tree_no || (woodMode ? 'Wood Item' : 'Furniture Item'),
+        description: item.description || (woodMode ? (item.car_no || item.carNo ? `Car: ${item.car_no || item.carNo}` : '') : (item.category || '')),
         quantity: isNaN(qty) ? 1 : qty,
         unit: item.unit || (woodMode ? 'CFT' : 'PCS'),
         price: isNaN(price) ? 0 : price,
@@ -172,8 +212,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         width,
         length,
         cft: isNaN(cft) ? 0 : cft,
-        tag: item.tag || '-',
-        isStock: !!(item.product_id || item.productId)
+        tag: item.tag || '',
+        isStock: !!(item.product_id || item.productId),
+        marked: false
       }
     })
   }, [])
@@ -321,9 +362,11 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         current.width = p.width
         current.length = p.length
         current.cft = p.cft
-        current.tag = p.tag
+        current.tag = p.tag || current.tag
+        current.description = p.car_no ? `Car: ${p.car_no}` : ''
         current.total = Math.round(Number(p.cft || 0) * Number(p.price || 0))
       } else {
+        current.description = p.category || 'Stock Item'
         current.total = Math.round(current.quantity * p.price)
       }
       
@@ -339,10 +382,20 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       const next = [...prev]
       const current = { ...next[index], [field]: value }
 
+      let updatedPrice = field === 'price' ? Number(value) || 0 : (Number(current.price) || 0)
+
+      // When tag is changed, update price automatically from matching saved tag
+      if (field === 'tag') {
+        const matchingTag = savedTags.find(t => t.name.toLowerCase() === String(value).trim().toLowerCase())
+        if (matchingTag && matchingTag.sell_price > 0) {
+          updatedPrice = matchingTag.sell_price
+          current.price = updatedPrice
+        }
+      }
+
       if (isWood) {
         const w = field === 'width' ? Number(value) || 0 : (Number(current.width) || 0)
         const l = field === 'length' ? Number(value) || 0 : (Number(current.length) || 0)
-        const p = field === 'price' ? Number(value) || 0 : (Number(current.price) || 0)
 
         let cftVal = current.cft || 0
         if (field === 'width' || field === 'length') {
@@ -354,11 +407,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
           cftVal = Number(value) || 0
         }
 
-        current.total = Math.round(cftVal * p)
+        current.total = Math.round(cftVal * updatedPrice)
       } else {
         const qty = field === 'quantity' ? Number(value) || 0 : (Number(current.quantity) || 1)
-        const prc = field === 'price' ? Number(value) || 0 : (Number(current.price) || 0)
-        current.total = Math.round(qty * prc)
+        current.total = Math.round(qty * updatedPrice)
       }
 
       next[index] = current
@@ -390,6 +442,12 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       }
       return next
     })
+  }
+
+  const handleReverseOrder = () => {
+    if (items.length <= 1) return
+    setItems(prev => [...prev].reverse())
+    toast.success('Items order reversed')
   }
 
   const handleClearItems = () => {
@@ -600,7 +658,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-white dark:bg-slate-900 w-full max-w-6xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800"
+          className="bg-white dark:bg-slate-900 w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800"
         >
           {/* Modal Header */}
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
@@ -647,9 +705,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                 <p className="font-bold">Loading invoice data...</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Main Form Area */}
-                <div className="lg:col-span-2 space-y-8">
+              <div className="space-y-8">
+                {/* Full-width Form Area (Metadata & Items Table) */}
+                <div className="space-y-6">
                   {/* Top Metadata Card: Invoice Core & Customer Context */}
                   <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 space-y-5">
                     {/* Header Row: Invoice ID, Invoice Date, Staff Assignment */}
@@ -833,12 +891,159 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                     </div>
                   </div>
 
+                  {/* Payment & Financial Summary Area - Positioned Above Item Table */}
+                  <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      {/* Payment Info Section & Alert (5 cols) */}
+                      <div className="lg:col-span-5 space-y-4">
+                        <div className="bg-slate-50 dark:bg-slate-800/30 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 space-y-4">
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">
+                            <DollarSign size={16} className="text-emerald-500" /> Payment & Status
+                          </h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider">Payment Method</label>
+                              <select 
+                                value={paymentMethod} 
+                                onChange={e => setPaymentMethod(e.target.value)}
+                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold outline-none"
+                              >
+                                <option value="Cash">Cash</option>
+                                <option value="Card">Card</option>
+                                <option value="bKash">bKash</option>
+                                <option value="Nagad">Nagad</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider">Amount Paid (৳)</label>
+                              <input 
+                                type="number" 
+                                value={paid ?? ''} 
+                                onChange={e => setPaid(parseFloat(e.target.value) || 0)}
+                                onWheel={e => e.currentTarget.blur()}
+                                ref={el => {
+                                  if (el) {
+                                    el.addEventListener('wheel', e => e.preventDefault(), { passive: false })
+                                  }
+                                }}
+                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-black text-emerald-600 outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                            </div>
+                          </div>
+                          {!isWood && (
+                            <div className="pt-2">
+                              <label className="text-[10px] font-bold text-slate-400 mb-2 block uppercase tracking-wider">Delivery Status</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {(['Pending', 'Delivered'] as const).map(status => (
+                                  <button
+                                    key={status}
+                                    type="button"
+                                    onClick={() => setDeliveryStatus(status)}
+                                    className={cn(
+                                      "py-2 rounded-xl text-xs font-black transition-all border flex items-center justify-center gap-2",
+                                      deliveryStatus === status 
+                                        ? (status === 'Delivered' ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200")
+                                        : "bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700"
+                                    )}
+                                  >
+                                    {status === 'Delivered' ? <Check size={14} /> : <Truck size={14} />}
+                                    {status}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 flex gap-3">
+                          <AlertCircle className="text-amber-600 shrink-0" size={18} />
+                          <p className="text-[11px] text-amber-800 dark:text-amber-400 font-medium leading-relaxed">
+                            Updating this invoice will recalculate the customer&apos;s account balance and may affect inventory stock levels.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Financial Breakdown Section (7 cols) */}
+                      <div className="lg:col-span-7">
+                        <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl space-y-5">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-2">
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Subtotal</span>
+                              <span className="text-lg font-bold font-mono text-white block">৳{Math.round(itemsSubtotal).toLocaleString()}</span>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Discount</span>
+                                <div className="flex bg-slate-800 rounded-lg p-0.5">
+                                  <button onClick={() => setDiscountType('fixed')} className={cn("px-2 py-0.5 rounded text-[9px] font-black", discountType === 'fixed' ? "bg-amber-500 text-black" : "text-slate-400")}>৳</button>
+                                  <button onClick={() => setDiscountType('percent')} className={cn("px-2 py-0.5 rounded text-[9px] font-black", discountType === 'percent' ? "bg-amber-500 text-black" : "text-slate-400")}>%</button>
+                                </div>
+                              </div>
+                              <input 
+                                type="number" 
+                                value={discount ?? ''} 
+                                onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
+                                className="w-full bg-slate-800 border border-slate-700/60 rounded-xl px-3 py-1.5 text-right font-mono font-black text-amber-400 outline-none focus:border-amber-500"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Delivery Charge</span>
+                              <input 
+                                type="number" 
+                                value={deliveryCharge ?? ''} 
+                                onChange={e => setDeliveryCharge(parseFloat(e.target.value) || 0)}
+                                className="w-full bg-slate-800 border border-slate-700/60 rounded-xl px-3 py-1.5 text-right font-mono font-black text-white outline-none focus:border-slate-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="h-px bg-slate-800" />
+
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
+                            <div className="sm:col-span-5 space-y-1">
+                              <span className="text-xs font-black uppercase tracking-widest text-slate-500 block">Grand Total</span>
+                              <span className="text-3xl font-black font-mono text-white block">৳{Math.round(grandTotal).toLocaleString()}</span>
+                            </div>
+                            <div className="sm:col-span-7 bg-white/5 rounded-2xl p-4 space-y-2.5">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-400 font-bold">Paid</span>
+                                <span className="text-emerald-400 font-mono font-black">৳{Math.round(paid).toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-slate-400 font-bold">Current Invoice Due</span>
+                                <span className="text-rose-400 font-mono font-black">৳{Math.round(currentDue).toLocaleString()}</span>
+                              </div>
+                              <div className="h-px bg-white/10 my-1" />
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-black uppercase text-amber-500">Total Outstanding</span>
+                                <span className="text-base font-black font-mono text-amber-500">৳{Math.round(totalDue).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Items Table Section */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between px-1">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                        <Tag size={16} className="text-amber-500" /> Invoice Items
-                      </h3>
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                          <Tag size={16} className="text-amber-500" /> Invoice Items
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={handleReverseOrder}
+                          disabled={items.length <= 1}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-900/30 hover:text-amber-700 dark:hover:text-amber-400 transition-all border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                          title="Reverse item order"
+                        >
+                          <ArrowUpDown size={13} className="text-amber-600 dark:text-amber-400" />
+                          <span>Reverse Order</span>
+                        </button>
+                      </div>
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={handleClearItems}
@@ -856,76 +1061,73 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                     </div>
 
                     <div className="border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
-                      <table className="w-full text-sm">
-                        <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400">
+                      <table className="w-full text-sm table-fixed border-collapse">
+                        <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs">
                           <tr>
-                            <th className="py-3 px-4 text-left font-bold w-16">#</th>
-                            <th className="py-3 px-4 text-left font-bold">Item Description & Type</th>
-                            <th className="py-3 px-4 text-center font-bold w-24">{isWood ? 'CFT' : 'Qty'}</th>
-                            <th className="py-3 px-4 text-right font-bold w-32">Price</th>
-                            <th className="py-3 px-4 text-right font-bold w-32">Total</th>
-                            <th className="py-3 px-4 text-center w-12"></th>
+                            <th className="py-3 px-2 text-center w-12">
+                              <input 
+                                type="checkbox" 
+                                checked={items.length > 0 && items.every(it => it.marked)}
+                                onChange={e => {
+                                  const isChecked = e.target.checked
+                                  setItems(prev => prev.map(it => ({ ...it, marked: isChecked })))
+                                }}
+                                className="rounded border-slate-300 dark:border-slate-700 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer accent-amber-600"
+                                title="Mark all items"
+                              />
+                            </th>
+                            <th className={cn("py-3 px-2.5 text-left font-bold", isWood ? "w-[28%]" : "w-[24%]")}>Item Name</th>
+                            {!isWood && (
+                              <th className="py-3 px-2.5 text-left font-bold w-[22%]">Description</th>
+                            )}
+                            {isWood && (
+                              <th className="py-3 px-2.5 text-center font-bold w-[16%]">Car</th>
+                            )}
+                            <th className={cn("py-3 px-2.5 text-center font-bold", isWood ? "w-[18%]" : "w-[16%]")}>Tag Box</th>
+                            <th className={cn("py-3 px-2.5 text-center font-bold", isWood ? "w-[12%]" : "w-[11%]")}>{isWood ? 'CFT' : 'Qty'}</th>
+                            <th className={cn("py-3 px-2.5 text-right font-bold", isWood ? "w-[13%]" : "w-[12%]")}>Price</th>
+                            <th className={cn("py-3 px-2.5 text-right font-bold", isWood ? "w-[13%]" : "w-[13%]")}>Total</th>
+                            <th className="py-3 px-2 text-center font-bold w-20">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                           {items.map((item, idx) => (
-                            <tr key={item.id || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group">
-                              <td className="py-4 px-4">
-                                <div className="flex flex-col items-center gap-1">
-                                  <span className="text-slate-400 font-mono font-bold text-xs">{idx + 1}</span>
-                                  <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleMoveItem(idx, 'up')} disabled={idx === 0} className="p-0.5 text-slate-400 hover:text-amber-500 disabled:opacity-30">
-                                      <ArrowUp size={12} />
-                                    </button>
-                                    <button onClick={() => handleMoveItem(idx, 'down')} disabled={idx === items.length - 1} className="p-0.5 text-slate-400 hover:text-amber-500 disabled:opacity-30">
-                                      <ArrowDown size={12} />
-                                    </button>
-                                  </div>
-                                </div>
+                            <tr key={item.id || idx} className={cn("hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group", item.marked && "bg-amber-50/40 dark:bg-amber-900/10")}>
+                              {/* 1. Markable Box */}
+                              <td className="py-2.5 px-2 text-center w-12">
+                                <input 
+                                  type="checkbox"
+                                  checked={!!item.marked}
+                                  onChange={e => handleItemChange(idx, 'marked', e.target.checked)}
+                                  className="rounded border-slate-300 dark:border-slate-700 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer accent-amber-600"
+                                  title={`Mark item ${idx + 1}`}
+                                />
                               </td>
-                              <td className="py-2 px-2 relative">
-                                <div className="space-y-1">
-                                  <div className="relative group/itemsearch">
-                                    <input 
-                                      type="text"
-                                      value={item.name}
-                                      onChange={e => {
-                                        handleItemChange(idx, 'name', e.target.value)
-                                        if (isWood) handleItemChange(idx, 'treeNo', e.target.value)
-                                        setItemSearchTerm(e.target.value)
-                                        setActiveItemSearchIdx(idx)
-                                      }}
-                                      onFocus={() => {
-                                        setActiveItemSearchIdx(idx)
-                                        setItemSearchTerm(item.name)
-                                      }}
-                                      placeholder="Search or enter item..."
-                                      className="w-full bg-transparent border-none outline-none font-bold text-slate-800 dark:text-slate-200 px-2"
-                                    />
-                                    <Search size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within/itemsearch:text-amber-500" />
-                                  </div>
-                                  
-                                  <div className="flex items-center gap-2 px-2">
-                                    {item.product_id ? (
-                                      <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase flex items-center gap-1">
-                                        <Check size={8} /> Stock Item
-                                      </span>
-                                    ) : (
-                                      <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase">
-                                        Custom Item
-                                      </span>
-                                    )}
-                                    {isWood && item.carNo && (
-                                      <span className="text-[9px] font-bold text-slate-400">Car: {item.carNo}</span>
-                                    )}
-                                    {isWood && item.tag && (
-                                      <span className="text-[9px] font-bold text-slate-400">Tag: {item.tag}</span>
-                                    )}
-                                  </div>
+
+                              {/* 2. Item Name */}
+                              <td className="py-2.5 px-2.5 relative">
+                                <div className="relative group/itemsearch">
+                                  <input 
+                                    type="text"
+                                    value={item.name}
+                                    onChange={e => {
+                                      handleItemChange(idx, 'name', e.target.value)
+                                      if (isWood) handleItemChange(idx, 'treeNo', e.target.value)
+                                      setItemSearchTerm(e.target.value)
+                                      setActiveItemSearchIdx(idx)
+                                    }}
+                                    onFocus={() => {
+                                      setActiveItemSearchIdx(idx)
+                                      setItemSearchTerm(item.name)
+                                    }}
+                                    placeholder="Search or enter item name..."
+                                    className="w-full bg-transparent border-none outline-none font-bold text-slate-800 dark:text-slate-200 text-sm px-1 py-1 pr-6 truncate"
+                                  />
+                                  <Search size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within/itemsearch:text-amber-500 pointer-events-none" />
                                 </div>
 
                                 {activeItemSearchIdx === idx && (
-                                  <div className="absolute top-full left-0 w-[450px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[160] p-2 mt-1 animate-in fade-in slide-in-from-top-2">
+                                  <div className="absolute top-full left-0 w-[420px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[160] p-2 mt-1 animate-in fade-in slide-in-from-top-2">
                                     <div className="max-h-[300px] overflow-y-auto space-y-1 scrollbar-thin px-1">
                                       <div 
                                         className="p-3 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl cursor-pointer text-slate-500 font-bold text-xs flex items-center justify-between group/manual"
@@ -984,37 +1186,105 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                   </div>
                                 )}
                               </td>
-                              <td className="py-2 px-2">
+
+                              {/* 3. Description (Hidden for wood invoices, shown for furniture) */}
+                              {!isWood && (
+                                <td className="py-2.5 px-2.5">
+                                  <input 
+                                    type="text"
+                                    value={item.description ?? ''}
+                                    onChange={e => handleItemChange(idx, 'description', e.target.value)}
+                                    placeholder={item.isStock ? 'Stock Item' : 'Description...'}
+                                    className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2.5 text-xs font-medium text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-amber-500 truncate"
+                                  />
+                                </td>
+                              )}
+
+                              {/* 4. Car (Placed BEFORE Tag Box for wood invoices) */}
+                              {isWood && (
+                                <td className="py-2.5 px-2.5 text-center">
+                                  <input 
+                                    type="text"
+                                    value={item.carNo ?? ''}
+                                    onChange={e => handleItemChange(idx, 'carNo', e.target.value)}
+                                    placeholder="Car #"
+                                    className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500 truncate"
+                                  />
+                                </td>
+                              )}
+
+                              {/* 5. Tag Box (Displays only saved tags; changing tag updates price automatically) */}
+                              <td className="py-2.5 px-2.5 text-center">
+                                <div className="relative">
+                                  <select 
+                                    value={item.tag ?? ''}
+                                    onChange={e => handleItemChange(idx, 'tag', e.target.value)}
+                                    className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-2 pr-6 text-center font-mono font-bold text-xs text-amber-700 dark:text-amber-400 outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none truncate"
+                                    title="Choose saved tag (updates price automatically)"
+                                  >
+                                    <option value="">No Tag</option>
+                                    {savedTags.map(st => (
+                                      <option key={st.id || st.name} value={st.name}>
+                                        {st.name} {st.sell_price > 0 ? `(৳${st.sell_price})` : ''}
+                                      </option>
+                                    ))}
+                                    {item.tag && !savedTags.some(st => st.name.toLowerCase() === item.tag?.toLowerCase()) && (
+                                      <option value={item.tag}>{item.tag}</option>
+                                    )}
+                                  </select>
+                                  <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                </div>
+                              </td>
+
+                              {/* 6. CFT / Qty */}
+                              <td className="py-2.5 px-2.5 text-center">
                                 <input 
                                   type="number"
                                   value={isWood ? (item.cft ?? '') : (item.quantity ?? '')}
                                   onChange={e => handleItemChange(idx, isWood ? 'cft' : 'quantity', parseFloat(e.target.value) || 0)}
-                                  className="w-full bg-slate-100/50 dark:bg-slate-800 rounded-lg py-2 text-center font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                                  placeholder={isWood ? "CFT" : "Qty"}
+                                  className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 text-center font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
                                 />
                               </td>
-                              <td className="py-2 px-2">
+
+                              {/* 7. Price */}
+                              <td className="py-2.5 px-2.5 text-right">
                                 <div className="relative">
-                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">৳</span>
                                   <input 
                                     type="number"
                                     value={item.price ?? ''}
                                     onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                                    className="w-full bg-slate-100/50 dark:bg-slate-800 rounded-lg py-2 pl-6 pr-2 text-right font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                                    className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-5 pr-2 text-right font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
                                   />
                                 </div>
                               </td>
-                              <td className="py-2 px-4 text-right">
-                                <p className="font-mono font-black text-slate-900 dark:text-slate-100">
+
+                              {/* 8. Total */}
+                              <td className="py-2.5 px-2.5 text-right">
+                                <p className="font-mono font-black text-slate-900 dark:text-slate-100 text-sm">
                                   ৳{Math.round(item.total).toLocaleString()}
                                 </p>
                               </td>
-                              <td className="py-2 px-4 text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                  <button onClick={() => handleDuplicateItem(idx)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors" title="Duplicate Item">
-                                    <Copy size={16} />
+
+                              {/* 9. Actions */}
+                              <td className="py-2.5 px-2 text-center w-20">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button 
+                                    type="button"
+                                    onClick={() => handleDuplicateItem(idx)} 
+                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" 
+                                    title="Duplicate Item"
+                                  >
+                                    <Copy size={15} />
                                   </button>
-                                  <button onClick={() => handleRemoveItem(idx)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors" title="Remove Item">
-                                    <Trash2 size={16} />
+                                  <button 
+                                    type="button"
+                                    onClick={() => handleRemoveItem(idx)} 
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors" 
+                                    title="Delete Item"
+                                  >
+                                    <Trash2 size={15} />
                                   </button>
                                 </div>
                               </td>
@@ -1023,135 +1293,6 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                </div>
-
-                {/* Sidebar Summary Area */}
-                <div className="space-y-6">
-                  {/* Payment Info Section */}
-                  <div className="bg-slate-50 dark:bg-slate-800/30 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 space-y-4">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">
-                      <DollarSign size={16} className="text-emerald-500" /> Payment & Status
-                    </h3>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider">Payment Method</label>
-                        <select 
-                          value={paymentMethod} 
-                          onChange={e => setPaymentMethod(e.target.value)}
-                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold outline-none"
-                        >
-                          <option value="Cash">Cash</option>
-                          <option value="Card">Card</option>
-                          <option value="bKash">bKash</option>
-                          <option value="Nagad">Nagad</option>
-                          <option value="Bank Transfer">Bank Transfer</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider">Amount Paid (৳)</label>
-                        <input 
-                          type="number" 
-                          value={paid ?? ''} 
-                          onChange={e => setPaid(parseFloat(e.target.value) || 0)}
-                          onWheel={e => e.currentTarget.blur()}
-                          ref={el => {
-                            if (el) {
-                              el.addEventListener('wheel', e => e.preventDefault(), { passive: false })
-                            }
-                          }}
-                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-black text-emerald-600 outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                      </div>
-                      {!isWood && (
-                        <div className="pt-2">
-                          <label className="text-[10px] font-bold text-slate-400 mb-2 block uppercase tracking-wider">Delivery Status</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {(['Pending', 'Delivered'] as const).map(status => (
-                              <button
-                                key={status}
-                                type="button"
-                                onClick={() => setDeliveryStatus(status)}
-                                className={cn(
-                                  "py-2 rounded-xl text-xs font-black transition-all border flex items-center justify-center gap-2",
-                                  deliveryStatus === status 
-                                    ? (status === 'Delivered' ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200")
-                                    : "bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700"
-                                )}
-                              >
-                                {status === 'Delivered' ? <Check size={14} /> : <Truck size={14} />}
-                                {status}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Financial Breakdown Section */}
-                  <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl space-y-4">
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between items-center text-slate-400 font-bold">
-                        <span>Subtotal</span>
-                        <span className="font-mono">৳{Math.round(itemsSubtotal).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-400 font-bold">Discount</span>
-                          <div className="flex bg-slate-800 rounded-lg p-0.5">
-                            <button onClick={() => setDiscountType('fixed')} className={cn("px-2 py-0.5 rounded text-[9px] font-black", discountType === 'fixed' ? "bg-amber-500 text-black" : "text-slate-400")}>৳</button>
-                            <button onClick={() => setDiscountType('percent')} className={cn("px-2 py-0.5 rounded text-[9px] font-black", discountType === 'percent' ? "bg-amber-500 text-black" : "text-slate-400")}>%</button>
-                          </div>
-                        </div>
-                        <input 
-                          type="number" 
-                          value={discount ?? ''} 
-                          onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
-                          className="w-20 bg-slate-800 border-none rounded-lg px-3 py-1 text-right font-mono font-black text-amber-400 outline-none"
-                        />
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 font-bold">Delivery Charge</span>
-                        <input 
-                          type="number" 
-                          value={deliveryCharge ?? ''} 
-                          onChange={e => setDeliveryCharge(parseFloat(e.target.value) || 0)}
-                          className="w-20 bg-slate-800 border-none rounded-lg px-3 py-1 text-right font-mono font-black text-white outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="h-px bg-slate-800 my-4" />
-
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-500">Grand Total</span>
-                        <span className="text-2xl font-black font-mono text-white">৳{Math.round(grandTotal).toLocaleString()}</span>
-                      </div>
-                      <div className="bg-white/5 rounded-2xl p-4 space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-slate-400 font-bold">Paid</span>
-                          <span className="text-emerald-400 font-mono font-black">৳{Math.round(paid).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-slate-400 font-bold">Current Invoice Due</span>
-                          <span className="text-rose-400 font-mono font-black">৳{Math.round(currentDue).toLocaleString()}</span>
-                        </div>
-                        <div className="h-px bg-white/10 my-2" />
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black uppercase text-amber-500">Total Outstanding</span>
-                          <span className="text-base font-black font-mono text-amber-500">৳{Math.round(totalDue).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 flex gap-3">
-                    <AlertCircle className="text-amber-600 shrink-0" size={18} />
-                    <p className="text-[11px] text-amber-800 dark:text-amber-400 font-medium leading-relaxed">
-                      Updating this invoice will recalculate the customer&apos;s account balance and may affect inventory stock levels.
-                    </p>
                   </div>
                 </div>
               </div>
