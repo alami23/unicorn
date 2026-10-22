@@ -264,6 +264,10 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
               }
+              .break-after-page, .page-break {
+                page-break-after: always !important;
+                break-after: page !important;
+              }
               thead { display: table-header-group; }
               tfoot { display: table-footer-group; }
             }

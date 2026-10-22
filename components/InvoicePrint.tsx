@@ -68,7 +68,10 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
   const isWood = invoice.type?.toLowerCase() === 'wood' || 
                  invoice.type?.toLowerCase() === 'solo_wood' || 
                  invoice.originalType?.toLowerCase() === 'solo_wood' || 
-                 invoice.original_type?.toLowerCase() === 'solo_wood'
+                 invoice.original_type?.toLowerCase() === 'solo_wood' ||
+                 invoice.originalType?.toLowerCase() === 'wood' || 
+                 invoice.original_type?.toLowerCase() === 'wood' ||
+                 Boolean(invoice.id?.includes?.('-W-'))
 
   const showPaymentData = !isChalan ? true : (isWood ? Boolean(settings?.finance?.showPaymentOnChalan) : false)
 
@@ -294,22 +297,42 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
   }
 
   if (isStandardPage) {
-    const halfItems = Math.ceil(items.length / 2);
-    
-    const leftRealItems = items.slice(0, halfItems).map((item: any, idx: number) => ({ ...item, globalIndex: idx }));
-    const rightRealItems = items.slice(halfItems).map((item: any, idx: number) => ({ ...item, globalIndex: halfItems + idx }));
-    
-    const maxLength = Math.max(leftRealItems.length, rightRealItems.length);
-    const leftTableItems = [
-      ...leftRealItems,
-      ...Array(Math.max(0, maxLength - leftRealItems.length)).fill({ isEmpty: true })
-    ];
-    const rightTableItems = [
-      ...rightRealItems,
-      ...Array(Math.max(0, maxLength - rightRealItems.length)).fill({ isEmpty: true })
-    ];
+    const DueSummaryHeader = ({
+      label, 
+      value, 
+      isLast, 
+      labelClass, 
+      valueClass,
+      isCompactMode = false
+    }: {
+      label: string, 
+      value: string|number, 
+      isLast?: boolean, 
+      labelClass?: string, 
+      valueClass?: string,
+      isCompactMode?: boolean
+    }) => (
+      <div className={cn(
+        "flex justify-between items-center border-black",
+        isCompactMode
+          ? (isA5 ? "py-[0.5px] mt-[0px]" : "py-[1px] mt-[0.5px]")
+          : (isA5 ? "py-[1px] mt-[1px]" : "py-0.5 mt-[1px]"),
+        isLast ? (isA5 ? "border-b-[3px]" : "border-b-4") : (isA5 ? "border-b-[1.5px]" : "border-b-[2px]")
+      )}>
+        <span className={cn(
+          "font-black uppercase",
+          isCompactMode ? (isA5 ? "text-[6.5px]" : "text-[9px]") : (isA5 ? "text-[7.5px]" : "text-[10.5px]"),
+          labelClass
+        )}>{label}</span>
+        <span className={cn(
+          "font-extrabold",
+          isCompactMode ? (isA5 ? "text-[6.5px]" : "text-[9px]") : (isA5 ? "text-[7.5px]" : "text-[10.5px]"),
+          valueClass
+        )}>{value}</span>
+      </div>
+    );
 
-    const renderTable = (tableItems: any[]) => {
+    const renderTable = (tableItems: any[], isCompact = false) => {
       if (!tableItems || tableItems.length === 0) return null;
       
       return (
@@ -317,15 +340,17 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
           <thead>
             <tr className={cn(
               "font-black uppercase border-b-[1.5px] border-black bg-black text-white print:bg-black print:text-white print:-webkit-print-color-adjust-exact",
-              isA5 ? "text-[8.5px]" : "text-[12px]"
+              isCompact 
+                ? (isA5 ? "text-[7.5px]" : "text-[10.5px]") 
+                : (isA5 ? "text-[8.5px]" : "text-[12px]")
             )}>
-              <th className={cn("py-[1px] text-center", isA5 ? "w-[22px]" : "w-[32px]")}>NO</th>
+              <th className={cn("py-[1px] text-center", isA5 ? "w-[22px]" : (isCompact ? "w-[28px]" : "w-[32px]"))}>NO</th>
               {isWood ? (
                 <>
-                  <th className={cn("py-[1px] text-center", isA5 ? "w-[22px]" : "w-[32px]")}>CAR</th>
+                  <th className={cn("py-[1px] text-center", isA5 ? "w-[22px]" : (isCompact ? "w-[28px]" : "w-[32px]"))}>CAR</th>
                   <th className="py-[1px] text-center">( TREE - W - L ) = SIZE</th>
-                  <th className={cn("py-[1px] text-center", isA5 ? "w-[28px]" : "w-[40px]")}>TAG</th>
-                  <th className={cn("py-[1px] text-center", isA5 ? "w-[56px]" : "w-[80px]")}>TOTAL</th>
+                  <th className={cn("py-[1px] text-center", isA5 ? "w-[28px]" : (isCompact ? "w-[36px]" : "w-[40px]"))}>TAG</th>
+                  <th className={cn("py-[1px] text-center", isA5 ? "w-[56px]" : (isCompact ? "w-[72px]" : "w-[80px]"))}>TOTAL</th>
                 </>
               ) : (
                 <>
@@ -341,18 +366,36 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
             {tableItems.map((item, idx) => (
               <tr key={idx} className={cn(
                 "border-b-[1.2px] border-black font-extrabold",
-                isA5 ? "text-[7.5px] h-[14px] leading-[13px]" : "text-[11px] h-[20px] leading-[18px]"
+                isCompact
+                  ? (isA5 ? "text-[6.2px] h-[11.5px] leading-[10.5px]" : "text-[9.5px] h-[16px] leading-[14.5px]")
+                  : (isA5 ? "text-[7.5px] h-[14px] leading-[13px]" : "text-[11px] h-[20px] leading-[18px]")
               )}>
-                <td className="text-center border-r-[1.5px] border-black py-[0px] whitespace-nowrap">{item.isEmpty ? '' : item.globalIndex + 1}</td>
+                <td className="text-center border-r-[1.5px] border-black py-[0px] whitespace-nowrap">
+                  {item.isEmpty ? '' : item.globalIndex + 1}
+                </td>
                 {isWood ? (
                   <>
-                    <td className="text-center border-r-[1.5px] border-black py-[0px] whitespace-nowrap">{!item.isEmpty ? (item.treeNo?.startsWith('M-') ? 'M' : (item.carNo || '')) : ''}</td>
-                    <td className={cn("text-center border-r-[1.5px] border-black py-[0px] whitespace-nowrap", isA5 ? "text-[6.5px]" : "text-[9.5px]")}>
+                    <td className="text-center border-r-[1.5px] border-black py-[0px] whitespace-nowrap">
+                      {!item.isEmpty ? (item.treeNo?.startsWith('M-') ? 'M' : (item.carNo || '')) : ''}
+                    </td>
+                    <td className={cn(
+                      "text-center border-r-[1.5px] border-black py-[0px] whitespace-nowrap",
+                      isCompact
+                        ? (isA5 ? "text-[5.8px]" : "text-[8.5px]")
+                        : (isA5 ? "text-[6.5px]" : "text-[9.5px]")
+                    )}>
                       {!item.isEmpty ? (
                         <>{`( ${item.treeNo || '-'} - ${item.width || 0}" - ${item.length || 0}' ) = ${item.cft?.toFixed(4)}`}</>
                       ) : ''}
                     </td>
-                    <td className={cn("text-center border-r-[1.5px] border-black py-[0px] uppercase whitespace-nowrap", isA5 ? "text-[6px]" : "text-[8.5px]")}>{!item.isEmpty ? formatTagDisplay(item.tag) : ''}</td>
+                    <td className={cn(
+                      "text-center border-r-[1.5px] border-black py-[0px] uppercase whitespace-nowrap",
+                      isCompact
+                        ? (isA5 ? "text-[5.5px]" : "text-[7.5px]")
+                        : (isA5 ? "text-[6px]" : "text-[8.5px]")
+                    )}>
+                      {!item.isEmpty ? formatTagDisplay(item.tag) : ''}
+                    </td>
                     <td className="text-right pr-[8px] py-[0px] whitespace-nowrap">
                       {!item.isEmpty ? (showPaymentData ? Math.round(Number(item.total || 0)).toLocaleString() : '') : ''}
                     </td>
@@ -377,20 +420,385 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
             ))}
           </tbody>
         </table>
-      )
+      );
+    };
+
+    const renderHeader = (isCompactHeader = false, pageNum?: number, totalPgs?: number) => (
+      <div className={cn(
+        "flex justify-between items-start print:break-inside-avoid",
+        isCompactHeader
+          ? (isA5 ? "mb-[4px]" : "mb-[6px]")
+          : (isA5 ? "mb-[8px]" : "mb-[12px]")
+      )}>
+        <div className={isA5 ? (isCompactHeader ? "w-[110px]" : "w-[126px]") : (isCompactHeader ? "w-[160px]" : "w-[180px]")}>
+          {business.logo ? (
+            <div className={cn(
+              "flex flex-col items-center justify-center",
+              isCompactHeader
+                ? (isA5 ? "w-[36px] h-[36px] mb-[2px]" : "w-[48px] h-[48px] mb-[4px]")
+                : (isA5 ? "w-[45px] h-[45px] mb-[5px]" : "w-[64px] h-[64px] mb-[8px]")
+            )}>
+              <div className="relative w-full h-full overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src={business.logo} 
+                  alt="Logo" 
+                  loading="eager"
+                  decoding="sync"
+                  className="w-full h-full object-cover"
+                  style={{
+                    objectPosition: `${business.logoX ?? 50}% ${business.logoY ?? 50}%`,
+                    transform: `translate(${((business.logoX ?? 50) - 50)}%, ${((business.logoY ?? 50) - 50)}%) scale(${(business.logoZoom ?? 100) / 100})`,
+                    transformOrigin: 'center'
+                  }}
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className={cn(
+              "border-[1.5px] border-black flex items-center justify-center text-center",
+              isCompactHeader
+                ? (isA5 ? "w-[36px] h-[36px] mb-[2px]" : "w-[48px] h-[48px] mb-[4px]")
+                : (isA5 ? "w-[45px] h-[45px] mb-[5px]" : "w-[64px] h-[64px] mb-[8px]")
+            )}>
+              <span className={cn("font-black text-black flex items-center justify-center h-full w-full", isA5 ? "text-[7px]" : "text-[10px]")}>LOGO</span>
+            </div>
+          )}
+          <div className={isCompactHeader ? (isA5 ? "mt-[8px]" : "mt-[12px]") : (isA5 ? "mt-[16px]" : "mt-[24px]")}>
+            <h2 className={cn(
+              "font-black uppercase tracking-wide text-black drop-shadow-sm",
+              isCompactHeader ? (isA5 ? "text-[8px] mb-[1px]" : "text-[11px] mb-[2px]") : (isA5 ? "text-[9px] mb-[2px]" : "text-[13px] mb-[4px]")
+            )}>INVOICE TO :-</h2>
+            <div className={cn(
+              "flex flex-col leading-tight text-black font-black",
+              isCompactHeader ? (isA5 ? "gap-[1px] text-[6.5px]" : "gap-[2px] text-[9.5px]") : (isA5 ? "gap-[2px] text-[7.5px]" : "gap-[4px] text-[10.5px]")
+            )}>
+              <p className="lowercase">{invoice.customer}</p>
+              {invoice.customerAddress && <p>{invoice.customerAddress}</p>}
+              {invoice.customerPhone && <p>{invoice.customerPhone}</p>}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex-1 flex flex-col items-center text-center">
+          <h1 className={cn(
+            "font-black text-black tracking-tight whitespace-nowrap",
+            isCompactHeader ? (isA5 ? "text-[17px] mb-[0px]" : "text-[24px] mb-[1px]") : (isA5 ? "text-[21px] mb-[1px]" : "text-[30px] mb-[2px]")
+          )}>{business.name}</h1>
+          {business.address && <p className={cn("font-black text-black", isCompactHeader ? (isA5 ? "text-[7px]" : "text-[9.5px]") : (isA5 ? "text-[8px]" : "text-[11px]"))}>{business.address}</p>}
+          {business.email && <p className={cn("font-extrabold text-black", isCompactHeader ? (isA5 ? "text-[7px]" : "text-[9.5px]") : (isA5 ? "text-[8px]" : "text-[11px]"))}>Email: {business.email}</p>}
+          {business.phone && <p className={cn("font-extrabold text-black", isCompactHeader ? (isA5 ? "text-[7px]" : "text-[9.5px]") : (isA5 ? "text-[8px]" : "text-[11px]"))}>Mobile: {business.phone}{business.secondaryPhone ? `, ${business.secondaryPhone}` : ''}</p>}
+          
+          <h1 className={cn(
+            "font-black tracking-[2px] uppercase text-black",
+            isCompactHeader ? (isA5 ? "text-[18px] mt-[4px]" : "text-[24px] mt-[6px]") : (isA5 ? "text-[22px] mt-[8px]" : "text-[32px] mt-[12px]")
+          )}>
+            {isChalan ? 'CHALAN' : 'INVOICE'}
+          </h1>
+        </div>
+
+        <div className={cn(
+          "flex flex-col items-stretch",
+          isCompactHeader
+            ? (isA5 ? "mt-[12px] mb-0 w-[110px] space-y-[2px]" : "mt-[24px] mb-0 w-[160px] space-y-[3px]")
+            : (isA5 ? "mt-[20px] mb-0 w-[126px] space-y-[3px]" : "mt-[40px] mb-0 w-[180px] space-y-[4px]")
+        )}>
+          <div className={cn(
+            "flex justify-center",
+            isCompactHeader
+              ? (isA5 ? "mt-[-12px] mb-[12px] w-[32px] h-[32px] ml-[70px]" : "mt-[-24px] mb-[18px] w-[45px] h-[45px] ml-[105px]")
+              : (isA5 ? "mt-[-20px] mb-[20px] w-[40px] h-[40px] ml-[81px]" : "mt-[-40px] mb-[30px] w-[60px] h-[60px] ml-[115px]")
+          )}>
+            <QRCode 
+              value={getDisplayInvoiceId(invoice.id)} 
+              size={isCompactHeader ? (isA5 ? 32 : 45) : (isA5 ? 40 : 55)}
+              style={{ height: "auto", maxWidth: "100%", width: isCompactHeader ? (isA5 ? "32px" : "45px") : (isA5 ? "40px" : "55px") }}
+              viewBox={`0 0 256 256`}
+            />
+          </div>
+          <div className={cn("border-[1.5px] border-black bg-black text-white rounded-lg flex items-center justify-center text-center", isA5 ? "px-[5px] py-[1px]" : "px-[8px] py-[2px]")}>
+            <span className={cn("font-extrabold", isA5 ? "text-[6.5px]" : "text-[9px]")}>{isChalan ? 'Chalan No' : 'Invoice No'}: {getDisplayInvoiceId(invoice.id)}</span>
+          </div>
+          <div className={cn("border-[1.5px] border-black bg-black text-white rounded-lg flex items-center justify-center text-center", isA5 ? "px-[5px] py-[1px]" : "px-[8px] py-[2px]")}>
+            <span className={cn("font-extrabold", isA5 ? "text-[6.5px]" : "text-[9px]")}>{isChalan ? 'Chalan Date' : 'Invoice Date'}: {formatDate(isChalan ? new Date().toISOString() : invoice.date)}</span>
+          </div>
+          {pageNum && totalPgs && totalPgs > 1 && (
+            <div className={cn("border-[1.5px] border-black bg-black text-white font-black rounded-lg flex items-center justify-center text-center", isA5 ? "px-[5px] py-[1px]" : "px-[8px] py-[2px]")}>
+              <span className={cn("font-black uppercase", isA5 ? "text-[6.5px]" : "text-[9px]")}>Page {pageNum} of {totalPgs}</span>
+            </div>
+          )}
+          {(invoice.deliveryDate || invoice.delivery_date) && !isWood && (
+            <div className={cn("border-[1.5px] border-black bg-black text-white rounded-lg flex items-center justify-center text-center", isA5 ? "px-[5px] py-[1px]" : "px-[8px] py-[2px]")}>
+              <span className={cn("font-extrabold", isA5 ? "text-[6.5px]" : "text-[9px]")}>Delivery Date: {formatDate(invoice.deliveryDate || invoice.delivery_date)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+
+    const renderSignatures = (isCompact = false) => (
+      <>
+        <div className={cn(
+          "mt-auto flex justify-between items-end print:break-inside-avoid",
+          isCompact
+            ? (isA5 ? "px-[24px] pb-[1px] pt-[4px]" : "px-[36px] pb-[2px] pt-[8px]")
+            : (isA5 ? "px-[32px] pb-[2px] pt-[8px]" : "px-[48px] pb-[4px] pt-[12px]")
+        )}>
+          <div className={cn("text-center", isA5 ? "w-[135px]" : "w-[192px]")}>
+            <div className={cn("border-black shrink-0", isA5 ? "border-t-[1.5px] mb-[2px]" : "border-t-[2px] mb-[4px]")}></div>
+            <p className={cn("font-black tracking-wide", isA5 ? "text-[6.5px]" : "text-[9px]")}>CUSTOMER SIGNATURE</p>
+          </div>
+          
+          <div className={cn("text-center", isA5 ? "w-[135px]" : "w-[192px]")}>
+            <div className={cn("border-black shrink-0", isA5 ? "border-t-[1.5px] mb-[2px]" : "border-t-[2px] mb-[4px]")}></div>
+            <p className={cn("font-black tracking-wide", isA5 ? "text-[6.5px]" : "text-[9px]")}>AUTHORIZED SIGNATURE</p>
+          </div>
+        </div>
+        
+        <div className={cn(
+          "text-center font-black tracking-wide print:break-inside-avoid",
+          isCompact
+            ? (isA5 ? "mt-[1px] text-[6px] pb-[1px]" : "mt-[2px] text-[8.5px] pb-[2px]")
+            : (isA5 ? "mt-[2px] text-[7px] pb-[2px]" : "mt-[4px] text-[10px] pb-[4px]")
+        )}>
+          Just wanted to say thank you for your purchase. We&apos;re so lucky to have customers like you!
+        </div>
+      </>
+    );
+
+    // ==========================================
+    // WOOD INVOICE GENERATOR WITH MULTI-PAGE LOGIC
+    // ==========================================
+    if (isWood) {
+      interface WoodPageConfig {
+        pageIndex: number;
+        totalPages: number;
+        leftTableItems: any[];
+        rightTableItems: any[];
+        isCompact: boolean;
+        showTotalSum: boolean;
+      }
+
+      const woodPages: WoodPageConfig[] = [];
+      const totalWoodItems = items.length;
+
+      if (totalWoodItems <= 70) {
+        // 1 Page Mode:
+        // <= 60: default comfortable spacing (up to 30 rows per column)
+        // 61 to 70: adjust spacing and layout (compact rows, compact header/due) to fit all items on ONE page!
+        const isCompact = totalWoodItems > 60;
+        const half = Math.ceil(totalWoodItems / 2);
+        const leftReal = items.slice(0, half).map((item: any, idx: number) => ({ ...item, globalIndex: idx }));
+        const rightReal = items.slice(half).map((item: any, idx: number) => ({ ...item, globalIndex: half + idx }));
+        const maxRows = Math.max(leftReal.length, rightReal.length);
+        const leftTable = [
+          ...leftReal,
+          ...Array(Math.max(0, maxRows - leftReal.length)).fill({ isEmpty: true })
+        ];
+        const rightTable = [
+          ...rightReal,
+          ...Array(Math.max(0, maxRows - rightReal.length)).fill({ isEmpty: true })
+        ];
+
+        woodPages.push({
+          pageIndex: 0,
+          totalPages: 1,
+          leftTableItems: leftTable,
+          rightTableItems: rightTable,
+          isCompact,
+          showTotalSum: true,
+        });
+      } else {
+        // Exceeds 70 items:
+        // Place 60 items on first page (30 in left table, 30 in right table).
+        // Transfer remaining items to second page (and subsequent if needed), including total sum on the second page!
+        const remainingTotal = totalWoodItems - 60;
+        const additionalPages = remainingTotal <= 70 ? 1 : Math.ceil(remainingTotal / 60);
+        const totalPages = 1 + additionalPages;
+
+        // Page 1: exactly 60 items
+        const p1Items = items.slice(0, 60);
+        const p1Left = p1Items.slice(0, 30).map((it: any, idx: number) => ({ ...it, globalIndex: idx }));
+        const p1Right = p1Items.slice(30, 60).map((it: any, idx: number) => ({ ...it, globalIndex: 30 + idx }));
+        woodPages.push({
+          pageIndex: 0,
+          totalPages,
+          leftTableItems: p1Left,
+          rightTableItems: p1Right,
+          isCompact: false, // Default 60-item spacing
+          showTotalSum: false, // Total sum transferred to second page!
+        });
+
+        // Subsequent pages (Page 2 onwards):
+        let cursor = 60;
+        for (let p = 1; p < totalPages; p++) {
+          const isFinalPage = p === totalPages - 1;
+          const pageItemsRaw = isFinalPage
+            ? items.slice(cursor)
+            : items.slice(cursor, cursor + 60);
+
+          const pageCount = pageItemsRaw.length;
+          const startNum = cursor + 1;
+          cursor += pageCount;
+
+          const isCompact = pageCount > 60 && pageCount <= 70;
+          const half = Math.ceil(pageCount / 2);
+          const pLeft = pageItemsRaw.slice(0, half).map((it: any, idx: number) => ({
+            ...it,
+            globalIndex: startNum - 1 + idx,
+          }));
+          const pRight = pageItemsRaw.slice(half).map((it: any, idx: number) => ({
+            ...it,
+            globalIndex: startNum - 1 + half + idx,
+          }));
+
+          const maxRows = Math.max(pLeft.length, pRight.length);
+          const leftTable = [
+            ...pLeft,
+            ...Array(Math.max(0, maxRows - pLeft.length)).fill({ isEmpty: true }),
+          ];
+          const rightTable = [
+            ...pRight,
+            ...Array(Math.max(0, maxRows - pRight.length)).fill({ isEmpty: true }),
+          ];
+
+          woodPages.push({
+            pageIndex: p,
+            totalPages,
+            leftTableItems: leftTable,
+            rightTableItems: rightTable,
+            isCompact,
+            showTotalSum: isFinalPage, // Total sum is on the second (final) page!
+          });
+        }
+      }
+
+      return (
+        <div className="flex flex-col gap-6 print:gap-0">
+          {woodPages.map((pageCfg, pageIdx) => {
+            const isLastPage = pageIdx === woodPages.length - 1;
+            return (
+              <div
+                key={pageIdx}
+                className={cn(
+                  "bg-white text-black font-sans mx-auto flex flex-col relative shadow-sm print:shadow-none print:m-0",
+                  isA5 
+                    ? (pageCfg.isCompact ? "w-[148mm] h-[210mm] p-[4.5mm] print:p-[4.5mm]" : "w-[148mm] h-[210mm] p-[7mm] print:p-[7mm]") 
+                    : (pageCfg.isCompact ? "w-[210mm] h-[297mm] p-[6.5mm] print:p-[6.5mm]" : "w-[210mm] h-[297mm] p-[10mm] print:p-[10mm]"),
+                  !isLastPage && "break-after-page print:break-after-page mb-6 print:mb-0"
+                )}
+                style={!isLastPage ? { breakAfter: 'page', pageBreakAfter: 'always' } : undefined}
+              >
+                {/* Header */}
+                {renderHeader(pageCfg.isCompact, pageCfg.pageIndex + 1, pageCfg.totalPages)}
+
+                {/* Table Section */}
+                <div className={cn(
+                  "flex flex-1 min-h-0 print:break-inside-avoid",
+                  isA5 ? "gap-[4px]" : "gap-[6px]"
+                )}>
+                  {/* Left Table & Left Dues (if showTotalSum) */}
+                  <div className="flex-1 flex flex-col h-full rounded-sm">
+                    {renderTable(pageCfg.leftTableItems, pageCfg.isCompact)}
+                    {pageCfg.showTotalSum && (
+                      <div className={cn(
+                        "block w-[55%] self-center",
+                        pageCfg.isCompact
+                          ? (isA5 ? "mt-[4px] pb-[1px]" : "mt-[6px] pb-[2px]")
+                          : (isA5 ? "mt-[8px] pb-[2px]" : "mt-[12px] pb-[4px]")
+                      )}>
+                        <DueSummaryHeader label="PREV DUE:" value={showPaymentData ? Math.round(invoice.oldDue || 0).toLocaleString() : ''} isCompactMode={pageCfg.isCompact} />
+                        <DueSummaryHeader label="CURR DUE:" value={showPaymentData ? Math.round(invoice.due || 0).toLocaleString() : ''} isLast={true} isCompactMode={pageCfg.isCompact} />
+                        <DueSummaryHeader label="TOTAL DUE:" value={showPaymentData ? Math.round((invoice.oldDue || 0) + (invoice.due || 0)).toLocaleString() : ''} isCompactMode={pageCfg.isCompact} />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Right Table & Right Dues (if showTotalSum) */}
+                  <div className="flex-1 flex flex-col h-full rounded-sm">
+                    {renderTable(pageCfg.rightTableItems, pageCfg.isCompact)}
+                    {pageCfg.showTotalSum && (
+                      <div className={cn(
+                        "block w-full self-end",
+                        pageCfg.isCompact
+                          ? (isA5 ? "mt-[4px]" : "mt-[6px]")
+                          : (isA5 ? "mt-[8px]" : "mt-[12px]")
+                      )}>
+                        <DueSummaryHeader label="TOTAL CFT:" value={items.reduce((sum: number, it: any) => sum + (Number(it.cft) || 0), 0).toFixed(4)} isCompactMode={pageCfg.isCompact} />
+                        <DueSummaryHeader label="Subtotal:" value={showPaymentData ? Math.round(itemsSubtotal || 0).toLocaleString() : ''} isCompactMode={pageCfg.isCompact} />
+                        {invoice.discount > 0 && (
+                          <DueSummaryHeader label={`Discount ${invoice.discountType === 'percent' ? `(${invoice.discount}%)` : ''}:`} value={showPaymentData ? `-${Math.round(discountAmount || 0).toLocaleString()}` : ''} isCompactMode={pageCfg.isCompact} />
+                        )}
+                        {invoice.deliveryCharge > 0 && (
+                          <DueSummaryHeader label="Delivery Charge:" value={showPaymentData ? Math.round(invoice.deliveryCharge || 0).toLocaleString() : ''} isCompactMode={pageCfg.isCompact} />
+                        )}
+                        <DueSummaryHeader label="TOTAL:" value={showPaymentData ? Math.round(totalOrderAmount || 0).toLocaleString() : ''} isCompactMode={pageCfg.isCompact} />
+                        {invoice.payments && invoice.payments.length > 0 ? (
+                          invoice.payments.map((p: any, i: number) => (
+                            <DueSummaryHeader key={i} label={`Payment On ${formatDate(p.date)} (${capitalizeMethod(p.method)}) :`} value={showPaymentData ? Math.round(p.amount || 0).toLocaleString() : ''} labelClass={cn("normal-case text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} valueClass={cn("text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} isCompactMode={pageCfg.isCompact} />
+                          ))
+                        ) : (invoice.paid || 0) > 0 ? (
+                            <DueSummaryHeader label={`Payment On ${formatDate(invoice.date)} (${capitalizeMethod(invoice.paymentMethod)}) :`} value={showPaymentData ? Math.round(invoice.paid || 0).toLocaleString() : ''} labelClass={cn("normal-case text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} valueClass={cn("text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} isCompactMode={pageCfg.isCompact} />
+                        ) : null}
+                        <DueSummaryHeader label="AMOUNT DUE:" value={showPaymentData ? Math.round(invoice.due || 0).toLocaleString() : ''} isLast={invoice.due === 0} labelClass="text-rose-700" valueClass="text-rose-700" isCompactMode={pageCfg.isCompact} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom Section: If NOT showing total sum on this page (Page 1 of multi-page) */}
+                {!pageCfg.showTotalSum ? (
+                  <div className={cn(
+                    "mt-auto flex flex-col justify-end print:break-inside-avoid",
+                    isA5 ? "pt-[4px]" : "pt-[8px]"
+                  )}>
+                    <div className={cn(
+                      "border-t-2 border-b-2 border-black flex items-center justify-between",
+                      isA5 ? "py-[3px] px-[6px]" : "py-[5px] px-[10px]"
+                    )}>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "font-black uppercase bg-black text-white rounded px-2 py-0.5",
+                          isA5 ? "text-[7px]" : "text-[10px]"
+                        )}>
+                          PAGE {pageCfg.pageIndex + 1} OF {pageCfg.totalPages}
+                        </span>
+                        <span className={cn(
+                          "font-extrabold text-black",
+                          isA5 ? "text-[7px]" : "text-[10px]"
+                        )}>
+                          Items 1 to 60 shown
+                        </span>
+                      </div>
+                      <div className={cn(
+                        "font-black text-black uppercase tracking-wider flex items-center gap-1.5",
+                        isA5 ? "text-[7.5px]" : "text-[10.5px]"
+                      )}>
+                        <span>Continued on Page 2 for remaining items &amp; total sum</span>
+                        <span className="text-sm font-bold">&rarr;</span>
+                      </div>
+                    </div>
+                    <p className={cn(
+                      "text-center text-slate-600 font-bold tracking-tight",
+                      isA5 ? "mt-[3px] text-[6.5px]" : "mt-[4px] text-[9px]"
+                    )}>
+                      * Please see Page 2 for overall Total CFT, Grand Total, Amount Due, and authorized signatures.
+                    </p>
+                  </div>
+                ) : (
+                  renderSignatures(pageCfg.isCompact)
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
     }
 
-    const DueSummaryHeader = ({label, value, isLast, labelClass, valueClass}: {label: string, value: string|number, isLast?: boolean, labelClass?: string, valueClass?: string}) => (
-        <div className={cn(
-          "flex justify-between items-center mt-[1px] border-black",
-          isA5 ? "py-[1px]" : "py-0.5",
-          isLast ? (isA5 ? "border-b-[3px]" : "border-b-4") : (isA5 ? "border-b-[1.5px]" : "border-b-[2px]")
-        )}>
-          <span className={cn("font-black uppercase", isA5 ? "text-[7.5px]" : "text-[10.5px]", labelClass)}>{label}</span>
-          <span className={cn("font-extrabold", isA5 ? "text-[7.5px]" : "text-[10.5px]", valueClass)}>{value}</span>
-        </div>
-    )
-
+    // ==========================================
+    // FURNITURE INVOICE RENDERING (SINGLE TABLE)
+    // ==========================================
     return (
       <div className={cn(
         "bg-white text-black font-sans mx-auto flex flex-col relative shadow-sm print:shadow-none print:m-0",
@@ -398,174 +806,51 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
           ? "w-[148mm] h-[210mm] p-[7mm] print:p-[7mm]" 
           : "w-[210mm] h-[297mm] p-[10mm] print:p-[10mm]"
       )}>
-        
         {/* Header Block */}
-        <div className={cn("flex justify-between items-start print:break-inside-avoid", isA5 ? "mb-[8px]" : "mb-[12px]")}>
-          <div className={isA5 ? "w-[126px]" : "w-[180px]"}>
-             {business.logo ? (
-                <div className={cn("flex flex-col items-center justify-center", isA5 ? "w-[45px] h-[45px] mb-[5px]" : "w-[64px] h-[64px] mb-[8px]")}>
-                  <div className="relative w-full h-full overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={business.logo} 
-                      alt="Logo" 
-                      loading="eager"
-                      decoding="sync"
-                      className="w-full h-full object-cover"
-                      style={{
-                        objectPosition: `${business.logoX ?? 50}% ${business.logoY ?? 50}%`,
-                        transform: `translate(${((business.logoX ?? 50) - 50)}%, ${((business.logoY ?? 50) - 50)}%) scale(${(business.logoZoom ?? 100) / 100})`,
-                        transformOrigin: 'center'
-                      }}
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                </div>
-            ) : (
-              <div className={cn("border-[1.5px] border-black flex items-center justify-center text-center", isA5 ? "w-[45px] h-[45px] mb-[5px]" : "w-[64px] h-[64px] mb-[8px]")}>
-                 <span className={cn("font-black text-black flex items-center justify-center h-full w-full", isA5 ? "text-[7px]" : "text-[10px]")}>LOGO</span>
-              </div>
-            )}
-            <div className={isA5 ? "mt-[16px]" : "mt-[24px]"}>
-              <h2 className={cn("font-black uppercase tracking-wide text-black drop-shadow-sm", isA5 ? "text-[9px] mb-[2px]" : "text-[13px] mb-[4px]")}>INVOICE TO :-</h2>
-              <div className={cn("flex flex-col leading-tight text-black font-black", isA5 ? "gap-[2px] text-[7.5px]" : "gap-[4px] text-[10.5px]")}>
-                <p className="lowercase">{invoice.customer}</p>
-                {invoice.customerAddress && <p>{invoice.customerAddress}</p>}
-                {invoice.customerPhone && <p>{invoice.customerPhone}</p>}
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex-1 flex flex-col items-center text-center">
-             <h1 className={cn("font-black text-black tracking-tight whitespace-nowrap", isA5 ? "text-[21px] mb-[1px]" : "text-[30px] mb-[2px]")}>{business.name}</h1>
-             {business.address && <p className={cn("font-black text-black", isA5 ? "text-[8px]" : "text-[11px]")}>{business.address}</p>}
-             {business.email && <p className={cn("font-extrabold text-black", isA5 ? "text-[8px]" : "text-[11px]")}>Email: {business.email}</p>}
-             {business.phone && <p className={cn("font-extrabold text-black", isA5 ? "text-[8px]" : "text-[11px]")}>Mobile: {business.phone}{business.secondaryPhone ? `, ${business.secondaryPhone}` : ''}</p>}
-             
-             <h1 className={cn("font-black tracking-[2px] uppercase text-black", isA5 ? "text-[22px] mt-[8px]" : "text-[32px] mt-[12px]")}>
-                {isChalan ? 'CHALAN' : 'INVOICE'}
-             </h1>
-          </div>
-
-          <div className={cn("flex flex-col items-stretch", isA5 ? "mt-[20px] mb-0 w-[126px] space-y-[3px]" : "mt-[40px] mb-0 w-[180px] space-y-[4px]")}>
-            <div className={cn("flex justify-center", isA5 ? "mt-[-20px] mb-[20px] w-[40px] h-[40px] ml-[81px]" : "mt-[-40px] mb-[30px] w-[60px] h-[60px] ml-[115px]")}>
-              <QRCode 
-                value={getDisplayInvoiceId(invoice.id)} 
-                size={isA5 ? 40 : 55}
-                style={{ height: "auto", maxWidth: "100%", width: isA5 ? "40px" : "55px" }}
-                viewBox={`0 0 256 256`}
-              />
-            </div>
-            <div className={cn("border-[1.5px] border-black bg-black text-white rounded-lg flex items-center justify-center text-center", isA5 ? "px-[5px] py-[1.5px]" : "px-[8px] py-[2px]")}>
-               <span className={cn("font-extrabold", isA5 ? "text-[6.5px]" : "text-[9px]")}>{isChalan ? 'Chalan No' : 'Invoice No'}: {getDisplayInvoiceId(invoice.id)}</span>
-            </div>
-            <div className={cn("border-[1.5px] border-black bg-black text-white rounded-lg flex items-center justify-center text-center", isA5 ? "px-[5px] py-[1.5px]" : "px-[8px] py-[2px]")}>
-               <span className={cn("font-extrabold", isA5 ? "text-[6.5px]" : "text-[9px]")}>{isChalan ? 'Chalan Date' : 'Invoice Date'}: {formatDate(isChalan ? new Date().toISOString() : invoice.date)}</span>
-            </div>
-            {(invoice.deliveryDate || invoice.delivery_date) && !isWood && (
-              <div className={cn("border-[1.5px] border-black bg-black text-white rounded-lg flex items-center justify-center text-center", isA5 ? "px-[5px] py-[1.5px]" : "px-[8px] py-[2px]")}>
-                 <span className={cn("font-extrabold", isA5 ? "text-[6.5px]" : "text-[9px]")}>Delivery Date: {formatDate(invoice.deliveryDate || invoice.delivery_date)}</span>
-              </div>
-            )}
-          </div>
-        </div>
+        {renderHeader(false)}
 
         {/* Table Section */}
-        {isWood ? (
-          <div className={cn("flex flex-1 min-h-0 print:break-inside-avoid", isA5 ? "gap-[4px]" : "gap-[6px]")}>
-            <div className="flex-1 flex flex-col h-full rounded-sm">
-              {renderTable(leftTableItems)}
-              <div className={cn("block w-[48%] self-center", isA5 ? "mt-[8px] pb-[2px]" : "mt-[12px] pb-[4px]")}>
+        <div className="flex flex-col flex-1 min-h-0 print:break-inside-avoid">
+          {renderTable([
+            ...items.map((item: any, idx: number) => ({ ...item, globalIndex: idx }))
+          ])}
+          <div className={cn("flex justify-between w-full print:break-inside-avoid", isA5 ? "mt-[10px] gap-[20px]" : "mt-[16px] gap-[32px]")}>
+            {/* Left Side: PREV DUE, CURR DUE, TOTAL DUE */}
+            <div className="flex-1 flex flex-col items-center pt-[2px]">
+              <div className={cn("w-[50%]", isA5 ? "pb-[2px]" : "pb-[4px]")}>
                 <DueSummaryHeader label="PREV DUE:" value={showPaymentData ? Math.round(invoice.oldDue || 0).toLocaleString() : ''} />
                 <DueSummaryHeader label="CURR DUE:" value={showPaymentData ? Math.round(invoice.due || 0).toLocaleString() : ''} isLast={true} />
                 <DueSummaryHeader label="TOTAL DUE:" value={showPaymentData ? Math.round((invoice.oldDue || 0) + (invoice.due || 0)).toLocaleString() : ''} />
               </div>
             </div>
-            
-            <div className="flex-1 flex flex-col h-full rounded-sm">
-              {renderTable(rightTableItems)}
-              <div className={cn("block w-full self-end", isA5 ? "mt-[8px]" : "mt-[12px]")}>
-                  <DueSummaryHeader label="TOTAL CFT:" value={invoice.items.reduce((sum:any, item:any)=> sum + (item.cft || 0), 0).toFixed(4)} />
-                  <DueSummaryHeader label="Subtotal:" value={showPaymentData ? Math.round(itemsSubtotal || 0).toLocaleString() : ''} />
-                  {invoice.discount > 0 && (
-                    <DueSummaryHeader label={`Discount ${invoice.discountType === 'percent' ? `(${invoice.discount}%)` : ''}:`} value={showPaymentData ? `-${Math.round(discountAmount || 0).toLocaleString()}` : ''} />
-                  )}
-                  {invoice.deliveryCharge > 0 && (
-                    <DueSummaryHeader label="Delivery Charge:" value={showPaymentData ? Math.round(invoice.deliveryCharge || 0).toLocaleString() : ''} />
-                  )}
-                  <DueSummaryHeader label="TOTAL:" value={showPaymentData ? Math.round(totalOrderAmount || 0).toLocaleString() : ''} />
-                  {invoice.payments && invoice.payments.length > 0 ? (
-                    invoice.payments.map((p: any, i: number) => (
-                      <DueSummaryHeader key={i} label={`Payment On ${formatDate(p.date)} (${capitalizeMethod(p.method)}) :`} value={showPaymentData ? Math.round(p.amount || 0).toLocaleString() : ''} labelClass={cn("normal-case text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} valueClass={cn("text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} />
-                    ))
-                  ) : (invoice.paid || 0) > 0 ? (
-                      <DueSummaryHeader label={`Payment On ${formatDate(invoice.date)} (${capitalizeMethod(invoice.paymentMethod)}) :`} value={showPaymentData ? Math.round(invoice.paid || 0).toLocaleString() : ''} labelClass={cn("normal-case text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} valueClass={cn("text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} />
-                  ) : null}
-                  <DueSummaryHeader label="AMOUNT DUE:" value={showPaymentData ? Math.round(invoice.due || 0).toLocaleString() : ''} isLast={invoice.due === 0} labelClass="text-rose-700" valueClass="text-rose-700" />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col flex-1 min-h-0 print:break-inside-avoid">
-            {renderTable([
-              ...items.map((item: any, idx: number) => ({ ...item, globalIndex: idx }))
-            ])}
-            <div className={cn("flex justify-between w-full print:break-inside-avoid", isA5 ? "mt-[10px] gap-[20px]" : "mt-[16px] gap-[32px]")}>
-              {/* Left Side: PREV DUE, CURR DUE, TOTAL DUE */}
-              <div className="flex-1 flex flex-col items-center pt-[2px]">
-                <div className={cn("w-[50%]", isA5 ? "pb-[2px]" : "pb-[4px]")}>
-                  <DueSummaryHeader label="PREV DUE:" value={showPaymentData ? Math.round(invoice.oldDue || 0).toLocaleString() : ''} />
-                  <DueSummaryHeader label="CURR DUE:" value={showPaymentData ? Math.round(invoice.due || 0).toLocaleString() : ''} isLast={true} />
-                  <DueSummaryHeader label="TOTAL DUE:" value={showPaymentData ? Math.round((invoice.oldDue || 0) + (invoice.due || 0)).toLocaleString() : ''} />
-                </div>
-              </div>
 
-              {/* Right Side: Totals and Payments */}
-              <div className="flex-1 flex flex-col">
-                <DueSummaryHeader label="Subtotal:" value={showPaymentData ? Math.round(itemsSubtotal || 0).toLocaleString() : ''} />
-                {invoice.discount > 0 && (
-                  <DueSummaryHeader label={`Discount ${invoice.discountType === 'percent' ? `(${invoice.discount}%)` : ''}:`} value={showPaymentData ? `-${Math.round(discountAmount || 0).toLocaleString()}` : ''} />
-                )}
-                {invoice.deliveryCharge > 0 && (
-                  <DueSummaryHeader label="Delivery Charge:" value={showPaymentData ? Math.round(invoice.deliveryCharge || 0).toLocaleString() : ''} />
-                )}
-                <DueSummaryHeader label="TOTAL:" value={showPaymentData ? Math.round(totalOrderAmount || 0).toLocaleString() : ''} />
-                
-                {invoice.payments && invoice.payments.length > 0 ? (
-                  invoice.payments.map((p: any, i: number) => (
-                    <DueSummaryHeader key={i} label={`Payment On ${formatDate(p.date)} (${capitalizeMethod(p.method)}) :`} value={showPaymentData ? Math.round(p.amount || 0).toLocaleString() : ''} labelClass={cn("normal-case text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} valueClass={cn("text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} />
-                  ))
-                ) : (invoice.paid || 0) > 0 ? (
-                    <DueSummaryHeader label={`Payment On ${formatDate(invoice.date)} (${capitalizeMethod(invoice.paymentMethod)}) :`} value={showPaymentData ? Math.round(invoice.paid || 0).toLocaleString() : ''} labelClass={cn("normal-case text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} valueClass={cn("text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} />
-                ) : null}
-                <DueSummaryHeader label="AMOUNT DUE:" value={showPaymentData ? Math.round(invoice.due || 0).toLocaleString() : ''} isLast={invoice.due === 0} labelClass="text-rose-700" valueClass="text-rose-700" />
-              </div>
+            {/* Right Side: Totals and Payments */}
+            <div className="flex-1 flex flex-col">
+              <DueSummaryHeader label="Subtotal:" value={showPaymentData ? Math.round(itemsSubtotal || 0).toLocaleString() : ''} />
+              {invoice.discount > 0 && (
+                <DueSummaryHeader label={`Discount ${invoice.discountType === 'percent' ? `(${invoice.discount}%)` : ''}:`} value={showPaymentData ? `-${Math.round(discountAmount || 0).toLocaleString()}` : ''} />
+              )}
+              {invoice.deliveryCharge > 0 && (
+                <DueSummaryHeader label="Delivery Charge:" value={showPaymentData ? Math.round(invoice.deliveryCharge || 0).toLocaleString() : ''} />
+              )}
+              <DueSummaryHeader label="TOTAL:" value={showPaymentData ? Math.round(totalOrderAmount || 0).toLocaleString() : ''} />
+              
+              {invoice.payments && invoice.payments.length > 0 ? (
+                invoice.payments.map((p: any, i: number) => (
+                  <DueSummaryHeader key={i} label={`Payment On ${formatDate(p.date)} (${capitalizeMethod(p.method)}) :`} value={showPaymentData ? Math.round(p.amount || 0).toLocaleString() : ''} labelClass={cn("normal-case text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} valueClass={cn("text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} />
+                ))
+              ) : (invoice.paid || 0) > 0 ? (
+                  <DueSummaryHeader label={`Payment On ${formatDate(invoice.date)} (${capitalizeMethod(invoice.paymentMethod)}) :`} value={showPaymentData ? Math.round(invoice.paid || 0).toLocaleString() : ''} labelClass={cn("normal-case text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} valueClass={cn("text-emerald-700 font-extrabold", isA5 ? "text-[7px]" : "text-[10px]")} />
+              ) : null}
+              <DueSummaryHeader label="AMOUNT DUE:" value={showPaymentData ? Math.round(invoice.due || 0).toLocaleString() : ''} isLast={invoice.due === 0} labelClass="text-rose-700" valueClass="text-rose-700" />
             </div>
           </div>
-        )}
+        </div>
         
         {/* Signatures */}
-        <div className={cn(
-          "mt-auto flex justify-between items-end print:break-inside-avoid",
-          isA5 ? "px-[32px] pb-[2px] pt-[8px]" : "px-[48px] pb-[4px] pt-[12px]"
-        )}>
-           <div className={cn("text-center", isA5 ? "w-[135px]" : "w-[192px]")}>
-              <div className={cn("border-black shrink-0", isA5 ? "border-t-[1.5px] mb-[2px]" : "border-t-[2px] mb-[4px]")}></div>
-              <p className={cn("font-black tracking-wide", isA5 ? "text-[6.5px]" : "text-[9px]")}>CUSTOMER SIGNATURE</p>
-           </div>
-           
-           <div className={cn("text-center", isA5 ? "w-[135px]" : "w-[192px]")}>
-              <div className={cn("border-black shrink-0", isA5 ? "border-t-[1.5px] mb-[2px]" : "border-t-[2px] mb-[4px]")}></div>
-              <p className={cn("font-black tracking-wide", isA5 ? "text-[6.5px]" : "text-[9px]")}>AUTHORIZED SIGNATURE</p>
-           </div>
-        </div>
-        
-        <div className={cn("text-center font-black tracking-wide print:break-inside-avoid", isA5 ? "mt-[2px] text-[7px] pb-[2px]" : "mt-[4px] text-[10px] pb-[4px]")}>
-           Just wanted to say thank you for your purchase. We&apos;re so lucky to have customers like you!
-        </div>
-
+        {renderSignatures(false)}
       </div>
-    )
+    );
   }
 
   return (
