@@ -1087,11 +1087,11 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           type="button"
                           onClick={handleReverseOrder}
                           disabled={items.length <= 1}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-900/30 hover:text-amber-700 dark:hover:text-amber-400 transition-all border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                          className="flex items-center justify-center p-2 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-900/30 hover:text-amber-700 dark:hover:text-amber-400 transition-all border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
                           title="Reverse item order"
+                          aria-label="Reverse item order"
                         >
-                          <ArrowUpDown size={13} className="text-amber-600 dark:text-amber-400" />
-                          <span>Reverse Order</span>
+                          <ArrowUpDown size={14} className="text-amber-600 dark:text-amber-400" />
                         </button>
 
                         {/* Display Area for Total CFT of Selected Items */}
@@ -1128,12 +1128,6 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
-                          onClick={handleClearItems}
-                          className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 dark:bg-rose-900/10 dark:text-rose-400 text-xs font-bold rounded-xl hover:bg-rose-100 transition-all border border-rose-100 dark:border-rose-900/20"
-                        >
-                          <Eraser size={14} /> Clear All
-                        </button>
-                        <button 
                           onClick={handleAddItem}
                           className="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md"
                         >
@@ -1166,33 +1160,33 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             </th>
 
                             {/* 2. No */}
-                            <th className="py-3 px-1 text-center font-bold w-12 text-slate-500 dark:text-slate-400">No</th>
+                            <th className="py-3 px-1 text-center font-bold w-10 text-slate-500 dark:text-slate-400">No</th>
 
                             {isWood ? (
                               <>
                                 {/* 3. Car */}
-                                <th className="py-3 px-2 text-center font-bold w-[11%]">Car</th>
+                                <th className="py-3 px-1 text-center font-bold w-[8%]">Car</th>
 
                                 {/* 4. Tree */}
-                                <th className="py-3 px-2 text-left font-bold w-[17%]">Tree</th>
+                                <th className="py-3 px-1 text-center font-bold w-[11%]">Tree</th>
 
                                 {/* 5. W */}
-                                <th className="py-3 px-1.5 text-center font-bold w-[6.5%]">W</th>
+                                <th className="py-3 px-1.5 text-center font-bold w-[7%]">W</th>
 
                                 {/* 6. L */}
-                                <th className="py-3 px-1.5 text-center font-bold w-[6.5%]">L</th>
+                                <th className="py-3 px-1.5 text-center font-bold w-[7%]">L</th>
 
                                 {/* 7. CFT */}
-                                <th className="py-3 px-1.5 text-center font-bold w-[8.5%]">CFT</th>
+                                <th className="py-3 px-1.5 text-center font-bold w-[9%]">CFT</th>
 
                                 {/* 8. Tag */}
-                                <th className="py-3 px-2 text-center font-bold w-[13%]">Tag</th>
+                                <th className="py-3 px-2 text-center font-bold w-[15%]">Tag</th>
 
                                 {/* 9. Price */}
-                                <th className="py-3 px-2 text-right font-bold w-[10%]">Price</th>
+                                <th className="py-3 px-1 text-center font-bold w-[8%]">Price</th>
 
                                 {/* 10. Total */}
-                                <th className="py-3 px-2 text-right font-bold w-[11%]">Total</th>
+                                <th className="py-3 px-2 text-right font-bold w-[12%]">Total</th>
                               </>
                             ) : (
                               <>
@@ -1206,7 +1200,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             )}
 
                             {/* 11. Actions */}
-                            <th className="py-3 px-2 text-center font-bold w-20">Actions</th>
+                            <th className="py-3 px-2 text-center font-bold w-14">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1233,7 +1227,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               {isWood ? (
                                 <>
                                   {/* 3. Car */}
-                                  <td className="py-2.5 px-1.5 text-center">
+                                  <td className="py-2.5 px-1 text-center">
                                     <input 
                                       type="text"
                                       value={item.carNo?.trim().toLowerCase() === 'solo' ? 'M' : (item.carNo ?? '')}
@@ -1243,12 +1237,12 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                         handleItemChange(idx, 'carNo', val)
                                       }}
                                       placeholder="Car #"
-                                      className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500 truncate"
+                                      className="w-full max-w-[64px] mx-auto bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-1.5 text-center font-mono font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500 truncate"
                                     />
                                   </td>
 
                                   {/* 4. Tree (Direct inline text editing) */}
-                                  <td className="py-2.5 px-2">
+                                  <td className="py-2.5 px-1 text-center">
                                     <input 
                                       type="text"
                                       value={item.treeNo || item.name || ''}
@@ -1256,8 +1250,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                         handleItemChange(idx, 'treeNo', e.target.value)
                                         handleItemChange(idx, 'name', e.target.value)
                                       }}
-                                      placeholder="Tree / Log #"
-                                      className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2.5 font-bold text-slate-800 dark:text-slate-200 text-sm outline-none focus:ring-1 focus:ring-amber-500 truncate"
+                                      placeholder="Tree #"
+                                      className="w-full max-w-[90px] mx-auto bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2 text-center font-bold text-slate-800 dark:text-slate-200 text-xs outline-none focus:ring-1 focus:ring-amber-500 truncate"
                                     />
                                   </td>
 
@@ -1337,17 +1331,15 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                   </td>
 
                                   {/* 9. Price */}
-                                  <td className="py-2.5 px-1.5 text-right">
-                                    <div className="relative">
-                                      <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[11px]">৳</span>
-                                      <input 
-                                        type="number"
-                                        step="any"
-                                        value={item.price ?? ''}
-                                        onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                                        className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-4 pr-1.5 text-right font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
-                                      />
-                                    </div>
+                                  <td className="py-2.5 px-1 text-center">
+                                    <input 
+                                      type="number"
+                                      step="any"
+                                      value={item.price ?? ''}
+                                      onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                      placeholder="0"
+                                      className="w-full max-w-[68px] mx-auto bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
                                   </td>
 
                                   {/* 10. Total */}
@@ -1429,16 +1421,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                       className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 text-center font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
                                     />
                                   </td>
-                                  <td className="py-2.5 px-2.5 text-right">
-                                    <div className="relative">
-                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">৳</span>
-                                      <input 
-                                        type="number"
-                                        value={item.price ?? ''}
-                                        onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                                        className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-5 pr-2 text-right font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
-                                      />
-                                    </div>
+                                  <td className="py-2.5 px-2.5 text-center">
+                                    <input 
+                                      type="number"
+                                      value={item.price ?? ''}
+                                      onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                      placeholder="0"
+                                      className="w-full max-w-[72px] mx-auto bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-1.5 text-center font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
                                   </td>
                                   <td className="py-2.5 px-2.5 text-right">
                                     <p className="font-mono font-black text-slate-900 dark:text-slate-100 text-sm">
@@ -1449,16 +1439,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               )}
 
                               {/* 9. Actions */}
-                              <td className="py-2.5 px-2 text-center w-20">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <button 
-                                    type="button"
-                                    onClick={() => handleDuplicateItem(idx)} 
-                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" 
-                                    title="Duplicate Item"
-                                  >
-                                    <Copy size={15} />
-                                  </button>
+                              <td className="py-2.5 px-2 text-center w-14">
+                                <div className="flex items-center justify-center">
                                   <button 
                                     type="button"
                                     onClick={() => handleRemoveItem(idx)} 
