@@ -171,8 +171,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   }, [savedTags])
 
   const getTagColor = useCallback((tagName?: string): string | null => {
+    if (!tagName) return null
     const data = getTagData(tagName)
-    return data?.color || null
+    if (data?.color) return data.color
+    const normalized = tagName.trim().toLowerCase()
+    if (normalized === 'premium') return '#f59e0b'
+    if (normalized === 'standard') return '#3b82f6'
+    if (normalized === 'economy') return '#22c55e'
+    return null
   }, [getTagData])
 
   const createEmptyItem = useCallback((woodMode: boolean): EditableItem => {
@@ -1294,27 +1300,15 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                   {/* 8. Tag */}
                                   <td className="py-2.5 px-1.5 text-center">
                                     <div className="relative flex items-center">
-                                      {itemTagColor && (
-                                        <span 
-                                          className="absolute left-2 w-2.5 h-2.5 rounded-full shrink-0 shadow-xs pointer-events-none ring-1 ring-white/70 dark:ring-black/40 z-10" 
-                                          style={{ backgroundColor: itemTagColor }}
-                                          aria-hidden="true"
-                                        />
-                                      )}
+                                      <span 
+                                        className="absolute left-2 w-2.5 h-2.5 rounded-full shrink-0 shadow-xs pointer-events-none ring-1 ring-white/70 dark:ring-black/40 z-10 bg-slate-300 dark:bg-slate-600 transition-colors" 
+                                        style={itemTagColor ? { backgroundColor: itemTagColor } : undefined}
+                                        aria-hidden="true"
+                                      />
                                       <select 
                                         value={item.tag ?? ''}
                                         onChange={e => handleItemChange(idx, 'tag', e.target.value)}
-                                        style={itemTagColor ? {
-                                          backgroundColor: `${itemTagColor}18`,
-                                          borderColor: `${itemTagColor}55`,
-                                          color: itemTagColor,
-                                        } : undefined}
-                                        className={cn(
-                                          "w-full rounded-lg py-1.5 pr-6 text-center font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none truncate transition-all",
-                                          itemTagColor 
-                                            ? "pl-6 border font-black shadow-xs" 
-                                            : "bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 pl-2 text-slate-500 dark:text-slate-400 font-semibold"
-                                        )}
+                                        className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-6 pr-6 text-center font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none truncate transition-all"
                                         title="Choose saved tag (updates price automatically)"
                                       >
                                         <option value="" className="text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 font-normal">
@@ -1324,10 +1318,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                           <option 
                                             key={st.id || st.name} 
                                             value={st.name}
-                                            style={st.color ? { color: st.color, backgroundColor: '#ffffff' } : undefined}
                                             className="font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900"
                                           >
-                                            ● {st.name} {st.sell_price > 0 ? `(৳${st.sell_price})` : ''}
+                                            {st.name} {st.sell_price > 0 ? `(৳${st.sell_price})` : ''}
                                           </option>
                                         ))}
                                         {item.tag && !savedTags.some(st => st.name.toLowerCase() === item.tag?.toLowerCase()) && (
@@ -1338,8 +1331,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                       </select>
                                       <ChevronDown 
                                         size={12} 
-                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors" 
-                                        style={itemTagColor ? { color: itemTagColor } : undefined}
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-colors" 
                                       />
                                     </div>
                                   </td>
@@ -1399,27 +1391,15 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                   </td>
                                   <td className="py-2.5 px-2.5 text-center">
                                     <div className="relative flex items-center">
-                                      {itemTagColor && (
-                                        <span 
-                                          className="absolute left-2 w-2.5 h-2.5 rounded-full shrink-0 shadow-xs pointer-events-none ring-1 ring-white/70 dark:ring-black/40 z-10" 
-                                          style={{ backgroundColor: itemTagColor }}
-                                          aria-hidden="true"
-                                        />
-                                      )}
+                                      <span 
+                                        className="absolute left-2 w-2.5 h-2.5 rounded-full shrink-0 shadow-xs pointer-events-none ring-1 ring-white/70 dark:ring-black/40 z-10 bg-slate-300 dark:bg-slate-600 transition-colors" 
+                                        style={itemTagColor ? { backgroundColor: itemTagColor } : undefined}
+                                        aria-hidden="true"
+                                      />
                                       <select 
                                         value={item.tag ?? ''}
                                         onChange={e => handleItemChange(idx, 'tag', e.target.value)}
-                                        style={itemTagColor ? {
-                                          backgroundColor: `${itemTagColor}18`,
-                                          borderColor: `${itemTagColor}55`,
-                                          color: itemTagColor,
-                                        } : undefined}
-                                        className={cn(
-                                          "w-full rounded-lg py-1.5 pr-6 text-center font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none truncate transition-all",
-                                          itemTagColor 
-                                            ? "pl-6 border font-black shadow-xs" 
-                                            : "bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 pl-2 text-slate-500 dark:text-slate-400 font-semibold"
-                                        )}
+                                        className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-6 pr-6 text-center font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none truncate transition-all"
                                       >
                                         <option value="" className="text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 font-normal">
                                           No Tag
@@ -1428,17 +1408,15 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                           <option 
                                             key={st.id || st.name} 
                                             value={st.name}
-                                            style={st.color ? { color: st.color, backgroundColor: '#ffffff' } : undefined}
                                             className="font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900"
                                           >
-                                            ● {st.name}
+                                            {st.name}
                                           </option>
                                         ))}
                                       </select>
                                       <ChevronDown 
                                         size={12} 
-                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors" 
-                                        style={itemTagColor ? { color: itemTagColor } : undefined}
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-colors" 
                                       />
                                     </div>
                                   </td>
