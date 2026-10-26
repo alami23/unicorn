@@ -11,24 +11,38 @@ interface AlertPopupProps {
   message: string
   type?: 'error' | 'warning' | 'info' | 'success'
   title?: string
+  playSound?: boolean
 }
 
-export default function AlertPopup({ isOpen, onClose, message, type = 'error', title }: AlertPopupProps) {
+export default function AlertPopup({ isOpen, onClose, message, type = 'error', title, playSound = true }: AlertPopupProps) {
+  const onCloseRef = React.useRef(onClose)
+  const soundPlayedRef = React.useRef(false)
+
   useEffect(() => {
-    if (isOpen) {
+    onCloseRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    if (!isOpen) {
+      soundPlayedRef.current = false
+      return
+    }
+
+    if (playSound && !soundPlayedRef.current) {
+      soundPlayedRef.current = true
       const soundUrl = type === 'success' 
         ? 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'
         : 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
       const audio = new Audio(soundUrl)
       audio.play().catch(e => console.log('Audio play failed:', e))
-
-      // Auto dismiss side toast after 5 seconds
-      const timer = setTimeout(() => {
-        onClose()
-      }, 5000)
-      return () => clearTimeout(timer)
     }
-  }, [isOpen, type, onClose])
+
+    // Auto dismiss side toast after 5 seconds
+    const timer = setTimeout(() => {
+      onCloseRef.current?.()
+    }, 5000)
+    return () => clearTimeout(timer)
+  }, [isOpen, type, playSound, message])
 
   const config = {
     error: {

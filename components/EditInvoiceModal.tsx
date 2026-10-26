@@ -6,7 +6,7 @@ import {
   X, Save, User, Plus, Trash2, Calendar, DollarSign, Phone, MapPin, 
   Truck, Tag, AlertCircle, Loader2, Check, Search, ChevronDown, 
   UserPlus, FileText, CornerDownRight, Hash, Edit3, 
-  Copy, ArrowUp, ArrowDown, Eraser, ArrowUpDown
+  Copy, ArrowUp, ArrowDown, Eraser, ArrowUpDown, CheckSquare
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -143,20 +143,18 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
           })))
         }
 
-        if (isWood) {
-          const { data: tagData } = await supabase
-            .from('wood_category_tag')
-            .select('*')
-            .order('name', { ascending: true })
+        const { data: tagData } = await supabase
+          .from('wood_category_tag')
+          .select('*')
+          .order('name', { ascending: true })
 
-          if (tagData && tagData.length > 0) {
-            setSavedTags(tagData.map((t: any) => ({
-              id: t.id,
-              name: t.name,
-              sell_price: Number(t.sell_price ?? t.sellPrice ?? t.price ?? 0),
-              color: t.color
-            })))
-          }
+        if (tagData && tagData.length > 0) {
+          setSavedTags(tagData.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            sell_price: Number(t.sell_price ?? t.sellPrice ?? t.price ?? 0),
+            color: t.color
+          })))
         }
       } catch (e) {
         console.warn('Failed to fetch initial data:', e)
@@ -165,6 +163,17 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     
     fetchInitialData()
   }, [isOpen, isWood])
+
+  const getTagData = useCallback((tagName?: string): SavedTag | undefined => {
+    if (!tagName) return undefined
+    const cleanName = tagName.trim().toLowerCase()
+    return savedTags.find(st => st.name.trim().toLowerCase() === cleanName)
+  }, [savedTags])
+
+  const getTagColor = useCallback((tagName?: string): string | null => {
+    const data = getTagData(tagName)
+    return data?.color || null
+  }, [getTagData])
 
   const createEmptyItem = useCallback((woodMode: boolean): EditableItem => {
     return {
@@ -178,7 +187,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       price: 0,
       total: 0,
       treeNo: '',
-      carNo: '',
+      carNo: woodMode ? 'M' : '',
       width: 0,
       length: 0,
       cft: 0,
@@ -197,18 +206,23 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       const cft = item.cft !== undefined && item.cft !== null ? Number(item.cft) : (qty || 0)
       const computedTotal = woodMode ? (cft * price) : (qty * price)
 
+      let carNoVal = item.carNo || item.car_no || ''
+      if (woodMode && carNoVal.trim().toLowerCase() === 'solo') {
+        carNoVal = 'M'
+      }
+
       return {
         id: item.id || `item-${Date.now()}-${idx}`,
         product_id: item.product_id || item.productId || null,
         product_type: item.product_type || (woodMode ? 'wood' : 'furniture'),
         name: item.name || item.treeNo || item.tree_no || (woodMode ? 'Wood Item' : 'Furniture Item'),
-        description: item.description || (woodMode ? (item.car_no || item.carNo ? `Car: ${item.car_no || item.carNo}` : '') : (item.category || '')),
+        description: item.description || (woodMode ? (carNoVal ? `Car: ${carNoVal}` : '') : (item.category || '')),
         quantity: isNaN(qty) ? 1 : qty,
         unit: item.unit || (woodMode ? 'CFT' : 'PCS'),
         price: isNaN(price) ? 0 : price,
         total: Number(item.total) || computedTotal,
         treeNo: item.treeNo || item.tree_no || (woodMode ? item.name : ''),
-        carNo: item.carNo || item.car_no || '',
+        carNo: carNoVal,
         width,
         length,
         cft: isNaN(cft) ? 0 : cft,
@@ -302,6 +316,19 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     return items.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
   }, [items])
 
+  // Selected items & CFT calculations (auto-updates when markable boxes toggle)
+  const selectedItems = useMemo(() => items.filter(it => it.marked), [items])
+  const selectedCount = selectedItems.length
+  const selectedTotalCft = useMemo(() => {
+    return items
+      .filter(it => it.marked)
+      .reduce((sum, item) => sum + (Number(item.cft) || 0), 0)
+  }, [items])
+
+  const totalAllCft = useMemo(() => {
+    return items.reduce((sum, item) => sum + (Number(item.cft) || 0), 0)
+  }, [items])
+
   const discountAmount = useMemo(() => {
     if (discountType === 'percent') {
       return Math.round((itemsSubtotal * (Number(discount) || 0)) / 100)
@@ -357,13 +384,13 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       current.isStock = true
       
       if (isWood) {
-        current.carNo = p.car_no
+        current.carNo = p.car_no?.trim().toLowerCase() === 'solo' ? 'M' : p.car_no
         current.treeNo = p.tree_no
         current.width = p.width
         current.length = p.length
         current.cft = p.cft
         current.tag = p.tag || current.tag
-        current.description = p.car_no ? `Car: ${p.car_no}` : ''
+        current.description = p.car_no ? `Car: ${current.carNo}` : ''
         current.total = Math.round(Number(p.cft || 0) * Number(p.price || 0))
       } else {
         current.description = p.category || 'Stock Item'
@@ -382,6 +409,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       const next = [...prev]
       const current = { ...next[index], [field]: value }
 
+      if (isWood && field === 'carNo' && typeof value === 'string' && value.trim().toLowerCase() === 'solo') {
+        current.carNo = 'M'
+      }
+
       let updatedPrice = field === 'price' ? Number(value) || 0 : (Number(current.price) || 0)
 
       // When tag is changed, update price automatically from matching saved tag
@@ -391,6 +422,12 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
           updatedPrice = matchingTag.sell_price
           current.price = updatedPrice
         }
+      }
+
+      if (field === 'treeNo') {
+        current.name = value
+      } else if (field === 'name') {
+        current.treeNo = value
       }
 
       if (isWood) {
@@ -466,6 +503,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   }
 
   const handleSaveChanges = async () => {
+    if (isSubmitting) return
     if (!invoiceId.trim()) {
       toast.error('Invoice ID is required')
       return
@@ -574,19 +612,25 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       if (deleteErr) throw deleteErr
 
       if (isWood) {
-        const woodItemsToInsert = items.map(item => ({
-          invoice_id: targetDbId,
-          product_type: 'wood',
-          product_id: item.product_id || 0,
-          name: (item.treeNo || item.name || '').trim(),
-          price: Number(item.price) || 0,
-          cft: Number(item.cft) || 0,
-          tag: item.tag || null,
-          car_no: item.carNo || null,
-          width: Number(item.width) || null,
-          length: Number(item.length) || null,
-          total: Number(item.total) || 0
-        }))
+        const woodItemsToInsert = items.map(item => {
+          let carVal = item.carNo ? item.carNo.trim() : ''
+          if (carVal.toLowerCase() === 'solo' || (!carVal && item.isStock === false)) {
+            carVal = 'M'
+          }
+          return {
+            invoice_id: targetDbId,
+            product_type: 'wood',
+            product_id: item.product_id || 0,
+            name: (item.treeNo || item.name || '').trim(),
+            price: Number(item.price) || 0,
+            cft: Number(item.cft) || 0,
+            tag: item.tag || null,
+            car_no: carVal || null,
+            width: Number(item.width) || null,
+            length: Number(item.length) || null,
+            total: Number(item.total) || 0
+          }
+        })
         const { error: insertItemsErr } = await supabase.from(itemsTable).insert(woodItemsToInsert)
         if (insertItemsErr) throw insertItemsErr
       } else {
@@ -1028,8 +1072,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
                   {/* Items Table Section */}
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between px-1">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                           <Tag size={16} className="text-amber-500" /> Invoice Items
                         </h3>
@@ -1043,6 +1087,38 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           <ArrowUpDown size={13} className="text-amber-600 dark:text-amber-400" />
                           <span>Reverse Order</span>
                         </button>
+
+                        {/* Display Area for Total CFT of Selected Items */}
+                        <div 
+                          className={cn(
+                            "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs",
+                            selectedCount > 0 
+                              ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/70 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/30" 
+                              : "bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
+                          )}
+                          title={`${selectedCount} items selected`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(
+                              "w-2 h-2 rounded-full transition-colors",
+                              selectedCount > 0 ? "bg-amber-500 animate-pulse" : "bg-slate-400"
+                            )} />
+                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                              Selected CFT:
+                            </span>
+                          </div>
+                          <div className="flex items-baseline gap-1">
+                            <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
+                              {selectedTotalCft.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                              CFT
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-700 pl-2">
+                            {selectedCount} of {items.length} selected
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -1064,37 +1140,76 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                       <table className="w-full text-sm table-fixed border-collapse">
                         <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs">
                           <tr>
-                            <th className="py-3 px-2 text-center w-12">
+                            {/* 1. The Markable Box */}
+                            <th className="py-3 px-2 text-center w-10">
                               <input 
                                 type="checkbox" 
+                                ref={el => {
+                                  if (el) {
+                                    el.indeterminate = items.some(it => it.marked) && !items.every(it => it.marked)
+                                  }
+                                }}
                                 checked={items.length > 0 && items.every(it => it.marked)}
                                 onChange={e => {
                                   const isChecked = e.target.checked
                                   setItems(prev => prev.map(it => ({ ...it, marked: isChecked })))
                                 }}
                                 className="rounded border-slate-300 dark:border-slate-700 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer accent-amber-600"
-                                title="Mark all items"
+                                title={items.every(it => it.marked) ? "Deselect all items" : "Select all items"}
                               />
                             </th>
-                            <th className={cn("py-3 px-2.5 text-left font-bold", isWood ? "w-[28%]" : "w-[24%]")}>Item Name</th>
-                            {!isWood && (
-                              <th className="py-3 px-2.5 text-left font-bold w-[22%]">Description</th>
+
+                            {/* 2. No */}
+                            <th className="py-3 px-1 text-center font-bold w-12 text-slate-500 dark:text-slate-400">No</th>
+
+                            {isWood ? (
+                              <>
+                                {/* 3. Car */}
+                                <th className="py-3 px-2 text-center font-bold w-[11%]">Car</th>
+
+                                {/* 4. Tree */}
+                                <th className="py-3 px-2 text-left font-bold w-[17%]">Tree</th>
+
+                                {/* 5. W */}
+                                <th className="py-3 px-1.5 text-center font-bold w-[6.5%]">W</th>
+
+                                {/* 6. L */}
+                                <th className="py-3 px-1.5 text-center font-bold w-[6.5%]">L</th>
+
+                                {/* 7. CFT */}
+                                <th className="py-3 px-1.5 text-center font-bold w-[8.5%]">CFT</th>
+
+                                {/* 8. Tag */}
+                                <th className="py-3 px-2 text-center font-bold w-[13%]">Tag</th>
+
+                                {/* 9. Price */}
+                                <th className="py-3 px-2 text-right font-bold w-[10%]">Price</th>
+
+                                {/* 10. Total */}
+                                <th className="py-3 px-2 text-right font-bold w-[11%]">Total</th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="py-3 px-2.5 text-left font-bold w-[26%]">Item Name</th>
+                                <th className="py-3 px-2.5 text-left font-bold w-[22%]">Description</th>
+                                <th className="py-3 px-2.5 text-center font-bold w-[14%]">Tag Box</th>
+                                <th className="py-3 px-2.5 text-center font-bold w-[8%]">Qty</th>
+                                <th className="py-3 px-2.5 text-right font-bold w-[10%]">Price</th>
+                                <th className="py-3 px-2.5 text-right font-bold w-[11%]">Total</th>
+                              </>
                             )}
-                            {isWood && (
-                              <th className="py-3 px-2.5 text-center font-bold w-[16%]">Car</th>
-                            )}
-                            <th className={cn("py-3 px-2.5 text-center font-bold", isWood ? "w-[18%]" : "w-[16%]")}>Tag Box</th>
-                            <th className={cn("py-3 px-2.5 text-center font-bold", isWood ? "w-[12%]" : "w-[11%]")}>{isWood ? 'CFT' : 'Qty'}</th>
-                            <th className={cn("py-3 px-2.5 text-right font-bold", isWood ? "w-[13%]" : "w-[12%]")}>Price</th>
-                            <th className={cn("py-3 px-2.5 text-right font-bold", isWood ? "w-[13%]" : "w-[13%]")}>Total</th>
+
+                            {/* 11. Actions */}
                             <th className="py-3 px-2 text-center font-bold w-20">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {items.map((item, idx) => (
+                          {items.map((item, idx) => {
+                            const itemTagColor = getTagColor(item.tag)
+                            return (
                             <tr key={item.id || idx} className={cn("hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group", item.marked && "bg-amber-50/40 dark:bg-amber-900/10")}>
-                              {/* 1. Markable Box */}
-                              <td className="py-2.5 px-2 text-center w-12">
+                              {/* 1. The Markable Box */}
+                              <td className="py-2.5 px-2 text-center w-10">
                                 <input 
                                   type="checkbox"
                                   checked={!!item.marked}
@@ -1104,168 +1219,256 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                 />
                               </td>
 
-                              {/* 2. Item Name */}
-                              <td className="py-2.5 px-2.5 relative">
-                                <div className="relative group/itemsearch">
-                                  <input 
-                                    type="text"
-                                    value={item.name}
-                                    onChange={e => {
-                                      handleItemChange(idx, 'name', e.target.value)
-                                      if (isWood) handleItemChange(idx, 'treeNo', e.target.value)
-                                      setItemSearchTerm(e.target.value)
-                                      setActiveItemSearchIdx(idx)
-                                    }}
-                                    onFocus={() => {
-                                      setActiveItemSearchIdx(idx)
-                                      setItemSearchTerm(item.name)
-                                    }}
-                                    placeholder="Search or enter item name..."
-                                    className="w-full bg-transparent border-none outline-none font-bold text-slate-800 dark:text-slate-200 text-sm px-1 py-1 pr-6 truncate"
-                                  />
-                                  <Search size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within/itemsearch:text-amber-500 pointer-events-none" />
-                                </div>
+                              {/* 2. No */}
+                              <td className="py-2.5 px-1 text-center font-mono font-bold text-xs text-slate-400 dark:text-slate-500 select-none">
+                                {idx + 1}
+                              </td>
 
-                                {activeItemSearchIdx === idx && (
-                                  <div className="absolute top-full left-0 w-[420px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[160] p-2 mt-1 animate-in fade-in slide-in-from-top-2">
-                                    <div className="max-h-[300px] overflow-y-auto space-y-1 scrollbar-thin px-1">
-                                      <div 
-                                        className="p-3 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl cursor-pointer text-slate-500 font-bold text-xs flex items-center justify-between group/manual"
-                                        onClick={() => {
-                                          handleItemChange(idx, 'product_id', null)
-                                          handleItemChange(idx, 'isStock', false)
-                                          setActiveItemSearchIdx(null)
-                                        }}
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <Edit3 size={14} className="text-slate-400 group-hover/manual:text-amber-500" />
-                                          <span>Use as Custom / Non-Stock Item</span>
-                                        </div>
-                                        <CornerDownRight size={14} />
-                                      </div>
-                                      <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-                                      
-                                      <p className="px-3 py-1 text-[10px] font-black text-slate-400 uppercase tracking-widest">Inventory Results</p>
-                                      
-                                      {filteredProducts.map(p => (
-                                        <div key={p.id} onClick={() => selectProduct(p, idx)} className="p-3 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl cursor-pointer group/row flex items-center justify-between transition-colors">
-                                          <div className="min-w-0">
-                                            <p className="text-sm font-bold truncate group-hover/row:text-amber-600 transition-colors">
-                                              {isWood ? `Log #${p.tree_no}` : p.name}
-                                            </p>
-                                            <p className="text-[10px] text-slate-500 font-medium">
-                                              {isWood ? `Car: ${p.car_no} • W: ${p.width} • L: ${p.length} • Tag: ${p.tag}` : p.category}
-                                            </p>
-                                          </div>
-                                          <div className="text-right shrink-0 ml-4">
-                                            <p className="text-sm font-black text-amber-600">৳{p.price}</p>
-                                            <div className="flex items-center justify-end gap-1 mt-0.5">
-                                              <div className={cn("w-1.5 h-1.5 rounded-full", (p.stock > 0 || !p.is_sold) ? "bg-emerald-500" : "bg-rose-500")} />
-                                              <p className={cn("text-[9px] font-bold uppercase", (p.stock > 0 || !p.is_sold) ? "text-emerald-500" : "text-rose-500")}>
-                                                {isWood ? (p.is_sold ? "Sold" : "Available") : `${p.stock} In Stock`}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                      {filteredProducts.length === 0 && (
-                                        <div className="py-8 text-center">
-                                          <AlertCircle size={24} className="mx-auto text-slate-200 mb-2" />
-                                          <p className="text-[11px] text-slate-400 font-bold uppercase">No matching stock items</p>
-                                        </div>
+                              {isWood ? (
+                                <>
+                                  {/* 3. Car */}
+                                  <td className="py-2.5 px-1.5 text-center">
+                                    <input 
+                                      type="text"
+                                      value={item.carNo?.trim().toLowerCase() === 'solo' ? 'M' : (item.carNo ?? '')}
+                                      onChange={e => {
+                                        let val = e.target.value
+                                        if (val.trim().toLowerCase() === 'solo') val = 'M'
+                                        handleItemChange(idx, 'carNo', val)
+                                      }}
+                                      placeholder="Car #"
+                                      className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500 truncate"
+                                    />
+                                  </td>
+
+                                  {/* 4. Tree (Direct inline text editing) */}
+                                  <td className="py-2.5 px-2">
+                                    <input 
+                                      type="text"
+                                      value={item.treeNo || item.name || ''}
+                                      onChange={e => {
+                                        handleItemChange(idx, 'treeNo', e.target.value)
+                                        handleItemChange(idx, 'name', e.target.value)
+                                      }}
+                                      placeholder="Tree / Log #"
+                                      className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2.5 font-bold text-slate-800 dark:text-slate-200 text-sm outline-none focus:ring-1 focus:ring-amber-500 truncate"
+                                    />
+                                  </td>
+
+                                  {/* 5. W */}
+                                  <td className="py-2.5 px-1.5 text-center">
+                                    <input 
+                                      type="number"
+                                      step="any"
+                                      value={item.width ?? ''}
+                                      onChange={e => handleItemChange(idx, 'width', parseFloat(e.target.value) || 0)}
+                                      placeholder="W"
+                                      className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </td>
+
+                                  {/* 6. L */}
+                                  <td className="py-2.5 px-1.5 text-center">
+                                    <input 
+                                      type="number"
+                                      step="any"
+                                      value={item.length ?? ''}
+                                      onChange={e => handleItemChange(idx, 'length', parseFloat(e.target.value) || 0)}
+                                      placeholder="L"
+                                      className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </td>
+
+                                  {/* 7. CFT */}
+                                  <td className="py-2.5 px-1.5 text-center">
+                                    <input 
+                                      type="number"
+                                      step="any"
+                                      value={item.cft ?? ''}
+                                      onChange={e => handleItemChange(idx, 'cft', parseFloat(e.target.value) || 0)}
+                                      placeholder="CFT"
+                                      className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </td>
+
+                                  {/* 8. Tag */}
+                                  <td className="py-2.5 px-1.5 text-center">
+                                    <div className="relative flex items-center">
+                                      {itemTagColor && (
+                                        <span 
+                                          className="absolute left-2 w-2.5 h-2.5 rounded-full shrink-0 shadow-xs pointer-events-none ring-1 ring-white/70 dark:ring-black/40 z-10" 
+                                          style={{ backgroundColor: itemTagColor }}
+                                          aria-hidden="true"
+                                        />
                                       )}
-                                    </div>
-                                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-end">
-                                      <button 
-                                        onClick={() => setActiveItemSearchIdx(null)}
-                                        className="text-[10px] font-black text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-3 py-1.5 uppercase tracking-wider"
+                                      <select 
+                                        value={item.tag ?? ''}
+                                        onChange={e => handleItemChange(idx, 'tag', e.target.value)}
+                                        style={itemTagColor ? {
+                                          backgroundColor: `${itemTagColor}18`,
+                                          borderColor: `${itemTagColor}55`,
+                                          color: itemTagColor,
+                                        } : undefined}
+                                        className={cn(
+                                          "w-full rounded-lg py-1.5 pr-6 text-center font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none truncate transition-all",
+                                          itemTagColor 
+                                            ? "pl-6 border font-black shadow-xs" 
+                                            : "bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 pl-2 text-slate-500 dark:text-slate-400 font-semibold"
+                                        )}
+                                        title="Choose saved tag (updates price automatically)"
                                       >
-                                        Close Search
-                                      </button>
+                                        <option value="" className="text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 font-normal">
+                                          No Tag
+                                        </option>
+                                        {savedTags.map(st => (
+                                          <option 
+                                            key={st.id || st.name} 
+                                            value={st.name}
+                                            style={st.color ? { color: st.color, backgroundColor: '#ffffff' } : undefined}
+                                            className="font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900"
+                                          >
+                                            ● {st.name} {st.sell_price > 0 ? `(৳${st.sell_price})` : ''}
+                                          </option>
+                                        ))}
+                                        {item.tag && !savedTags.some(st => st.name.toLowerCase() === item.tag?.toLowerCase()) && (
+                                          <option value={item.tag} className="text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900">
+                                            {item.tag}
+                                          </option>
+                                        )}
+                                      </select>
+                                      <ChevronDown 
+                                        size={12} 
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors" 
+                                        style={itemTagColor ? { color: itemTagColor } : undefined}
+                                      />
                                     </div>
-                                  </div>
-                                )}
-                              </td>
+                                  </td>
 
-                              {/* 3. Description (Hidden for wood invoices, shown for furniture) */}
-                              {!isWood && (
-                                <td className="py-2.5 px-2.5">
-                                  <input 
-                                    type="text"
-                                    value={item.description ?? ''}
-                                    onChange={e => handleItemChange(idx, 'description', e.target.value)}
-                                    placeholder={item.isStock ? 'Stock Item' : 'Description...'}
-                                    className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2.5 text-xs font-medium text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-amber-500 truncate"
-                                  />
-                                </td>
+                                  {/* 9. Price */}
+                                  <td className="py-2.5 px-1.5 text-right">
+                                    <div className="relative">
+                                      <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[11px]">৳</span>
+                                      <input 
+                                        type="number"
+                                        step="any"
+                                        value={item.price ?? ''}
+                                        onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                        className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-4 pr-1.5 text-right font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                      />
+                                    </div>
+                                  </td>
+
+                                  {/* 10. Total */}
+                                  <td className="py-2.5 px-2 text-right">
+                                    <p className="font-mono font-black text-slate-900 dark:text-slate-100 text-xs truncate">
+                                      ৳{Math.round(item.total).toLocaleString()}
+                                    </p>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  {/* Furniture Items */}
+                                  <td className="py-2.5 px-2.5 relative">
+                                    <div className="relative group/itemsearch">
+                                      <input 
+                                        type="text"
+                                        value={item.name}
+                                        onChange={e => {
+                                          handleItemChange(idx, 'name', e.target.value)
+                                          setItemSearchTerm(e.target.value)
+                                          setActiveItemSearchIdx(idx)
+                                        }}
+                                        onFocus={() => {
+                                          setActiveItemSearchIdx(idx)
+                                          setItemSearchTerm(item.name)
+                                        }}
+                                        placeholder="Search or enter item name..."
+                                        className="w-full bg-transparent border-none outline-none font-bold text-slate-800 dark:text-slate-200 text-sm px-1 py-1 pr-6 truncate"
+                                      />
+                                      <Search size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within/itemsearch:text-amber-500 pointer-events-none" />
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-2.5">
+                                    <input 
+                                      type="text"
+                                      value={item.description ?? ''}
+                                      onChange={e => handleItemChange(idx, 'description', e.target.value)}
+                                      placeholder={item.isStock ? 'Stock Item' : 'Description...'}
+                                      className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2.5 text-xs font-medium text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-amber-500 truncate"
+                                    />
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-center">
+                                    <div className="relative flex items-center">
+                                      {itemTagColor && (
+                                        <span 
+                                          className="absolute left-2 w-2.5 h-2.5 rounded-full shrink-0 shadow-xs pointer-events-none ring-1 ring-white/70 dark:ring-black/40 z-10" 
+                                          style={{ backgroundColor: itemTagColor }}
+                                          aria-hidden="true"
+                                        />
+                                      )}
+                                      <select 
+                                        value={item.tag ?? ''}
+                                        onChange={e => handleItemChange(idx, 'tag', e.target.value)}
+                                        style={itemTagColor ? {
+                                          backgroundColor: `${itemTagColor}18`,
+                                          borderColor: `${itemTagColor}55`,
+                                          color: itemTagColor,
+                                        } : undefined}
+                                        className={cn(
+                                          "w-full rounded-lg py-1.5 pr-6 text-center font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none truncate transition-all",
+                                          itemTagColor 
+                                            ? "pl-6 border font-black shadow-xs" 
+                                            : "bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 pl-2 text-slate-500 dark:text-slate-400 font-semibold"
+                                        )}
+                                      >
+                                        <option value="" className="text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 font-normal">
+                                          No Tag
+                                        </option>
+                                        {savedTags.map(st => (
+                                          <option 
+                                            key={st.id || st.name} 
+                                            value={st.name}
+                                            style={st.color ? { color: st.color, backgroundColor: '#ffffff' } : undefined}
+                                            className="font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900"
+                                          >
+                                            ● {st.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <ChevronDown 
+                                        size={12} 
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors" 
+                                        style={itemTagColor ? { color: itemTagColor } : undefined}
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-center">
+                                    <input 
+                                      type="number"
+                                      value={item.quantity ?? ''}
+                                      onChange={e => handleItemChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                                      placeholder="Qty"
+                                      className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 text-center font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-right">
+                                    <div className="relative">
+                                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">৳</span>
+                                      <input 
+                                        type="number"
+                                        value={item.price ?? ''}
+                                        onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                        className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-5 pr-2 text-right font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-right">
+                                    <p className="font-mono font-black text-slate-900 dark:text-slate-100 text-sm">
+                                      ৳{Math.round(item.total).toLocaleString()}
+                                    </p>
+                                  </td>
+                                </>
                               )}
-
-                              {/* 4. Car (Placed BEFORE Tag Box for wood invoices) */}
-                              {isWood && (
-                                <td className="py-2.5 px-2.5 text-center">
-                                  <input 
-                                    type="text"
-                                    value={item.carNo ?? ''}
-                                    onChange={e => handleItemChange(idx, 'carNo', e.target.value)}
-                                    placeholder="Car #"
-                                    className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500 truncate"
-                                  />
-                                </td>
-                              )}
-
-                              {/* 5. Tag Box (Displays only saved tags; changing tag updates price automatically) */}
-                              <td className="py-2.5 px-2.5 text-center">
-                                <div className="relative">
-                                  <select 
-                                    value={item.tag ?? ''}
-                                    onChange={e => handleItemChange(idx, 'tag', e.target.value)}
-                                    className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-2 pr-6 text-center font-mono font-bold text-xs text-amber-700 dark:text-amber-400 outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none truncate"
-                                    title="Choose saved tag (updates price automatically)"
-                                  >
-                                    <option value="">No Tag</option>
-                                    {savedTags.map(st => (
-                                      <option key={st.id || st.name} value={st.name}>
-                                        {st.name} {st.sell_price > 0 ? `(৳${st.sell_price})` : ''}
-                                      </option>
-                                    ))}
-                                    {item.tag && !savedTags.some(st => st.name.toLowerCase() === item.tag?.toLowerCase()) && (
-                                      <option value={item.tag}>{item.tag}</option>
-                                    )}
-                                  </select>
-                                  <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                                </div>
-                              </td>
-
-                              {/* 6. CFT / Qty */}
-                              <td className="py-2.5 px-2.5 text-center">
-                                <input 
-                                  type="number"
-                                  value={isWood ? (item.cft ?? '') : (item.quantity ?? '')}
-                                  onChange={e => handleItemChange(idx, isWood ? 'cft' : 'quantity', parseFloat(e.target.value) || 0)}
-                                  placeholder={isWood ? "CFT" : "Qty"}
-                                  className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 text-center font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </td>
-
-                              {/* 7. Price */}
-                              <td className="py-2.5 px-2.5 text-right">
-                                <div className="relative">
-                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">৳</span>
-                                  <input 
-                                    type="number"
-                                    value={item.price ?? ''}
-                                    onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
-                                    className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-5 pr-2 text-right font-mono font-bold text-sm outline-none focus:ring-1 focus:ring-amber-500"
-                                  />
-                                </div>
-                              </td>
-
-                              {/* 8. Total */}
-                              <td className="py-2.5 px-2.5 text-right">
-                                <p className="font-mono font-black text-slate-900 dark:text-slate-100 text-sm">
-                                  ৳{Math.round(item.total).toLocaleString()}
-                                </p>
-                              </td>
 
                               {/* 9. Actions */}
                               <td className="py-2.5 px-2 text-center w-20">
@@ -1289,8 +1492,41 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                          )})}
                         </tbody>
+                        <tfoot className="bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">
+                          <tr>
+                            <td colSpan={isWood ? 6 : 5} className="py-3 px-3 text-right">
+                              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                {selectedCount > 0 
+                                  ? `Selected Items (${selectedCount}) ${isWood ? 'CFT' : 'Qty'}:` 
+                                  : `Total Items (${items.length}) ${isWood ? 'CFT' : 'Qty'}:`}
+                              </span>
+                            </td>
+                            <td className="py-3 px-1.5 text-center">
+                              <div className="inline-flex items-center justify-center gap-1 font-mono font-black text-amber-600 dark:text-amber-400 text-sm">
+                                <span>
+                                  {isWood 
+                                    ? (selectedCount > 0 ? selectedTotalCft.toFixed(2) : totalAllCft.toFixed(2))
+                                    : (selectedCount > 0 ? selectedItems.reduce((s, it) => s + (Number(it.quantity) || 1), 0) : items.reduce((s, it) => s + (Number(it.quantity) || 1), 0))
+                                  }
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-400">{isWood ? 'CFT' : 'PCS'}</span>
+                              </div>
+                            </td>
+                            <td colSpan={isWood ? 4 : 3} className="py-3 px-3 text-right">
+                              {isWood && selectedCount > 0 ? (
+                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                  All {items.length} items: <strong className="font-mono text-slate-800 dark:text-slate-100">{totalAllCft.toFixed(2)} CFT</strong>
+                                </span>
+                              ) : (
+                                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                                  Mark items using checkboxes to view selected CFT
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   </div>

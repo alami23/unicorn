@@ -45,13 +45,12 @@ export default function SendSMSModal({ isOpen, onClose, customerName, customerPh
   }, [isOpen, initialMessage])
 
   const handleSend = async () => {
+    if (isSending) return
     if (!message.trim()) return
 
     setIsSending(true)
     try {
       await sendSMS(customerPhone, message)
-      
-      setIsSending(false)
       setStatus('success')
       
       setTimeout(() => {
@@ -59,6 +58,7 @@ export default function SendSMSModal({ isOpen, onClose, customerName, customerPh
       }, 1500)
     } catch (error: any) {
       console.error('Failed to send SMS:', error)
+    } finally {
       setIsSending(false)
     }
   }
@@ -161,7 +161,7 @@ export default function SendSMSModal({ isOpen, onClose, customerName, customerPh
                     <button 
                       disabled={!message.trim() || isSending}
                       onClick={handleSend}
-                      className="flex-[2] py-3.5 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-[2] py-3.5 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                     >
                       {isSending ? (
                         <>

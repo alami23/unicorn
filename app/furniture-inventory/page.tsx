@@ -18,7 +18,8 @@ import {
   X,
   Camera,
   LayoutGrid,
-  List
+  List,
+  Loader2
 } from 'lucide-react'
 import { cn, safeParse } from '@/lib/utils'
 import { motion, AnimatePresence } from 'motion/react'
@@ -54,6 +55,8 @@ function FurnitureInventoryPageContent() {
   const [products, setProducts] = useState<FurnitureProduct[]>([])
   const [categories, setCategories] = useState<FurnitureCategory[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const fetchProducts = React.useCallback(async () => {
     setIsLoading(true)
@@ -388,10 +391,12 @@ function FurnitureInventoryPageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
     if (!formData.category) {
       toast.error('Please save or select a Furniture Category first.')
       return
     }
+    setIsSubmitting(true)
     try {
       const productData = {
         name: formData.name,
@@ -432,6 +437,8 @@ function FurnitureInventoryPageContent() {
     } catch (error: any) {
       console.error('Error saving furniture:', error)
       toast.error(error?.message ? `Failed to save furniture: ${error.message}` : 'Failed to save furniture item')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -459,7 +466,8 @@ function FurnitureInventoryPageContent() {
   }
 
   const confirmDelete = async () => {
-    if (!deleteConfirm.id) return
+    if (!deleteConfirm.id || isDeleting) return
+    setIsDeleting(true)
     try {
       const { error } = await supabase
         .from('furniture_inventory')
@@ -474,6 +482,7 @@ function FurnitureInventoryPageContent() {
       console.error('Failed to delete furniture:', error)
       toast.error('Failed to delete furniture item')
     } finally {
+      setIsDeleting(false)
       setDeleteConfirm({ isOpen: false, id: null })
     }
   }
@@ -903,9 +912,11 @@ function FurnitureInventoryPageContent() {
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
+                      disabled={isSubmitting}
+                      className="flex-1 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                     >
-                      {editingId ? 'Update Furniture' : 'Save Furniture'}
+                      {isSubmitting && <Loader2 size={18} className="animate-spin" />}
+                      {editingId ? (isSubmitting ? 'Updating...' : 'Update Furniture') : (isSubmitting ? 'Saving...' : 'Save Furniture')}
                     </button>
                   </div>
                 </form>
@@ -1020,9 +1031,11 @@ function FurnitureInventoryPageContent() {
                   <button
                     type="button"
                     onClick={confirmDelete}
-                    className="flex-1 py-3 px-4 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-rose-600/20 active:scale-95"
+                    disabled={isDeleting}
+                    className="flex-1 py-3 px-4 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-rose-600/20 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                   >
-                    Delete
+                    {isDeleting && <Loader2 size={16} className="animate-spin" />}
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
               </motion.div>

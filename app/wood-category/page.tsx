@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
-import { Search, Plus, Trees, Edit2, Trash2, Box, ChevronRight, Layers, X, Tags, RefreshCcw, Check } from 'lucide-react'
+import { Search, Plus, Trees, Edit2, Trash2, Box, ChevronRight, Layers, X, Tags, RefreshCcw, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'motion/react'
 import { supabase } from '@/lib/supabase'
@@ -13,6 +13,8 @@ function WoodCategoryPageContent() {
   const [subCategories, setSubCategories] = useState<any[]>([])
   const [tags, setTags] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
@@ -219,6 +221,7 @@ function WoodCategoryPageContent() {
   const filteredSubCategories = subCategories.filter((sc: any) => sc.category_id === selectedCategoryId)
 
   const handleAddCategory = async () => {
+    if (isSaving) return
     if (!newCategory.name.trim()) return
     
     // Check for duplicate category name
@@ -236,6 +239,7 @@ function WoodCategoryPageContent() {
       status: 'Active'
     }
     
+    setIsSaving(true)
     try {
       const { error } = await supabase.from('wood_category').insert([newCat]);
       if (error) throw error;
@@ -247,6 +251,8 @@ function WoodCategoryPageContent() {
       toast.success('Category added to cloud')
     } catch (error: any) {
       toast.error('Failed to save category: ' + error.message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -257,6 +263,7 @@ function WoodCategoryPageContent() {
   }
 
   const handleUpdateCategory = async () => {
+    if (isSaving) return
     if (!editCategoryData?.name.trim()) return
     
     const categoryNameInput = editCategoryData.name.trim().toLowerCase();
@@ -265,6 +272,7 @@ function WoodCategoryPageContent() {
       return
     }
 
+    setIsSaving(true)
     try {
       const { error } = await supabase
         .from('wood_category')
@@ -283,6 +291,8 @@ function WoodCategoryPageContent() {
       toast.success('Category updated')
     } catch (error: any) {
       toast.error('Update failed: ' + error.message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -292,6 +302,7 @@ function WoodCategoryPageContent() {
   }
 
   const handleAddSubCategory = async () => {
+    if (isSaving) return
     if (!newSubCategory.name.trim() || !selectedCategoryId) return
     
     // Check for duplicate sub-category name within the current category
@@ -310,6 +321,7 @@ function WoodCategoryPageContent() {
       status: 'Active'
     }
     
+    setIsSaving(true)
     try {
       const { error } = await supabase.from('wood_category_car').insert([newSubCat]);
       if (error) throw error;
@@ -320,6 +332,8 @@ function WoodCategoryPageContent() {
       toast.success('Car No added')
     } catch (error: any) {
       toast.error('Failed to save Car No: ' + error.message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -329,6 +343,7 @@ function WoodCategoryPageContent() {
   }
 
   const handleUpdateSubCategory = async () => {
+    if (isSaving) return
     if (!editSubCategoryData?.name.trim()) return
 
     const subCatNameInput = editSubCategoryData.name.trim().toLowerCase();
@@ -337,6 +352,7 @@ function WoodCategoryPageContent() {
       return
     }
 
+    setIsSaving(true)
     try {
       const { error } = await supabase
         .from('wood_category_car')
@@ -353,6 +369,8 @@ function WoodCategoryPageContent() {
       toast.success('Car No updated')
     } catch (error: any) {
       toast.error('Update failed: ' + error.message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -361,6 +379,7 @@ function WoodCategoryPageContent() {
   }
 
   const handleAddTag = async () => {
+    if (isSaving) return
     if (!newTag.name.trim()) return
     const buy_price = parseFloat(String(newTag.buyPrice)) || 0
     const sell_price = parseFloat(String(newTag.sellPrice)) || 0
@@ -373,6 +392,7 @@ function WoodCategoryPageContent() {
       status: 'Active'
     }
 
+    setIsSaving(true)
     try {
       const { error } = await supabase.from('wood_category_tag').insert([tag]);
       if (error) throw error;
@@ -383,6 +403,8 @@ function WoodCategoryPageContent() {
       toast.success('Tag added')
     } catch (error: any) {
       toast.error('Failed to save tag: ' + error.message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -392,9 +414,11 @@ function WoodCategoryPageContent() {
   }
 
   const handleUpdateTag = async () => {
+    if (isSaving) return
     if (!editTagData?.name.trim()) return
     const buy_price = parseFloat(String(editTagData.buyPrice)) || 0
     const sell_price = parseFloat(String(editTagData.sellPrice)) || 0
+    setIsSaving(true)
     try {
       const { error } = await supabase
         .from('wood_category_tag')
@@ -428,6 +452,8 @@ function WoodCategoryPageContent() {
       toast.success('Tag updated & wood inventory prices auto-updated')
     } catch (error: any) {
       toast.error('Update failed: ' + error.message)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -436,8 +462,9 @@ function WoodCategoryPageContent() {
   }
 
   const confirmDelete = async () => {
-    if (!deleteConfirmation.id || !deleteConfirmation.type) return;
+    if (isDeleting || !deleteConfirmation.id || !deleteConfirmation.type) return;
 
+    setIsDeleting(true);
     try {
       let table = '';
       if (deleteConfirmation.type === 'category') table = 'wood_category';
@@ -461,6 +488,7 @@ function WoodCategoryPageContent() {
     } catch (error: any) {
       toast.error('Deletion failed: ' + error.message);
     } finally {
+      setIsDeleting(false);
       setDeleteConfirmation({ isOpen: false, type: null, id: null })
     }
   }
@@ -798,9 +826,11 @@ function WoodCategoryPageContent() {
                 </button>
                 <button 
                   onClick={handleAddCategory}
-                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                 >
-                  Save Category
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  {isSaving ? 'Saving...' : 'Save Category'}
                 </button>
               </div>
             </motion.div>
@@ -854,9 +884,11 @@ function WoodCategoryPageContent() {
                 </button>
                 <button 
                   onClick={handleUpdateCategory}
-                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                 >
-                  Update Category
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  {isSaving ? 'Updating...' : 'Update Category'}
                 </button>
               </div>
             </motion.div>
@@ -928,9 +960,11 @@ function WoodCategoryPageContent() {
                 </button>
                 <button 
                   onClick={handleAddSubCategory}
-                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                 >
-                  Save Car No
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  {isSaving ? 'Saving...' : 'Save Car No'}
                 </button>
               </div>
             </motion.div>
@@ -993,9 +1027,11 @@ function WoodCategoryPageContent() {
                 </button>
                 <button 
                   onClick={handleUpdateSubCategory}
-                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                 >
-                  Update Car No
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  {isSaving ? 'Updating...' : 'Update Car No'}
                 </button>
               </div>
             </motion.div>
@@ -1083,9 +1119,11 @@ function WoodCategoryPageContent() {
                 </button>
                 <button 
                   onClick={handleAddTag}
-                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                 >
-                  Save Tag
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  {isSaving ? 'Saving...' : 'Save Tag'}
                 </button>
               </div>
             </motion.div>
@@ -1172,9 +1210,11 @@ function WoodCategoryPageContent() {
                 </button>
                 <button 
                   onClick={handleUpdateTag}
-                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                 >
-                  Update Tag
+                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  {isSaving ? 'Updating...' : 'Update Tag'}
                 </button>
               </div>
             </motion.div>
@@ -1217,9 +1257,11 @@ function WoodCategoryPageContent() {
                 </button>
                 <button 
                   onClick={confirmDelete}
-                  className="px-4 py-2 text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 rounded-xl transition-colors shadow-lg shadow-rose-600/20 flex-1"
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 rounded-xl transition-colors shadow-lg shadow-rose-600/20 flex-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                 >
-                  Delete
+                  {isDeleting && <Loader2 size={16} className="animate-spin" />}
+                  {isDeleting ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             </motion.div>

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Trash2, RotateCcw, X } from 'lucide-react'
+import { Trash2, RotateCcw, X, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { safeParse } from '@/lib/utils'
 
@@ -17,6 +17,7 @@ export default function BinModal({ isOpen, onClose }: BinModalProps) {
   const [binItems, setBinItems] = useState<any[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean, ids: number[] }>({ isOpen: false, ids: [] });
+  const [isProcessing, setIsProcessing] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -47,6 +48,8 @@ export default function BinModal({ isOpen, onClose }: BinModalProps) {
   }
 
   const handleRestore = async (id: number) => {
+    if (isProcessing) return
+    setIsProcessing(true)
     try {
       const { error } = await supabase
         .from('wood_inventory')
@@ -60,6 +63,8 @@ export default function BinModal({ isOpen, onClose }: BinModalProps) {
     } catch (error: any) {
       console.error('Failed to restore item:', error)
       toast.error('Failed to restore: ' + error.message)
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -68,6 +73,8 @@ export default function BinModal({ isOpen, onClose }: BinModalProps) {
   }
 
   const confirmDelete = async () => {
+    if (isProcessing) return
+    setIsProcessing(true)
     try {
       const { error } = await supabase
         .from('wood_inventory')
@@ -84,6 +91,8 @@ export default function BinModal({ isOpen, onClose }: BinModalProps) {
     } catch (error: any) {
       console.error('Failed to permanently delete items:', error)
       toast.error('Delete failed: ' + error.message)
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -130,7 +139,8 @@ export default function BinModal({ isOpen, onClose }: BinModalProps) {
             {selectedIds.length > 0 && (
               <button 
                 onClick={() => handlePermanentDelete(selectedIds)}
-                className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-semibold hover:bg-rose-700 transition-all self-end"
+                disabled={isProcessing}
+                className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-semibold hover:bg-rose-700 transition-all self-end disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
               >
                 <Trash2 size={16} /> Delete Selected ({selectedIds.length})
               </button>
@@ -168,10 +178,20 @@ export default function BinModal({ isOpen, onClose }: BinModalProps) {
                       <td className="px-4 py-4">{item.treeNo}</td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <button onClick={() => handleRestore(item.id)} className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg">
+                          <button 
+                            onClick={() => handleRestore(item.id)} 
+                            disabled={isProcessing}
+                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
+                            title="Restore"
+                          >
                             <RotateCcw size={16} />
                           </button>
-                          <button onClick={() => handlePermanentDelete([item.id])} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg">
+                          <button 
+                            onClick={() => handlePermanentDelete([item.id])} 
+                            disabled={isProcessing}
+                            className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
+                            title="Delete Permanently"
+                          >
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -218,9 +238,11 @@ export default function BinModal({ isOpen, onClose }: BinModalProps) {
                     </button>
                     <button 
                       onClick={confirmDelete}
-                      className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl font-semibold hover:bg-rose-700 transition-colors"
+                      disabled={isProcessing}
+                      className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl font-semibold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                     >
-                      Delete
+                      {isProcessing && <Loader2 size={16} className="animate-spin" />}
+                      {isProcessing ? 'Deleting...' : 'Delete'}
                     </button>
                   </div>
                 </motion.div>

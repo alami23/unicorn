@@ -26,7 +26,8 @@ import {
   BellRing,
   Truck,
   Undo,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { sendSMS } from '@/lib/sms'
@@ -125,6 +126,7 @@ function InvoicePageContent() {
     invoiceId?: string
   } | null>(null)
   const [invoiceToDelete, setInvoiceToDelete] = useState<any>(null)
+  const [isDeletingInvoice, setIsDeletingInvoice] = useState(false)
   const [isFetchingItems, setIsFetchingItems] = useState(false)
   const [sendInvoiceData, setSendInvoiceData] = useState<{
     invoice: any
@@ -516,6 +518,8 @@ function InvoicePageContent() {
   }
 
   const handleDeleteInvoice = async (inv: any) => {
+    if (isDeletingInvoice || !inv) return
+    setIsDeletingInvoice(true)
     try {
       const isWood = inv.originalType?.toLowerCase() === 'wood' || 
                      inv.originalType?.toLowerCase() === 'solo_wood' || 
@@ -593,6 +597,8 @@ function InvoicePageContent() {
     } catch (error) {
       console.error('Error deleting invoice:', error)
       toast.error('Failed to delete invoice')
+    } finally {
+      setIsDeletingInvoice(false)
     }
   }
 
@@ -1609,9 +1615,11 @@ function InvoicePageContent() {
                   </button>
                   <button 
                     onClick={() => handleDeleteInvoice(invoiceToDelete)}
-                    className="flex-1 py-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl transition-all shadow-lg"
+                    disabled={isDeletingInvoice}
+                    className="flex-1 py-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                   >
-                    Delete
+                    {isDeletingInvoice && <Loader2 size={18} className="animate-spin" />}
+                    {isDeletingInvoice ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
               </motion.div>

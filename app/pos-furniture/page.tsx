@@ -239,6 +239,7 @@ function POSFurnitureContent() {
   }
 
   const handleCheckout = async () => {
+    if (isCheckingOut) return
     if (cart.length === 0) return
     setCheckoutError('')
 

@@ -26,6 +26,7 @@ export default function CategoryManagerModal({
   const [editingValue, setEditingValue] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleAdd = () => {
     const trimmed = newCategory.trim()
@@ -73,12 +74,17 @@ export default function CategoryManagerModal({
     setDeleteIndex(index)
   }
 
-  const confirmDelete = () => {
-    if (deleteIndex === null) return
-    const updated = categories.filter((_, i) => i !== deleteIndex)
-    onUpdate(updated)
-    setDeleteIndex(null)
-    toast.success('Category deleted')
+  const confirmDelete = async () => {
+    if (deleteIndex === null || isDeleting) return
+    setIsDeleting(true)
+    try {
+      const updated = categories.filter((_, i) => i !== deleteIndex)
+      await onUpdate(updated)
+      setDeleteIndex(null)
+      toast.success('Category deleted')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   return (
@@ -259,9 +265,11 @@ export default function CategoryManagerModal({
                       </button>
                       <button
                         onClick={confirmDelete}
-                        className="flex-1 px-4 py-2 text-sm font-bold bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all"
+                        disabled={isDeleting}
+                        className="flex-1 px-4 py-2 text-sm font-bold bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                       >
-                        Delete
+                        {isDeleting && <Loader2 size={16} className="animate-spin" />}
+                        {isDeleting ? 'Deleting...' : 'Delete'}
                       </button>
                     </div>
                   </motion.div>

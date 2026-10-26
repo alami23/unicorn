@@ -40,6 +40,7 @@ import {
   Lock,
   RotateCcw,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "motion/react";
@@ -424,6 +425,7 @@ function SettingsPageContent() {
   const [deleteOtp, setDeleteOtp] = useState("");
   const [deleteOtpToken, setDeleteOtpToken] = useState<string | null>(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
 
   // Auto pre-fill deletePhone when user is loaded or changed
@@ -756,6 +758,7 @@ function SettingsPageContent() {
   };
 
   const handleSave = async () => {
+    if (isSavingSettings) return;
     if (!canManageSettings) {
       setAlertConfig({
         isOpen: true,
@@ -764,6 +767,7 @@ function SettingsPageContent() {
       });
       return;
     }
+    setIsSavingSettings(true);
     try {
       // Save global settings directly
       const updatedSettings = { ...settings };
@@ -828,6 +832,8 @@ function SettingsPageContent() {
         message: "Settings save failed: " + (error.message || "Unknown error"),
         type: "error",
       });
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -901,6 +907,7 @@ function SettingsPageContent() {
   };
 
   const handleRequestClearOTP = async () => {
+    if (isAuthenticating) return;
     try {
       setAuthError(null);
       setIsAuthenticating(true);
@@ -957,6 +964,7 @@ function SettingsPageContent() {
   };
 
   const handleVerifyClearOTP = async () => {
+    if (isAuthenticating) return;
     try {
       setAuthError(null);
       setIsAuthenticating(true);
@@ -997,6 +1005,7 @@ function SettingsPageContent() {
   };
 
   const handleClearDatabaseAction = async () => {
+    if (isClearingDb) return;
     if (!isSuperAdmin) {
       toast.error("Only Super Admins can clear database data.");
       return;
@@ -1061,6 +1070,7 @@ function SettingsPageContent() {
   };
 
   const handleRequestDeleteOTP = async () => {
+    if (isDeletingAccount) return;
     try {
       setDeleteAccountError(null);
       setIsDeletingAccount(true);
@@ -1179,6 +1189,7 @@ function SettingsPageContent() {
   };
 
   const handleVerifyDeleteOTPAndExecute = async () => {
+    if (isDeletingAccount) return;
     try {
       setDeleteAccountError(null);
       setIsDeletingAccount(true);
@@ -1429,9 +1440,18 @@ function SettingsPageContent() {
             {isAdminOrSuperAdmin ? (
               <button
                 onClick={handleSave}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20 max-sm:w-[180px] max-sm:-mt-[45px] max-sm:ml-[155px] -mt-[10px] -mb-[5px] sm:w-auto sm:ml-0"
+                disabled={isSavingSettings}
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none transition-all shadow-lg shadow-amber-600/20 max-sm:w-[180px] max-sm:-mt-[45px] max-sm:ml-[155px] -mt-[10px] -mb-[5px] sm:w-auto sm:ml-0"
               >
-                <Save size={18} /> Save Changes
+                {isSavingSettings ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" /> Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} /> Save Changes
+                  </>
+                )}
               </button>
             ) : (
               <div className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 max-sm:w-[180px] max-sm:-mt-[45px] max-sm:ml-[155px] -mt-[10px] -mb-[5px] sm:w-auto sm:ml-0">

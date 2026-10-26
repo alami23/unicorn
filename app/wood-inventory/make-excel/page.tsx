@@ -164,6 +164,7 @@ export default function MakeExcelPage() {
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     
     if (!formData.category) {
       playAlertSound();
@@ -783,14 +784,20 @@ export default function MakeExcelPage() {
                   <div className="flex gap-2 w-full">
                     <button
                       type="submit"
+                      disabled={isLoading}
                       className={cn(
-                        "flex-1 flex items-center justify-center gap-2 px-6 py-3 text-white border border-transparent rounded-2xl font-bold transition-all active:scale-95 cursor-pointer text-sm h-[46px]",
+                        "flex-1 flex items-center justify-center gap-2 px-6 py-3 text-white border border-transparent rounded-2xl font-bold transition-all active:scale-95 cursor-pointer text-sm h-[46px] disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none",
                         editingId 
                           ? "bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20" 
                           : "bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-600/20"
                       )}
                     >
-                      {editingId ? (
+                      {isLoading ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          {editingId ? 'Updating...' : 'Adding...'}
+                        </>
+                      ) : editingId ? (
                         <>
                           <Save size={18} />
                           Update Item

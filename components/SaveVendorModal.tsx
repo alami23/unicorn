@@ -117,6 +117,7 @@ export default function SaveVendorModal({ isOpen, onClose, onSave, initialData }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
 
     const trimmedName = formData.name.trim()
     if (!trimmedName) {
@@ -385,7 +386,7 @@ export default function SaveVendorModal({ isOpen, onClose, onSave, initialData }
                 <button
                   type="submit"
                   disabled={isSubmitting || !formData.name.trim()}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-all shadow-md shadow-amber-600/20 active:scale-95 disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-all shadow-md shadow-amber-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                 >
                   {isSubmitting ? (
                     <>

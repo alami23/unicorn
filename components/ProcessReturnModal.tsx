@@ -91,6 +91,7 @@ export default function ProcessReturnModal({ isOpen, onClose, onSuccess }: Proce
   const totalRefund = returnItems.reduce((acc, item) => acc + (item.returnQty * (item.price || item.rate || 0)), 0)
 
   const handleSubmit = async () => {
+    if (isProcessing) return
     if (!selectedInvoice || returnItems.every(item => item.returnQty === 0) || !reason) return
 
     setIsProcessing(true)
@@ -279,7 +280,7 @@ export default function ProcessReturnModal({ isOpen, onClose, onSuccess }: Proce
               <button
                 disabled={!selectedInvoice || returnItems.every(item => item.returnQty === 0) || !reason || isProcessing}
                 onClick={handleSubmit}
-                className="flex items-center gap-2 px-8 py-3 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 disabled:opacity-50 disabled:shadow-none"
+                className="flex items-center gap-2 px-8 py-3 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none"
               >
                 {isProcessing ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

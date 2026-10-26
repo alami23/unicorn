@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef } from 'react'
-import { X, Camera, User, Phone, MapPin, Mail, Save, Plus } from 'lucide-react'
+import { X, Camera, User, Phone, MapPin, Mail, Save, Plus, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { safeParse } from '@/lib/utils'
 import Image from 'next/image'
@@ -23,6 +23,7 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
   const emailInputRef = useRef<HTMLInputElement>(null)
   const addressInputRef = useRef<HTMLTextAreaElement>(null)
   const balanceInputRef = useRef<HTMLInputElement>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -124,23 +125,31 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const customerData = {
-      id: initialData?.id || `CUS-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
-      ...formData,
-      totalOrders: initialData?.totalOrders || 0,
-      totalDue: formData.initialBalance,
-      lastPurchase: initialData?.lastPurchase || null
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      const customerData = {
+        id: initialData?.id || `CUS-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+        ...formData,
+        totalOrders: initialData?.totalOrders || 0,
+        totalDue: formData.initialBalance,
+        lastPurchase: initialData?.lastPurchase || null
+      }
+      
+      if (onAdd) {
+        await onAdd(customerData)
+      } else {
+        await saveToSupabase(customerData)
+      }
+      
+      onClose()
+    } catch (err: any) {
+      console.error('Error submitting customer:', err)
+    } finally {
+      setIsSubmitting(false)
     }
-    
-    if (onAdd) {
-      onAdd(customerData)
-    } else {
-      saveToSupabase(customerData)
-    }
-    
-    onClose()
   }
 
   const saveToSupabase = async (customer: any) => {
@@ -383,9 +392,11 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-6">
             <button 
               type="submit"
-              className="w-full sm:flex-1 order-1 sm:order-2 py-4 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-xl shadow-amber-600/20 flex items-center justify-center gap-2 active:scale-95"
+              disabled={isSubmitting}
+              className="w-full sm:flex-1 order-1 sm:order-2 py-4 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-xl shadow-amber-600/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
             >
-              <Save size={18} /> Save Customer
+              {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+              {isSubmitting ? 'Saving...' : 'Save Customer'}
             </button>
             <button 
               type="button"

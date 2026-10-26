@@ -135,6 +135,7 @@ export default function SendInvoiceModal({
 
   // Send via SMS
   const handleSendViaSms = async () => {
+    if (sendingSms) return;
     if (!recipientPhone.trim()) {
       toast.error('Please enter a valid recipient phone number.')
       return
@@ -398,7 +399,7 @@ export default function SendInvoiceModal({
                 type="button"
                 onClick={handleSendViaSms}
                 disabled={sendingSms}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer"
               >
                 {sendingSms ? (
                   <>

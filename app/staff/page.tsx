@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense, useMemo } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
-import { Search, Plus, UserCog, Phone, Calendar, MoreVertical, Shield, Briefcase, Eye, Edit2, Trash2, X, ChevronDown, Check, DollarSign, Wallet, Users, Settings } from 'lucide-react'
+import { Search, Plus, UserCog, Phone, Calendar, MoreVertical, Shield, Briefcase, Eye, Edit2, Trash2, X, ChevronDown, Check, DollarSign, Wallet, Users, Settings, Loader2 } from 'lucide-react'
 import { cn, safeParse, parseDateSafe } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { addNotification } from '@/lib/notifications'
@@ -39,6 +39,8 @@ function StaffPageContent() {
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [roles, setRoles] = useState<string[]>(defaultRoles)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const [searchTerm, setSearchTerm] = useState('')
   
@@ -200,8 +202,10 @@ function StaffPageContent() {
   }, [staff]);
 
   const handleAddStaff = async () => {
+    if (isSubmitting) return;
     if (!newStaff.name || !newStaff.phone || newStaff.salary <= 0 || !newStaff.role) return;
     
+    setIsSubmitting(true);
     try {
       const id = `STF-${Math.floor(100 + Math.random() * 900)}`;
       const { error } = await supabase.from('staff').insert([{
@@ -231,6 +235,8 @@ function StaffPageContent() {
     } catch (error: any) {
       console.error('Error adding staff:', error)
       toast.error(error.message || 'Failed to register staff member')
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -240,7 +246,8 @@ function StaffPageContent() {
   };
 
   const handleUpdateStaff = async () => {
-    if (!editingStaff) return;
+    if (isSubmitting || !editingStaff) return;
+    setIsSubmitting(true);
     try {
       const { error } = await supabase.from('staff').update({
         name: editingStaff.name,
@@ -261,6 +268,8 @@ function StaffPageContent() {
     } catch (error: any) {
       console.error('Error updating staff:', error)
       toast.error(error.message || 'Failed to update staff member')
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -270,19 +279,21 @@ function StaffPageContent() {
   };
 
   const confirmDelete = async () => {
-    if (staffToDelete) {
-      try {
-        const { error } = await supabase.from('staff').delete().eq('id', staffToDelete)
-        if (error) throw error
-        
-        toast.success('Staff member removed')
-        fetchStaff()
-        setIsDeleteModalOpen(false);
-        setStaffToDelete(null);
-      } catch (error: any) {
-        console.error('Error deleting staff:', error)
-        toast.error('Failed to terminate staff member')
-      }
+    if (isDeleting || !staffToDelete) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from('staff').delete().eq('id', staffToDelete)
+      if (error) throw error
+      
+      toast.success('Staff member removed')
+      fetchStaff()
+      setIsDeleteModalOpen(false);
+      setStaffToDelete(null);
+    } catch (error: any) {
+      console.error('Error deleting staff:', error)
+      toast.error('Failed to terminate staff member')
+    } finally {
+      setIsDeleting(false);
     }
   };
   return (
@@ -762,10 +773,11 @@ function StaffPageContent() {
                   </button>
                   <button 
                     onClick={isAddModalOpen ? handleAddStaff : handleUpdateStaff}
-                    className="flex-1 px-6 py-3 text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-50"
-                    disabled={isAddModalOpen ? (!newStaff.name || !newStaff.phone || !newStaff.salary) : (!editingStaff?.name || !editingStaff?.phone || !editingStaff?.salary)}
+                    className="flex-1 px-6 py-3 text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none flex items-center justify-center gap-2"
+                    disabled={isSubmitting || (isAddModalOpen ? (!newStaff.name || !newStaff.phone || !newStaff.salary) : (!editingStaff?.name || !editingStaff?.phone || !editingStaff?.salary))}
                   >
-                    {isAddModalOpen ? 'Register Member' : 'Save Changes'}
+                    {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                    {isSubmitting ? 'Saving...' : (isAddModalOpen ? 'Register Member' : 'Save Changes')}
                   </button>
                 </div>
               </motion.div>
@@ -803,9 +815,11 @@ function StaffPageContent() {
                   </button>
                   <button 
                     onClick={confirmDelete}
-                    className="flex-1 px-6 py-3 text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all rounded-xl active:scale-95"
+                    disabled={isDeleting}
+                    className="flex-1 px-6 py-3 text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all rounded-xl active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                   >
-                    Terminate
+                    {isDeleting && <Loader2 size={16} className="animate-spin" />}
+                    {isDeleting ? 'Terminating...' : 'Terminate'}
                   </button>
                 </div>
               </motion.div>

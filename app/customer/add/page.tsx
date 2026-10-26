@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, Suspense } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
-import { User, Phone, MapPin, Mail, Save, ArrowLeft, Camera, Plus } from 'lucide-react'
+import { User, Phone, MapPin, Mail, Save, ArrowLeft, Camera, Plus, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { safeParse } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -12,6 +12,7 @@ import Image from 'next/image'
 function AddCustomerContent() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -35,6 +36,8 @@ function AddCustomerContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
+    setIsSubmitting(true)
     const customerId = `CUS-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`
     
     try {
@@ -72,6 +75,8 @@ function AddCustomerContent() {
     } catch (error: any) {
       console.error('Error creating customer:', error)
       alert('Failed to create customer: ' + error.message)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -226,9 +231,11 @@ function AddCustomerContent() {
               </Link>
               <button 
                 type="submit"
-                className="flex-[2] py-5 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-2xl shadow-amber-600/20 flex items-center justify-center gap-3"
+                disabled={isSubmitting}
+                className="flex-[2] py-5 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-2xl shadow-amber-600/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
               >
-                <Save size={20} /> Create Customer Profile
+                {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+                {isSubmitting ? 'Creating Profile...' : 'Create Customer Profile'}
               </button>
             </div>
           </form>

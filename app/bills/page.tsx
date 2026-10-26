@@ -6,7 +6,7 @@ import {
   Search, Plus, Receipt, Calendar, User, Tag, MoreHorizontal, 
   Edit2, Trash2, ChevronDown, Check, X, DollarSign,
   Building2, Phone, Mail, MapPin, ExternalLink, ArrowRight,
-  UserPlus, FolderPlus
+  UserPlus, FolderPlus, Loader2
 } from 'lucide-react'
 import { cn, parseDateSafe } from '@/lib/utils'
 import {
@@ -46,6 +46,9 @@ function BillsContent() {
   const [categories, setCategories] = useState<string[]>(initialExpenseCategories)
   const [isLoading, setIsLoading] = useState(true)
   const [isMounted, setIsMounted] = useState(false)
+  const [isSavingBill, setIsSavingBill] = useState(false)
+  const [isDeletingBill, setIsDeletingBill] = useState(false)
+  const [isDeletingVendor, setIsDeletingVendor] = useState(false)
 
   // Search & filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -250,11 +253,13 @@ function BillsContent() {
 
   // Add bill handler
   const handleAddBill = async () => {
+    if (isSavingBill) return
     if (!newBill.vendor || newBill.amount <= 0) {
       toast.error('Please specify a vendor and positive amount')
       return
     }
     
+    setIsSavingBill(true)
     try {
       const id = `BILL-${Math.floor(100 + Math.random() * 900)}`
       const billData = {
@@ -284,6 +289,8 @@ function BillsContent() {
     } catch (error: any) {
       console.error('Error adding bill:', error)
       toast.error('Failed to add bill: ' + (error.message || 'Unknown error'))
+    } finally {
+      setIsSavingBill(false)
     }
   }
 
@@ -311,7 +318,8 @@ function BillsContent() {
   }
 
   const handleUpdateBill = async () => {
-    if (!editingBill) return
+    if (isSavingBill || !editingBill) return
+    setIsSavingBill(true)
     try {
       const { error } = await supabase
         .from('bills')
@@ -334,6 +342,8 @@ function BillsContent() {
     } catch (error: any) {
       console.error('Error updating bill:', error)
       toast.error('Failed to update bill')
+    } finally {
+      setIsSavingBill(false)
     }
   }
 
@@ -344,29 +354,32 @@ function BillsContent() {
   }
 
   const confirmDeleteBill = async () => {
-    if (billToDelete) {
-      try {
-        const { error } = await supabase
-          .from('bills')
-          .delete()
-          .eq('id', billToDelete)
-        
-        if (error) throw error
-        
-        toast.success('Bill deleted successfully')
-        setIsDeleteModalOpen(false)
-        setBillToDelete(null)
-        fetchBills()
-      } catch (error: any) {
-        console.error('Error deleting bill:', error)
-        toast.error('Failed to delete bill')
-      }
+    if (isDeletingBill || !billToDelete) return
+    setIsDeletingBill(true)
+    try {
+      const { error } = await supabase
+        .from('bills')
+        .delete()
+        .eq('id', billToDelete)
+      
+      if (error) throw error
+      
+      toast.success('Bill deleted successfully')
+      setIsDeleteModalOpen(false)
+      setBillToDelete(null)
+      fetchBills()
+    } catch (error: any) {
+      console.error('Error deleting bill:', error)
+      toast.error('Failed to delete bill')
+    } finally {
+      setIsDeletingBill(false)
     }
   }
 
   // Delete Vendor handler
   const confirmDeleteVendor = async () => {
-    if (!vendorToDelete) return
+    if (isDeletingVendor || !vendorToDelete) return
+    setIsDeletingVendor(true)
     try {
       try {
         await supabase
@@ -387,6 +400,8 @@ function BillsContent() {
       setVendorToDelete(null)
     } catch (err: any) {
       toast.error('Failed to delete vendor: ' + (err.message || 'Unknown error'))
+    } finally {
+      setIsDeletingVendor(false)
     }
   }
 
@@ -962,10 +977,11 @@ function BillsContent() {
                   <button 
                     type="button"
                     onClick={isAddModalOpen ? handleAddBill : handleUpdateBill}
-                    className="flex-1 px-6 py-2.5 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl shadow-lg shadow-amber-600/20 transition-all active:scale-95 disabled:opacity-50"
-                    disabled={isAddModalOpen ? (!newBill.vendor || !newBill.amount) : (!editingBill?.vendor || !editingBill?.amount)}
+                    className="flex-1 px-6 py-2.5 text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 rounded-xl shadow-lg shadow-amber-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none flex items-center justify-center gap-2"
+                    disabled={isSavingBill || (isAddModalOpen ? (!newBill.vendor || !newBill.amount) : (!editingBill?.vendor || !editingBill?.amount))}
                   >
-                    {isAddModalOpen ? 'Create Bill Entry' : 'Save Changes'}
+                    {isSavingBill && <Loader2 size={16} className="animate-spin" />}
+                    {isSavingBill ? 'Saving...' : (isAddModalOpen ? 'Create Bill Entry' : 'Save Changes')}
                   </button>
                 </div>
               </motion.div>
@@ -1051,9 +1067,11 @@ function BillsContent() {
                   <button 
                     type="button"
                     onClick={confirmDeleteBill}
-                    className="flex-1 px-6 py-2.5 text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all rounded-xl active:scale-95"
+                    disabled={isDeletingBill}
+                    className="flex-1 px-6 py-2.5 text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all rounded-xl active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                   >
-                    Delete
+                    {isDeletingBill && <Loader2 size={16} className="animate-spin" />}
+                    {isDeletingBill ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
               </motion.div>
@@ -1098,9 +1116,11 @@ function BillsContent() {
                   <button
                     type="button"
                     onClick={confirmDeleteVendor}
-                    className="flex-1 px-5 py-2.5 text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all rounded-xl active:scale-95"
+                    disabled={isDeletingVendor}
+                    className="flex-1 px-5 py-2.5 text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all rounded-xl active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                   >
-                    Delete
+                    {isDeletingVendor && <Loader2 size={16} className="animate-spin" />}
+                    {isDeletingVendor ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
               </motion.div>

@@ -136,11 +136,45 @@ function POSWoodContent() {
     return ''
   })
   const [manualCounter, setManualCounter] = useState(1)
-  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean, message: string, type: 'success' | 'error' | 'warning' | 'info' }>({
+
+  // Isolated state for Checkout validation alerts (e.g., incomplete payment)
+  const [checkoutAlert, setCheckoutAlert] = useState<{
+    isOpen: boolean
+    message: string
+    type: 'success' | 'error' | 'warning' | 'info'
+    playSound?: boolean
+  }>({
     isOpen: false,
     message: '',
-    type: 'error'
+    type: 'error',
+    playSound: false
   })
+
+  // Isolated state for manual item entry / input validation alerts
+  const [entryAlert, setEntryAlert] = useState<{
+    isOpen: boolean
+    message: string
+    type: 'success' | 'error' | 'warning' | 'info'
+    playSound?: boolean
+  }>({
+    isOpen: false,
+    message: '',
+    type: 'error',
+    playSound: false
+  })
+
+  const dismissCheckoutAlert = React.useCallback(() => {
+    setCheckoutAlert(prev => prev.isOpen ? { ...prev, isOpen: false, playSound: false } : prev)
+  }, [])
+
+  const dismissEntryAlert = React.useCallback(() => {
+    setEntryAlert(prev => prev.isOpen ? { ...prev, isOpen: false, playSound: false } : prev)
+  }, [])
+
+  const dismissAlertWithoutSound = React.useCallback(() => {
+    dismissCheckoutAlert()
+    dismissEntryAlert()
+  }, [dismissCheckoutAlert, dismissEntryAlert])
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
 
@@ -255,6 +289,9 @@ function POSWoodContent() {
   }
 
   const addToCart = (product: any) => {
+    // Dismiss any lingering checkout alert when adding items
+    dismissCheckoutAlert()
+
     const existingIndex = cart.findIndex(item => item.id === product.id)
     
     if (existingIndex > -1) {
@@ -293,18 +330,24 @@ function POSWoodContent() {
   }, [cart, products])
 
   const addManualToCart = () => {
+    // Explicitly dismiss and isolate any checkout alert so interacting with '+' never re-triggers checkout payment alerts
+    dismissCheckoutAlert()
+
     const w = parseFloat(manualWidth) || 0
     const l = parseFloat(manualLength) || 0
     const p = parseFloat(manualPrice) || 0
     
     if (w <= 0 || l <= 0 || p <= 0) {
-      setAlertConfig({
+      setEntryAlert({
         isOpen: true,
         message: 'Please enter valid width, length and price.',
-        type: 'error'
+        type: 'error',
+        playSound: true
       })
       return
     }
+
+    dismissEntryAlert()
 
     const cft = (w * w * l) / 2304
     
@@ -336,17 +379,27 @@ function POSWoodContent() {
   }
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return
+    dismissEntryAlert()
+    if (cart.length === 0) {
+      setCheckoutAlert({
+        isOpen: true,
+        message: 'Cart is empty. Please add items to cart.',
+        type: 'warning',
+        playSound: true
+      })
+      return
+    }
     if (isCheckingOut) return
     
     setIsCheckingOut(true)
     setCheckoutError('')
 
     if (selectedCustomer === 'Walk-in Customer' && paidAmount < total) {
-      setAlertConfig({
+      setCheckoutAlert({
         isOpen: true,
         message: 'Walk-in Customer cannot buy on due. Please pay the full amount.',
-        type: 'error'
+        type: 'error',
+        playSound: true
       })
       setIsCheckingOut(false)
       return
@@ -578,11 +631,27 @@ function POSWoodContent() {
   }
 
   const cancelEditing = () => {
+    dismissAlertWithoutSound()
     setEditingId(null)
     setEditData(null)
   }
 
   const saveEditing = async () => {
+    if (!editData) return
+    const w = parseFloat(editData.width) || 0
+    const l = parseFloat(editData.length) || 0
+    const p = parseFloat(editData.sellPrice) || 0
+
+    if (!editData.carNo?.toString().trim() || !editData.treeNo?.toString().trim() || w <= 0 || l <= 0 || p <= 0) {
+      setEntryAlert({
+        isOpen: true,
+        message: 'Please complete all required fields (Car No, Tree No, Width, Length, Rate).',
+        type: 'error',
+        playSound: true
+      })
+      return
+    }
+
     try {
       const { error } = await supabase
         .from('wood_inventory')
@@ -644,6 +713,7 @@ function POSWoodContent() {
   };
 
   const handleEditChange = (field: string, value: any) => {
+    dismissAlertWithoutSound()
     const newData = { ...editData, [field]: value }
     
     // Auto-calculate CFT if width or length changes
@@ -1098,6 +1168,7 @@ function POSWoodContent() {
               <form 
                 onSubmit={(e) => {
                   e.preventDefault()
+                  dismissCheckoutAlert()
                   addManualToCart()
                 }}
                 className="flex items-end gap-2 pt-2"
@@ -1112,7 +1183,10 @@ function POSWoodContent() {
                     placeholder="W" 
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     value={manualWidth}
-                    onChange={(e) => setManualWidth(e.target.value)}
+                    onChange={(e) => {
+                      dismissAlertWithoutSound()
+                      setManualWidth(e.target.value)
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.keyCode === 13) {
                         e.preventDefault()
@@ -1131,7 +1205,10 @@ function POSWoodContent() {
                     placeholder="L" 
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     value={manualLength}
-                    onChange={(e) => setManualLength(e.target.value)}
+                    onChange={(e) => {
+                      dismissAlertWithoutSound()
+                      setManualLength(e.target.value)
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.keyCode === 13) {
                         e.preventDefault()
@@ -1149,12 +1226,17 @@ function POSWoodContent() {
                     placeholder="Price" 
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     value={manualPrice}
-                    onChange={(e) => setManualPrice(e.target.value)}
+                    onChange={(e) => {
+                      dismissAlertWithoutSound()
+                      setManualPrice(e.target.value)
+                    }}
                   />
                 </div>
                 <button 
                   type="submit"
+                  onClick={dismissCheckoutAlert}
                   className="p-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-colors shadow-sm flex items-center justify-center shrink-0"
+                  title="Add to Cart"
                 >
                   <Plus size={18} />
                 </button>
@@ -1248,7 +1330,10 @@ function POSWoodContent() {
                   className="w-40 p-2 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-right text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="0"
                   value={discount === 0 ? '' : discount}
-                  onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    dismissAlertWithoutSound()
+                    setDiscount(parseFloat(e.target.value) || 0)
+                  }}
                 />
               </div>
 
@@ -1260,7 +1345,10 @@ function POSWoodContent() {
                   className="w-40 p-2 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg text-sm text-right outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="0"
                   value={deliveryCharge === 0 ? '' : deliveryCharge}
-                  onChange={(e) => setDeliveryCharge(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    dismissAlertWithoutSound()
+                    setDeliveryCharge(parseFloat(e.target.value) || 0)
+                  }}
                 />
               </div>
 
@@ -1282,7 +1370,10 @@ function POSWoodContent() {
                     className="w-40 p-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-lg text-sm text-right font-bold text-emerald-700 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-emerald-500/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     placeholder="0"
                     value={paidAmount === 0 ? '' : paidAmount}
-                    onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => {
+                      dismissAlertWithoutSound()
+                      setPaidAmount(parseFloat(e.target.value) || 0)
+                    }}
                     onWheel={(e) => e.currentTarget.blur()}
                     ref={(el) => {
                       if (el) {
@@ -1425,10 +1516,20 @@ function POSWoodContent() {
         />
 
         <AlertPopup 
-          isOpen={alertConfig.isOpen}
-          onClose={() => setAlertConfig({ ...alertConfig, isOpen: false })}
-          message={alertConfig.message}
-          type={alertConfig.type}
+          isOpen={checkoutAlert.isOpen}
+          onClose={dismissCheckoutAlert}
+          message={checkoutAlert.message}
+          type={checkoutAlert.type}
+          playSound={checkoutAlert.playSound}
+          title="Payment Required"
+        />
+
+        <AlertPopup 
+          isOpen={entryAlert.isOpen}
+          onClose={dismissEntryAlert}
+          message={entryAlert.message}
+          type={entryAlert.type}
+          playSound={entryAlert.playSound}
         />
       </div>
     </DashboardLayout>

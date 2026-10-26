@@ -18,7 +18,8 @@ import {
   Check,
   X,
   ChevronDown,
-  Recycle
+  Recycle,
+  Loader2
 } from 'lucide-react'
 import BinModal from '@/components/BinModal'
 import { cn, safeParse } from '@/lib/utils'
@@ -44,6 +45,8 @@ interface WoodProduct {
 function WoodInventoryPageContent() {
   const [products, setProducts] = useState<WoodProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const [categories, setCategories] = useState<any[]>([])
   const [tags, setTags] = useState<any[]>([])
@@ -349,6 +352,8 @@ function WoodInventoryPageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
+    setIsSubmitting(true)
     try {
       // Duplicate Check
       const { data: existing, error: checkError } = await supabase
@@ -406,6 +411,8 @@ function WoodInventoryPageContent() {
     } catch (error: any) {
       console.error('Error saving wood item:', error)
       toast.error('Failed to save wood item')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -438,6 +445,8 @@ function WoodInventoryPageContent() {
   }
 
   const confirmDelete = async () => {
+    if (isDeleting) return
+    setIsDeleting(true)
     try {
       const { error } = await supabase
         .from('wood_inventory')
@@ -453,6 +462,7 @@ function WoodInventoryPageContent() {
       console.error('Error deleting wood items:', error)
       toast.error('Failed to delete')
     } finally {
+      setIsDeleting(false)
       setDeleteConfirm({ isOpen: false, ids: [] })
     }
   }
@@ -712,9 +722,11 @@ function WoodInventoryPageContent() {
                   </button>
                   <button 
                     onClick={confirmDelete}
-                    className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl font-semibold hover:bg-rose-700 transition-colors"
+                    disabled={isDeleting}
+                    className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl font-semibold hover:bg-rose-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                   >
-                    Delete
+                    {isDeleting && <Loader2 size={16} className="animate-spin" />}
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
               </motion.div>
@@ -930,9 +942,11 @@ function WoodInventoryPageContent() {
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
+                      disabled={isSubmitting}
+                      className="flex-1 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                     >
-                      {editingId ? 'Update Item' : 'Save Item'}
+                      {isSubmitting && <Loader2 size={18} className="animate-spin" />}
+                      {editingId ? (isSubmitting ? 'Updating...' : 'Update Item') : (isSubmitting ? 'Saving...' : 'Save Item')}
                     </button>
                   </div>
                 </form>

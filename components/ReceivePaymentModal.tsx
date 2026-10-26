@@ -43,6 +43,7 @@ export default function ReceivePaymentModal({ isOpen, onClose, customerName, cus
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
 
     if (isZeroOrNegativeDue) {
       toast.error('Current Due is zero or less. Payment cannot be received.')
@@ -61,24 +62,27 @@ export default function ReceivePaymentModal({ isOpen, onClose, customerName, cus
     }
 
     setIsSubmitting(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    setIsSubmitting(false)
-    setIsSuccess(true)
-    
-    if (onPaymentReceived) {
-      onPaymentReceived({
-        amount: parsedAmount,
-        method,
-        date,
-        notes
-      })
-    }
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 800))
+      
+      setIsSuccess(true)
+      
+      if (onPaymentReceived) {
+        onPaymentReceived({
+          amount: parsedAmount,
+          method,
+          date,
+          notes
+        })
+      }
 
-    setTimeout(() => {
-      onClose()
-    }, 1200)
+      setTimeout(() => {
+        onClose()
+      }, 1200)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -324,7 +328,7 @@ export default function ReceivePaymentModal({ isOpen, onClose, customerName, cus
                       type="submit"
                       disabled={isZeroOrNegativeDue || !amount || numAmount <= 0 || isOverpayment || isSubmitting}
                       className={cn(
-                        "w-full py-4 rounded-2xl font-bold transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed",
+                        "w-full py-4 rounded-2xl font-bold transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none",
                         isZeroOrNegativeDue
                           ? "bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shadow-none"
                           : (isOverpayment
