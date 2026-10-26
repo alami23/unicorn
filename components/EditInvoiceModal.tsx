@@ -1125,6 +1125,26 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             {selectedCount} of {items.length} selected
                           </span>
                         </div>
+
+                        {/* Display Area for Total Items CFT */}
+                        <div 
+                          className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all shadow-xs"
+                          title={`Total across all ${items.length} items`}
+                        >
+                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            Total Items ({items.length}) {isWood ? 'CFT' : 'Qty'}:
+                          </span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
+                              {isWood 
+                                ? totalAllCft.toFixed(2) 
+                                : items.reduce((s, it) => s + (Number(it.quantity) || 1), 0)}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                              {isWood ? 'CFT' : 'PCS'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -1454,39 +1474,6 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             </tr>
                           )})}
                         </tbody>
-                        <tfoot className="bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">
-                          <tr>
-                            <td colSpan={isWood ? 6 : 5} className="py-3 px-3 text-right">
-                              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                {selectedCount > 0 
-                                  ? `Selected Items (${selectedCount}) ${isWood ? 'CFT' : 'Qty'}:` 
-                                  : `Total Items (${items.length}) ${isWood ? 'CFT' : 'Qty'}:`}
-                              </span>
-                            </td>
-                            <td className="py-3 px-1.5 text-center">
-                              <div className="inline-flex items-center justify-center gap-1 font-mono font-black text-amber-600 dark:text-amber-400 text-sm">
-                                <span>
-                                  {isWood 
-                                    ? (selectedCount > 0 ? selectedTotalCft.toFixed(2) : totalAllCft.toFixed(2))
-                                    : (selectedCount > 0 ? selectedItems.reduce((s, it) => s + (Number(it.quantity) || 1), 0) : items.reduce((s, it) => s + (Number(it.quantity) || 1), 0))
-                                  }
-                                </span>
-                                <span className="text-[10px] font-bold text-slate-400">{isWood ? 'CFT' : 'PCS'}</span>
-                              </div>
-                            </td>
-                            <td colSpan={isWood ? 4 : 3} className="py-3 px-3 text-right">
-                              {isWood && selectedCount > 0 ? (
-                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                  All {items.length} items: <strong className="font-mono text-slate-800 dark:text-slate-100">{totalAllCft.toFixed(2)} CFT</strong>
-                                </span>
-                              ) : (
-                                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                                  Mark items using checkboxes to view selected CFT
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        </tfoot>
                       </table>
                     </div>
                   </div>
