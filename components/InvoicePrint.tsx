@@ -204,6 +204,12 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
 
         {/* Totals Section */}
         <div className="w-full text-black flex flex-col gap-[4px] mt-[8px]">
+          {isWood && (
+            <div className="flex justify-between items-center text-[10px] font-black">
+              <span className="uppercase">TOTAL CFT:</span>
+              <span className="font-black">{items.reduce((sum: number, it: any) => sum + (Number(it.cft) || 0), 0).toFixed(4)}</span>
+            </div>
+          )}
           <div className="flex justify-between items-center text-[10px] font-bold">
             <span>Subtotal:</span>
             <span className="font-bold">৳{Math.round(itemsSubtotal || 0).toLocaleString()}</span>
