@@ -1161,22 +1161,6 @@ function InvoicePageContent() {
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48">
-                                {Number(inv.due || 0) > 0 && (
-                                  <DropdownMenuItem 
-                                    onClick={() => handleSendDueReminder(inv)}
-                                    disabled={sendingReminderId === inv.id || getRemainingCooldown(inv.id) > 0}
-                                    className="gap-3 text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-900/10 cursor-pointer disabled:opacity-50"
-                                  >
-                                    {sendingReminderId === inv.id ? (
-                                      <RotateCw size={16} className="animate-spin text-rose-500" />
-                                    ) : (
-                                      <BellRing size={16} />
-                                    )}
-                                    {getRemainingCooldown(inv.id) > 0
-                                      ? `Due Reminder (${getRemainingCooldown(inv.id)}s)`
-                                      : 'Due Reminder SMS'}
-                                  </DropdownMenuItem>
-                                )}
                                 <DropdownMenuItem 
                                   onClick={() => handleEditInvoice(inv)}
                                   className="gap-3 cursor-pointer"
@@ -1361,22 +1345,6 @@ function InvoicePageContent() {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                          {Number(inv.due || 0) > 0 && (
-                            <DropdownMenuItem 
-                              onClick={() => handleSendDueReminder(inv)}
-                              disabled={sendingReminderId === inv.id || getRemainingCooldown(inv.id) > 0}
-                              className="gap-3 text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-900/10 cursor-pointer disabled:opacity-50"
-                            >
-                              {sendingReminderId === inv.id ? (
-                                <RotateCw size={16} className="animate-spin text-rose-500" />
-                              ) : (
-                                <BellRing size={16} />
-                              )}
-                              {getRemainingCooldown(inv.id) > 0
-                                ? `Due Reminder (${getRemainingCooldown(inv.id)}s)`
-                                : 'Due Reminder SMS'}
-                            </DropdownMenuItem>
-                          )}
                           <DropdownMenuItem 
                             onClick={() => handleEditInvoice(inv)}
                             className="gap-3 cursor-pointer"

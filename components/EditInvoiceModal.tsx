@@ -1094,57 +1094,59 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           <ArrowUpDown size={14} className="text-amber-600 dark:text-amber-400" />
                         </button>
 
-                        {/* Display Area for Total CFT of Selected Items */}
-                        <div 
-                          className={cn(
-                            "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs",
-                            selectedCount > 0 
-                              ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/70 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/30" 
-                              : "bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
-                          )}
-                          title={`${selectedCount} items selected`}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className={cn(
-                              "w-2 h-2 rounded-full transition-colors",
-                              selectedCount > 0 ? "bg-amber-500 animate-pulse" : "bg-slate-400"
-                            )} />
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                              Selected CFT:
-                            </span>
-                          </div>
-                          <div className="flex items-baseline gap-1">
-                            <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
-                              {selectedTotalCft.toFixed(2)}
-                            </span>
-                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                              CFT
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-700 pl-2">
-                            {selectedCount} of {items.length} selected
-                          </span>
-                        </div>
+                        {isWood && (
+                          <>
+                            {/* Display Area for Total CFT of Selected Items */}
+                            <div 
+                              className={cn(
+                                "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs",
+                                selectedCount > 0 
+                                  ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/70 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/30" 
+                                  : "bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
+                              )}
+                              title={`${selectedCount} items selected`}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span className={cn(
+                                  "w-2 h-2 rounded-full transition-colors",
+                                  selectedCount > 0 ? "bg-amber-500 animate-pulse" : "bg-slate-400"
+                                )} />
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                  Selected CFT:
+                                </span>
+                              </div>
+                              <div className="flex items-baseline gap-1">
+                                <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
+                                  {selectedTotalCft.toFixed(2)}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                  CFT
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-700 pl-2">
+                                {selectedCount} of {items.length} selected
+                              </span>
+                            </div>
 
-                        {/* Display Area for Total Items CFT */}
-                        <div 
-                          className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all shadow-xs"
-                          title={`Total across all ${items.length} items`}
-                        >
-                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            Total Items ({items.length}) {isWood ? 'CFT' : 'Qty'}:
-                          </span>
-                          <div className="flex items-baseline gap-1">
-                            <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
-                              {isWood 
-                                ? totalAllCft.toFixed(2) 
-                                : items.reduce((s, it) => s + (Number(it.quantity) || 1), 0)}
-                            </span>
-                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                              {isWood ? 'CFT' : 'PCS'}
-                            </span>
-                          </div>
-                        </div>
+                            {/* Display Area for Total Items CFT */}
+                            <div 
+                              className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all shadow-xs"
+                              title={`Total across all ${items.length} items`}
+                            >
+                              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                Total Items ({items.length}) CFT:
+                              </span>
+                              <div className="flex items-baseline gap-1">
+                                <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
+                                  {totalAllCft.toFixed(2)}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                  CFT
+                                </span>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -1210,11 +1212,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               </>
                             ) : (
                               <>
-                                <th className="py-3 px-2.5 text-left font-bold w-[26%]">Item Name</th>
-                                <th className="py-3 px-2.5 text-left font-bold w-[22%]">Description</th>
-                                <th className="py-3 px-2.5 text-center font-bold w-[14%]">Tag Box</th>
+                                <th className="py-3 px-2.5 text-left font-bold w-[34%]">Item Name</th>
+                                <th className="py-3 px-2.5 text-left font-bold w-[28%]">Description</th>
                                 <th className="py-3 px-2.5 text-center font-bold w-[8%]">Qty</th>
-                                <th className="py-3 px-2.5 text-right font-bold w-[10%]">Price</th>
+                                <th className="py-3 px-2.5 text-center font-bold w-[10%]">Price</th>
                                 <th className="py-3 px-2.5 text-right font-bold w-[11%]">Total</th>
                               </>
                             )}
@@ -1400,37 +1401,6 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                       placeholder={item.isStock ? 'Stock Item' : 'Description...'}
                                       className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 px-2.5 text-xs font-medium text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-amber-500 truncate"
                                     />
-                                  </td>
-                                  <td className="py-2.5 px-2.5 text-center">
-                                    <div className="relative flex items-center">
-                                      <span 
-                                        className="absolute left-2 w-2.5 h-2.5 rounded-full shrink-0 shadow-xs pointer-events-none ring-1 ring-white/70 dark:ring-black/40 z-10 bg-slate-300 dark:bg-slate-600 transition-colors" 
-                                        style={itemTagColor ? { backgroundColor: itemTagColor } : undefined}
-                                        aria-hidden="true"
-                                      />
-                                      <select 
-                                        value={item.tag ?? ''}
-                                        onChange={e => handleItemChange(idx, 'tag', e.target.value)}
-                                        className="w-full bg-slate-100/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-lg py-1.5 pl-6 pr-6 text-center font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer appearance-none truncate transition-all"
-                                      >
-                                        <option value="" className="text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 font-normal">
-                                          No Tag
-                                        </option>
-                                        {savedTags.map(st => (
-                                          <option 
-                                            key={st.id || st.name} 
-                                            value={st.name}
-                                            className="font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900"
-                                          >
-                                            {st.name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                      <ChevronDown 
-                                        size={12} 
-                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-colors" 
-                                      />
-                                    </div>
                                   </td>
                                   <td className="py-2.5 px-2.5 text-center">
                                     <input 
