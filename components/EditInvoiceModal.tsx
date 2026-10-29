@@ -75,6 +75,18 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   // Items
   const [items, setItems] = useState<EditableItem[]>([])
 
+  // Manual Wood Entry States
+  const [manualWidth, setManualWidth] = useState('')
+  const [manualLength, setManualLength] = useState('')
+  const [manualPrice, setManualPrice] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('defaultWoodPrice') || ''
+    }
+    return ''
+  })
+  const manualWidthInputRef = useRef<HTMLInputElement>(null)
+  const manualLengthInputRef = useRef<HTMLInputElement>(null)
+
   // Financials
   const [discount, setDiscount] = useState<number>(0)
   const [discountType, setDiscountType] = useState<'fixed' | 'percent'>('fixed')
@@ -124,7 +136,13 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
           .select('settings')
           .eq('id', 'global')
           .single()
-        if (settingsData?.settings) setSettings(settingsData.settings)
+        if (settingsData?.settings) {
+          setSettings(settingsData.settings)
+          const defaultPrice = settingsData.settings?.system?.defaultWoodPrice
+          if (defaultPrice !== undefined && defaultPrice !== null && defaultPrice !== '') {
+            setManualPrice(String(defaultPrice))
+          }
+        }
         
         fetchOrgUsers().then(uList => setUsers(uList))
         
@@ -463,6 +481,74 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
   const handleAddItem = () => {
     setItems(prev => [...prev, createEmptyItem(isWood)])
+  }
+
+  const handleAddManualWoodItem = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    const w = parseFloat(manualWidth) || 0
+    const l = parseFloat(manualLength) || 0
+    const p = parseFloat(manualPrice) || 0
+
+    if (w <= 0 || l <= 0 || p <= 0) {
+      toast.error('Please enter valid Width, Length, and Price')
+      return
+    }
+
+    const cft = Number(((w * w * l) / 2304).toFixed(4))
+    const total = Math.round(cft * p)
+
+    const allTreeNos = [
+      ...allProducts.map(prod => String(prod.tree_no || prod.name || '')),
+      ...items.map(it => String(it.treeNo || it.name || ''))
+    ]
+    const mNumbers = allTreeNos
+      .filter(no => no.startsWith('M-'))
+      .map(no => parseInt(no.replace('M-', ''), 10))
+      .filter(num => !isNaN(num))
+    const nextCounter = mNumbers.length > 0 ? Math.max(...mNumbers) + 1 : 1
+    const nextTreeNo = `M-${nextCounter}`
+
+    const matchingTag = savedTags.find(st => Math.abs(Number(st.sell_price) - p) < 0.01)
+
+    const newItem: EditableItem = {
+      id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      product_id: null,
+      product_type: 'wood',
+      name: nextTreeNo,
+      description: 'Car: M',
+      quantity: 1,
+      unit: 'CFT',
+      price: p,
+      total,
+      treeNo: nextTreeNo,
+      carNo: 'M',
+      width: w,
+      length: l,
+      cft,
+      tag: matchingTag ? matchingTag.name : '',
+      isStock: false,
+      marked: false
+    }
+
+    setItems(prev => {
+      if (
+        prev.length === 1 &&
+        !prev[0].treeNo &&
+        !prev[0].name &&
+        !prev[0].width &&
+        !prev[0].length &&
+        !prev[0].cft
+      ) {
+        return [newItem]
+      }
+      return [...prev, newItem]
+    })
+
+    setManualWidth('')
+    setManualLength('')
+    setTimeout(() => {
+      manualWidthInputRef.current?.focus()
+    }, 0)
   }
 
   const handleDuplicateItem = (index: number) => {
@@ -1006,12 +1092,81 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           )}
                         </div>
 
-                        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 flex gap-3">
-                          <AlertCircle className="text-amber-600 shrink-0" size={18} />
-                          <p className="text-[11px] text-amber-800 dark:text-amber-400 font-medium leading-relaxed">
-                            Updating this invoice will recalculate the customer&apos;s account balance and may affect inventory stock levels.
-                          </p>
-                        </div>
+                        {isWood && (
+                          <form
+                            onSubmit={handleAddManualWoodItem}
+                            className="bg-slate-50 dark:bg-slate-800/30 rounded-3xl p-5 border border-slate-100 dark:border-slate-800"
+                          >
+                            <div className="flex items-end gap-2.5">
+                              <div className="flex-1 space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 block">Width</label>
+                                <input
+                                  ref={manualWidthInputRef}
+                                  type="number"
+                                  step="any"
+                                  inputMode="decimal"
+                                  enterKeyHint="next"
+                                  placeholder="Width"
+                                  value={manualWidth}
+                                  onChange={e => setManualWidth(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault()
+                                      manualLengthInputRef.current?.focus()
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                              </div>
+                              <div className="flex-1 space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 block">Length</label>
+                                <input
+                                  ref={manualLengthInputRef}
+                                  type="number"
+                                  step="any"
+                                  inputMode="decimal"
+                                  enterKeyHint="send"
+                                  placeholder="Length"
+                                  value={manualLength}
+                                  onChange={e => setManualLength(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault()
+                                      handleAddManualWoodItem()
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                              </div>
+                              <div className="flex-1 space-y-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 block">Price</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  inputMode="numeric"
+                                  placeholder="Price"
+                                  value={manualPrice}
+                                  onChange={e => setManualPrice(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault()
+                                      handleAddManualWoodItem()
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                              </div>
+                              <button
+                                type="submit"
+                                className="p-2.5 h-[42px] w-[42px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-colors shadow-sm flex items-center justify-center shrink-0"
+                                title="Add to List"
+                              >
+                                <Plus size={18} />
+                              </button>
+                            </div>
+                          </form>
+                        )}
+
                       </div>
 
                       {/* Financial Breakdown Section (7 cols) */}
