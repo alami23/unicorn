@@ -285,14 +285,14 @@ function SoloWoodContent() {
   const addToCart = (product: any) => {
     if (cart.find(item => item.id === product.id)) return
     if (product.stock < 1 || product.isSold) return
-    setCart([{ ...product }, ...cart])
+    setCart(prev => [...prev, { ...product }])
   }
 
   useEffect(() => {
-    const allTreeNos = [...products.map(p => p.treeNo), ...cart.map(p => p.treeNo)]
-    const mNumbers = allTreeNos
-      .filter(no => no?.startsWith('M-'))
-      .map(no => parseInt(no.replace('M-', ''), 10))
+    const mNumbers = cart
+      .map(p => String(p.treeNo || '').trim())
+      .filter(no => /^M-\d+$/i.test(no))
+      .map(no => parseInt(no.replace(/^M-/i, ''), 10))
       .filter(num => !isNaN(num))
     
     if (mNumbers.length > 0) {
@@ -300,7 +300,7 @@ function SoloWoodContent() {
     } else {
       setManualCounter(1)
     }
-  }, [products, cart])
+  }, [cart])
 
   const addManualToCart = () => {
     // Explicitly dismiss and isolate any checkout alert so interacting with '+' never re-triggers checkout payment alerts
@@ -328,22 +328,28 @@ function SoloWoodContent() {
     const matchingTag = tags.find(t => Number(t.sellPrice) === p)
     const tagName = matchingTag ? matchingTag.name : '-'
 
-    const newItem = {
-      id: Date.now(),
-      treeNo: `M-${manualCounter}`,
-      width: w,
-      length: l,
-      cft: parseFloat(cft.toFixed(5)),
-      sellPrice: p,
-      
-      tag: tagName,
-      category: 'Wood',
-      carNo: 'Solo',
-      stock: 1
-    }
-    
-    setCart([newItem, ...cart])
-    setManualCounter(prev => prev + 1)
+    setCart(prev => {
+      const mNumbers = prev
+        .map(it => String(it.treeNo || '').trim())
+        .filter(no => /^M-\d+$/i.test(no))
+        .map(no => parseInt(no.replace(/^M-/i, ''), 10))
+        .filter(num => !isNaN(num))
+      const nextCounter = mNumbers.length > 0 ? Math.max(...mNumbers) + 1 : 1
+
+      const newItem = {
+        id: Date.now(),
+        treeNo: `M-${nextCounter}`,
+        width: w,
+        length: l,
+        cft: parseFloat(cft.toFixed(5)),
+        sellPrice: p,
+        tag: tagName,
+        category: 'Wood',
+        carNo: 'Solo',
+        stock: 1
+      }
+      return [...prev, newItem]
+    })
     setManualWidth('')
     setManualLength('')
     setTimeout(() => {
@@ -808,7 +814,7 @@ function SoloWoodContent() {
                     exit={{ opacity: 0, x: -20 }}
                     className="flex items-center justify-between gap-2 p-2.5 px-3 w-full bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 group"
                   >
-                    <span className="text-[10px] font-mono text-slate-400 min-w-[16px] shrink-0">{cart.length - index}.</span>
+                    <span className="text-[10px] font-mono text-slate-400 min-w-[16px] shrink-0">{index + 1}.</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap overflow-hidden">
                         <span className="text-[10px] font-bold text-emerald-600 shrink-0">{item.treeNo}</span>

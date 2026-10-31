@@ -316,10 +316,10 @@ function POSWoodContent() {
   }
 
   useEffect(() => {
-    const allTreeNos = [...products.map(p => p.treeNo), ...cart.map(p => p.treeNo)]
-    const mNumbers = allTreeNos
-      .filter(no => no?.startsWith('M-'))
-      .map(no => parseInt(no.replace('M-', ''), 10))
+    const mNumbers = cart
+      .map(p => String(p.treeNo || '').trim())
+      .filter(no => /^M-\d+$/i.test(no))
+      .map(no => parseInt(no.replace(/^M-/i, ''), 10))
       .filter(num => !isNaN(num))
     
     if (mNumbers.length > 0) {
@@ -327,7 +327,7 @@ function POSWoodContent() {
     } else {
       setManualCounter(1)
     }
-  }, [cart, products])
+  }, [cart])
 
   const addManualToCart = () => {
     // Explicitly dismiss and isolate any checkout alert so interacting with '+' never re-triggers checkout payment alerts
@@ -355,22 +355,28 @@ function POSWoodContent() {
     const matchingTag = tags.find((t: any) => Math.abs(Number(t.sellPrice) - p) < 0.01)
     const tagName = matchingTag ? matchingTag.name : ''
 
-    const newItem = {
-      id: Date.now(),
-      treeNo: `M-${manualCounter}`,
-      width: w,
-      length: l,
-      cft: parseFloat(cft.toFixed(5)),
-      sellPrice: p,
-      
-      tag: tagName,
-      category: 'Wood',
-      carNo: 'Manual',
-      stock: 1
-    }
-    
-    setCart([...cart, newItem])
-    setManualCounter(prev => prev + 1)
+    setCart(prev => {
+      const mNumbers = prev
+        .map(it => String(it.treeNo || '').trim())
+        .filter(no => /^M-\d+$/i.test(no))
+        .map(no => parseInt(no.replace(/^M-/i, ''), 10))
+        .filter(num => !isNaN(num))
+      const nextCounter = mNumbers.length > 0 ? Math.max(...mNumbers) + 1 : 1
+
+      const newItem = {
+        id: Date.now(),
+        treeNo: `M-${nextCounter}`,
+        width: w,
+        length: l,
+        cft: parseFloat(cft.toFixed(5)),
+        sellPrice: p,
+        tag: tagName,
+        category: 'Wood',
+        carNo: 'Manual',
+        stock: 1
+      }
+      return [...prev, newItem]
+    })
     setManualWidth('')
     setManualLength('')
     setTimeout(() => {

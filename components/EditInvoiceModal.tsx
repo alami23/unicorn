@@ -41,6 +41,7 @@ interface EditableItem {
   tag?: string
   isStock?: boolean
   marked?: boolean
+  seq?: number
 }
 
 export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: EditInvoiceModalProps) {
@@ -74,6 +75,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
   // Items
   const [items, setItems] = useState<EditableItem[]>([])
+  const [isDisplayReversed, setIsDisplayReversed] = useState(false)
 
   // Manual Wood Entry States
   const [manualWidth, setManualWidth] = useState('')
@@ -199,7 +201,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     return null
   }, [getTagData])
 
-  const createEmptyItem = useCallback((woodMode: boolean): EditableItem => {
+  const createEmptyItem = useCallback((woodMode: boolean, seqNum: number = 1): EditableItem => {
     return {
       id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       product_id: null,
@@ -217,12 +219,32 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       cft: 0,
       tag: '',
       isStock: false,
-      marked: false
+      marked: false,
+      seq: seqNum
     }
   }, [])
 
   const normalizeItems = useCallback((rawItems: any[], woodMode: boolean): EditableItem[] => {
-    return rawItems.map((item, idx) => {
+    // Sort items chronologically from first entry to last
+    const chronologicalRaw = [...rawItems].sort((a, b) => {
+      if (woodMode) {
+        const treeA = String(a.treeNo || a.tree_no || a.name || '').trim()
+        const treeB = String(b.treeNo || b.tree_no || b.name || '').trim()
+        const matchA = /^M-(\d+)$/i.exec(treeA)
+        const matchB = /^M-(\d+)$/i.exec(treeB)
+        if (matchA && matchB) {
+          return parseInt(matchA[1], 10) - parseInt(matchB[1], 10)
+        }
+      }
+      const idA = Number(a.id)
+      const idB = Number(b.id)
+      if (!isNaN(idA) && !isNaN(idB) && idA !== idB) {
+        return idA - idB
+      }
+      return 0
+    })
+
+    return chronologicalRaw.map((item, idx) => {
       const qty = Number(item.quantity || 1)
       const price = Number(item.price || item.sellPrice || 0)
       const width = item.width !== undefined && item.width !== null ? Number(item.width) : 0
@@ -252,7 +274,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         cft: isNaN(cft) ? 0 : cft,
         tag: item.tag || '',
         isStock: !!(item.product_id || item.productId),
-        marked: false
+        marked: false,
+        seq: idx + 1
       }
     })
   }, [])
@@ -284,6 +307,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
   useEffect(() => {
     if (!isOpen || !invoice) return
+
+    setIsDisplayReversed(false)
 
     setCustomerName(invoice.customer || invoice.customer_name || 'Walk-in Customer')
     setCustomerPhone(invoice.customerPhone || invoice.customer_phone || '')
@@ -339,6 +364,11 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   const itemsSubtotal = useMemo(() => {
     return items.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
   }, [items])
+
+  const displayedItems = useMemo(() => {
+    const mapped = items.map((item, originalIndex) => ({ item, originalIndex }))
+    return isDisplayReversed ? [...mapped].reverse() : mapped
+  }, [items, isDisplayReversed])
 
   // Selected items & CFT calculations (auto-updates when markable boxes toggle)
   const selectedItems = useMemo(() => items.filter(it => it.marked), [items])
@@ -480,7 +510,11 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   }
 
   const handleAddItem = () => {
-    setItems(prev => [...prev, createEmptyItem(isWood)])
+    setItems(prev => {
+      const nextSeq = prev.length + 1
+      const emptyItem = createEmptyItem(isWood, nextSeq)
+      return [...prev, emptyItem]
+    })
   }
 
   const handleAddManualWoodItem = (e?: React.FormEvent) => {
@@ -510,35 +544,38 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
     const matchingTag = savedTags.find(st => Math.abs(Number(st.sell_price) - p) < 0.01)
 
-    const newItem: EditableItem = {
-      id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      product_id: null,
-      product_type: 'wood',
-      name: nextTreeNo,
-      description: 'Car: M',
-      quantity: 1,
-      unit: 'CFT',
-      price: p,
-      total,
-      treeNo: nextTreeNo,
-      carNo: 'M',
-      width: w,
-      length: l,
-      cft,
-      tag: matchingTag ? matchingTag.name : '',
-      isStock: false,
-      marked: false
-    }
-
     setItems(prev => {
-      if (
+      const isSingleEmpty =
         prev.length === 1 &&
         !prev[0].treeNo &&
         !prev[0].name &&
         !prev[0].width &&
         !prev[0].length &&
         !prev[0].cft
-      ) {
+
+      const nextSeq = isSingleEmpty ? 1 : prev.length + 1
+      const newItem: EditableItem = {
+        id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        product_id: null,
+        product_type: 'wood',
+        name: nextTreeNo,
+        description: 'Car: M',
+        quantity: 1,
+        unit: 'CFT',
+        price: p,
+        total,
+        treeNo: nextTreeNo,
+        carNo: 'M',
+        width: w,
+        length: l,
+        cft,
+        tag: matchingTag ? matchingTag.name : '',
+        isStock: false,
+        marked: false,
+        seq: nextSeq
+      }
+
+      if (isSingleEmpty) {
         return [newItem]
       }
       return [...prev, newItem]
@@ -575,8 +612,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
   const handleReverseOrder = () => {
     if (items.length <= 1) return
-    setItems(prev => [...prev].reverse())
-    toast.success('Items order reversed')
+    setIsDisplayReversed(prev => !prev)
   }
 
   const handleClearItems = () => {
@@ -591,7 +627,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       toast.error('Invoice must contain at least one item')
       return
     }
-    setItems(prev => prev.filter((_, i) => i !== index))
+    setItems(prev => prev.filter((_, i) => i !== index).map((it, i) => ({ ...it, seq: i + 1 })))
   }
 
   const handleSaveChanges = async () => {
@@ -704,7 +740,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       if (deleteErr) throw deleteErr
 
       if (isWood) {
-        const woodItemsToInsert = items.map(item => {
+        const chronologicalWoodItems = [...items].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
+        const woodItemsToInsert = chronologicalWoodItems.map(item => {
           let carVal = item.carNo ? item.carNo.trim() : ''
           if (carVal.toLowerCase() === 'solo' || (!carVal && item.isStock === false)) {
             carVal = 'M'
@@ -1242,9 +1279,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           type="button"
                           onClick={handleReverseOrder}
                           disabled={items.length <= 1}
-                          className="flex items-center justify-center p-2 text-xs font-bold rounded-xl text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-900/30 hover:text-amber-700 dark:hover:text-amber-400 transition-all border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
-                          title="Reverse item order"
-                          aria-label="Reverse item order"
+                          className={cn(
+                            "flex items-center justify-center p-2 text-xs font-bold rounded-xl transition-all border disabled:opacity-40 disabled:cursor-not-allowed shadow-xs",
+                            isDisplayReversed
+                              ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+                              : "text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-900/30 hover:text-amber-700 dark:hover:text-amber-400 border-slate-200 dark:border-slate-700"
+                          )}
+                          title="Reverse displayed item order"
+                          aria-label="Reverse displayed item order"
                         >
                           <ArrowUpDown size={14} className="text-amber-600 dark:text-amber-400" />
                         </button>
@@ -1380,7 +1422,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {items.map((item, idx) => {
+                          {displayedItems.map(({ item, originalIndex: idx }) => {
                             const itemTagColor = getTagColor(item.tag)
                             return (
                             <tr key={item.id || idx} className={cn("hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group", item.marked && "bg-amber-50/40 dark:bg-amber-900/10")}>

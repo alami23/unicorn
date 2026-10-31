@@ -100,8 +100,15 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
                      invoice.originalType?.toLowerCase() === 'solo_wood' || 
                      invoice.original_type?.toLowerCase() === 'solo_wood'
 
-  if (isSoloWood) {
-    items = [...items].reverse();
+  if (isSoloWood && items.length > 1) {
+    const mNums = items
+      .map((it: any) => String(it.treeNo || it.name || '').trim())
+      .filter((no: string) => /^M-\d+$/i.test(no))
+      .map((no: string) => parseInt(no.replace(/^M-/i, ''), 10))
+      .filter((num: number) => !isNaN(num))
+    if (mNums.length >= 2 && mNums[0] > mNums[mNums.length - 1]) {
+      items = [...items].reverse()
+    }
   }
   const itemsSubtotal = items.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0)
   const discountAmount = Math.round(invoice.discountType === 'percent' 

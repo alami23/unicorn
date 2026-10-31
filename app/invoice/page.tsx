@@ -361,7 +361,8 @@ function InvoicePageContent() {
         supabase
           .from(itemsTable)
           .select('*')
-          .eq('invoice_id', invoice.id),
+          .eq('invoice_id', invoice.id)
+          .order('id', { ascending: true }),
         supabase
           .from('transactions')
           .select('*')
