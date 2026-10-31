@@ -229,6 +229,9 @@ function POSWoodContent() {
     fetchProducts()
     loadCustomers()
     loadSettings()
+
+    window.addEventListener('wood-inventory-updated', fetchProducts)
+    return () => window.removeEventListener('wood-inventory-updated', fetchProducts)
   }, [])
 
   const loadCustomers = async () => {

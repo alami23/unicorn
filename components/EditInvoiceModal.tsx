@@ -84,6 +84,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   // Items
   const [items, setItems] = useState<EditableItem[]>([])
   const [isDisplayReversed, setIsDisplayReversed] = useState(false)
+  const initialProductIdsRef = useRef<Set<number>>(new Set())
+  const removedProductIdsRef = useRef<Set<number>>(new Set())
+  const lastClickedDisplayIdxRef = useRef<number | null>(null)
 
   // Manual Wood Entry States
   const [manualWidth, setManualWidth] = useState('')
@@ -308,9 +311,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         carNoVal = 'M'
       }
 
+      const rawProdId = Number(item.product_id || item.productId || 0)
       return {
         id: item.id || `item-${Date.now()}-${idx}`,
-        product_id: item.product_id || item.productId || null,
+        product_id: rawProdId > 0 ? rawProdId : null,
         product_type: item.product_type || (woodMode ? 'wood' : 'furniture'),
         name: item.name || item.treeNo || item.tree_no || (woodMode ? 'Wood Item' : 'Furniture Item'),
         description: item.description || (woodMode ? (carNoVal ? `Car: ${carNoVal}` : '') : (item.category || '')),
@@ -326,12 +330,31 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         tag: woodMode
           ? (getMatchingTagByPrice(price) ?? (item.tag && item.tag !== '-' ? item.tag : ''))
           : (item.tag || ''),
-        isStock: !!(item.product_id || item.productId),
+        isStock: rawProdId > 0,
         marked: false,
         seq: idx + 1
       }
     })
   }, [getMatchingTagByPrice])
+
+  const resolveWoodInventoryProductId = useCallback((item: EditableItem, productsList: any[] = allProducts): number => {
+    const directId = Number(item.product_id || 0)
+    if (directId > 0) return directId
+    if (!isWood) return 0
+    const treeVal = String(item.treeNo || item.name || '').trim().toLowerCase()
+    if (!treeVal || /^m-\d+$/i.test(treeVal)) return 0
+    const carVal = String(item.carNo || '').trim().toLowerCase()
+    const matched = productsList.find(p => {
+      const pTree = String(p.treeNo || p.tree_no || p.name || '').trim().toLowerCase()
+      if (pTree !== treeVal) return false
+      if (carVal && carVal !== 'm' && carVal !== 'manual' && carVal !== 'solo') {
+        const pCar = String(p.carNo || p.car_no || '').trim().toLowerCase()
+        if (pCar && pCar !== carVal) return false
+      }
+      return true
+    })
+    return matched ? Number(matched.id) : 0
+  }, [allProducts, isWood])
 
   const fetchItemsFromDb = useCallback(async (invId: string, woodMode: boolean) => {
     setIsLoadingItems(true)
@@ -346,7 +369,12 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       if (error) throw error
 
       if (data && data.length > 0) {
-        setItems(normalizeItems(data, woodMode))
+        const normalized = normalizeItems(data, woodMode)
+        normalized.forEach(it => {
+          const pid = Number(it.product_id || 0)
+          if (pid > 0) initialProductIdsRef.current.add(pid)
+        })
+        setItems(normalized)
       } else {
         setItems([createEmptyItem(woodMode)])
       }
@@ -362,6 +390,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     if (!isOpen || !invoice) return
 
     setIsDisplayReversed(false)
+    initialProductIdsRef.current = new Set()
+    removedProductIdsRef.current = new Set()
+    lastClickedDisplayIdxRef.current = null
 
     setCustomerName(invoice.customer || invoice.customer_name || 'Walk-in Customer')
     setCustomerPhone(invoice.customerPhone || invoice.customer_phone || '')
@@ -427,8 +458,17 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         setPaymentEntries(loadedEntries)
       })
 
+    // Always fetch items from DB so product_id is accurately loaded for stock restoration, with invoice.items as immediate fallback
     if (Array.isArray(invoice.items) && invoice.items.length > 0) {
-      setItems(normalizeItems(invoice.items, isWood))
+      const normalized = normalizeItems(invoice.items, isWood)
+      normalized.forEach(it => {
+        const pid = Number(it.product_id || 0)
+        if (pid > 0) initialProductIdsRef.current.add(pid)
+      })
+      setItems(normalized)
+      if (invoice.id) {
+        fetchItemsFromDb(invoice.id, isWood)
+      }
     } else {
       fetchItemsFromDb(invoice.id, isWood)
     }
@@ -450,6 +490,26 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         })
     }
   }, [isOpen, invoice, isWood, normalizeItems, fetchItemsFromDb])
+
+  // Backfill product_id for loaded wood items from wood_inventory if missing, and record initial stock IDs
+  useEffect(() => {
+    if (!isOpen || !isWood || allProducts.length === 0 || items.length === 0) return
+    setItems(prev => {
+      let changed = false
+      const next = prev.map(item => {
+        const resolvedId = resolveWoodInventoryProductId(item, allProducts)
+        if (resolvedId > 0) {
+          initialProductIdsRef.current.add(resolvedId)
+          if (Number(item.product_id || 0) !== resolvedId) {
+            changed = true
+            return { ...item, product_id: resolvedId, isStock: true }
+          }
+        }
+        return item
+      })
+      return changed ? next : prev
+    })
+  }, [isOpen, isWood, allProducts, items.length, resolveWoodInventoryProductId])
 
   // Automatically evaluate each line item's price against predefined price-tag rules when tags load
   useEffect(() => {
@@ -513,10 +573,19 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     return Math.max(0, Math.round(recordedPaymentsSum + (pendingVal > 0 ? pendingVal : 0)))
   }, [recordedPaymentsSum, pendingPaymentInput])
 
+  const isPaidExceedingGrandTotal = useMemo(() => {
+    return paid > grandTotal
+  }, [paid, grandTotal])
+
   const handleAddPartialPaymentEntry = () => {
     const amt = parseFloat(pendingPaymentInput) || 0
     if (amt <= 0) {
       toast.error('Please enter a valid payment amount greater than 0')
+      return
+    }
+    const nextTotalPaid = Math.round(recordedPaymentsSum + amt)
+    if (nextTotalPaid > grandTotal) {
+      toast.error(`Total Paid (৳${nextTotalPaid.toLocaleString()}) cannot exceed Grand Total (৳${Math.round(grandTotal).toLocaleString()})`)
       return
     }
     const todayStr = new Date().toISOString().split('T')[0]
@@ -919,12 +988,95 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
   const handleReverseOrder = () => {
     if (items.length <= 1) return
+    lastClickedDisplayIdxRef.current = null
     setIsDisplayReversed(prev => !prev)
   }
 
+  const handleItemRowSelection = useCallback((
+    displayIdx: number,
+    originalIdx: number,
+    e: React.MouseEvent,
+    fromCheckbox: boolean = false
+  ) => {
+    const isShift = e.shiftKey
+    const isCtrlOrMeta = e.ctrlKey || e.metaKey
+
+    if (isShift && lastClickedDisplayIdxRef.current !== null) {
+      const start = Math.min(lastClickedDisplayIdxRef.current, displayIdx)
+      const end = Math.max(lastClickedDisplayIdxRef.current, displayIdx)
+      const rangeOriginalIndices = new Set(
+        displayedItems.slice(start, end + 1).map(d => d.originalIndex)
+      )
+
+      setItems(prev =>
+        prev.map((it, idx) =>
+          rangeOriginalIndices.has(idx) ? { ...it, marked: true } : it
+        )
+      )
+      lastClickedDisplayIdxRef.current = displayIdx
+      return
+    }
+
+    if (isCtrlOrMeta || fromCheckbox) {
+      setItems(prev =>
+        prev.map((it, idx) =>
+          idx === originalIdx ? { ...it, marked: !it.marked } : it
+        )
+      )
+      lastClickedDisplayIdxRef.current = displayIdx
+      return
+    }
+  }, [displayedItems])
+
+  const restoreStockForRemovedItems = useCallback(async (removedItems: EditableItem[]) => {
+    if (!isWood || removedItems.length === 0) return
+
+    const productIdsToRestore: number[] = []
+    removedItems.forEach(item => {
+      const resolvedId = resolveWoodInventoryProductId(item, allProducts)
+      if (resolvedId > 0) {
+        productIdsToRestore.push(resolvedId)
+        removedProductIdsRef.current.add(resolvedId)
+      }
+    })
+
+    if (productIdsToRestore.length === 0) return
+
+    // Immediately update local POS Wood inventory state so available quantity increases right away
+    setAllProducts(prev =>
+      prev.map(p =>
+        productIdsToRestore.includes(Number(p.id))
+          ? { ...p, is_sold: false, isSold: false, stock: 1 }
+          : p
+      )
+    )
+
+    try {
+      const { error } = await supabase
+        .from('wood_inventory')
+        .update({ is_sold: false })
+        .in('id', productIdsToRestore)
+
+      if (error) throw error
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('wood-inventory-updated'))
+      }
+      toast.success(
+        productIdsToRestore.length === 1
+          ? 'Item restored to POS Wood inventory'
+          : `${productIdsToRestore.length} items restored to POS Wood inventory`
+      )
+    } catch (err) {
+      console.error('Failed to restore item to wood_inventory:', err)
+    }
+  }, [isWood, allProducts, resolveWoodInventoryProductId])
+
   const handleClearItems = () => {
     if (confirm('Are you sure you want to clear all items?')) {
+      const itemsToRestore = [...items]
       setItems([createEmptyItem(isWood)])
+      void restoreStockForRemovedItems(itemsToRestore)
       toast.info('All items cleared')
     }
   }
@@ -934,7 +1086,11 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       toast.error('Invoice must contain at least one item')
       return
     }
+    const removedItem = items[index]
     setItems(prev => prev.filter((_, i) => i !== index).map((it, i) => ({ ...it, seq: i + 1 })))
+    if (removedItem) {
+      void restoreStockForRemovedItems([removedItem])
+    }
   }
 
   const handleSaveChanges = async () => {
@@ -953,6 +1109,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     }
     if (items.length === 0) {
       toast.error('Please add at least one item')
+      return
+    }
+    if (paid > grandTotal) {
+      toast.error(`Total Paid (৳${Math.round(paid).toLocaleString()}) cannot exceed Grand Total (৳${Math.round(grandTotal).toLocaleString()})`)
       return
     }
 
@@ -1071,13 +1231,33 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         if (insertItemsErr) throw insertItemsErr
 
         const soldProductIds = chronologicalWoodItems
-          .map(it => Number(it.product_id))
+          .map(it => resolveWoodInventoryProductId(it, allProducts))
           .filter(id => id > 0)
+
+        const soldSet = new Set(soldProductIds)
+        const restoredProductIds = Array.from(
+          new Set([
+            ...Array.from(initialProductIdsRef.current),
+            ...Array.from(removedProductIdsRef.current)
+          ])
+        ).filter(id => id > 0 && !soldSet.has(id))
+
+        if (restoredProductIds.length > 0) {
+          await supabase
+            .from('wood_inventory')
+            .update({ is_sold: false })
+            .in('id', restoredProductIds)
+        }
+
         if (soldProductIds.length > 0) {
           await supabase
             .from('wood_inventory')
             .update({ is_sold: true })
             .in('id', soldProductIds)
+        }
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('wood-inventory-updated'))
         }
       } else {
         const furnitureItemsToInsert = items.map(item => ({
@@ -1226,8 +1406,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
               </button>
               <button 
                 onClick={handleSaveChanges} 
-                disabled={isSubmitting}
-                className="flex items-center gap-2 px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-amber-600/20 disabled:opacity-50"
+                disabled={isSubmitting || isPaidExceedingGrandTotal}
+                title={isPaidExceedingGrandTotal ? 'Total Paid cannot exceed Grand Total' : 'Save Changes'}
+                className="flex items-center gap-2 px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                 Save Changes
@@ -1248,15 +1429,15 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
               <div className="space-y-8">
                 {/* Full-width Form Area (Metadata & Items Table) */}
                 <div className="space-y-6">
-                  {/* Top Metadata Card: Left Side (Customer Name, Phone, Address) | Right Side (Invoice ID, Date, Created By / Assigned Staff) */}
+                  {/* Top Section: Left Side (Customer Details + Invoice Metadata) | Right Side (Totals Breakdown) */}
                   <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                      {/* Left Side: Customer Name, Phone Number, and Address */}
-                      <div className="lg:col-span-6 space-y-3.5">
-                        {/* Top Row: Customer Name & Phone Number */}
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-start">
-                          {/* Customer Name Dropdown */}
-                          <div className="sm:col-span-7 space-y-1.5 relative">
+                      {/* Left Column: Customer Name, Phone Number, Address vertically, then Invoice ID, Invoice Date, Created By/Assigned Staff below */}
+                      <div className="lg:col-span-6 space-y-5">
+                        {/* Customer Information (Arranged Vertically) */}
+                        <div className="space-y-3">
+                          {/* 1. Customer Name Dropdown */}
+                          <div className="space-y-1.5 relative">
                             <div className="flex items-center justify-between ml-1">
                               <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                                 <User size={13} className="text-amber-500" /> Customer Name
@@ -1319,8 +1500,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             )}
                           </div>
 
-                          {/* Customer Phone Number */}
-                          <div className="sm:col-span-5 space-y-1.5">
+                          {/* 2. Phone Number */}
+                          <div className="space-y-1.5">
                             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 ml-1">
                               <Phone size={12} className="text-slate-400" /> Phone Number
                             </label>
@@ -1335,32 +1516,32 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               />
                             </div>
                           </div>
-                        </div>
 
-                        {/* Bottom Row: Customer Address */}
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 ml-1">
-                            <MapPin size={12} className="text-slate-400" /> Address / Location
-                          </label>
-                          <div className="relative">
-                            <MapPin size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                            <input 
-                              type="text" 
-                              readOnly 
-                              disabled
-                              value={customerAddress || 'No address registered'} 
-                              title={customerAddress || 'No address registered'}
-                              className="w-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-not-allowed select-none outline-none truncate"
-                            />
+                          {/* 3. Address */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 ml-1">
+                              <MapPin size={12} className="text-slate-400" /> Address
+                            </label>
+                            <div className="relative">
+                              <MapPin size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                              <input 
+                                type="text" 
+                                readOnly 
+                                disabled
+                                value={customerAddress || 'No address registered'} 
+                                title={customerAddress || 'No address registered'}
+                                className="w-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-not-allowed select-none outline-none truncate"
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Right Side: Invoice ID, Invoice Date, Created By / Assigned Staff */}
-                      <div className="lg:col-span-6 space-y-3.5 lg:border-l lg:border-slate-200/80 lg:dark:border-slate-700/60 lg:pl-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-start">
-                          {/* 1. Invoice ID */}
-                          <div className="sm:col-span-6 space-y-1.5">
+                        <div className="h-px bg-slate-200/80 dark:bg-slate-700/60" />
+
+                        {/* Below Customer Details: Invoice ID, Invoice Date, Created By / Assigned Staff */}
+                        <div className="space-y-3">
+                          {/* Invoice ID */}
+                          <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between ml-1">
                               <span className="flex items-center gap-1.5">
                                 <Hash size={13} className="text-slate-400" /> Invoice ID
@@ -1399,8 +1580,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             )}
                           </div>
 
-                          {/* 2. Invoice Date */}
-                          <div className="sm:col-span-6 space-y-1.5">
+                          {/* Invoice Date */}
+                          <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 ml-1">
                               <Calendar size={13} className="text-slate-400" /> Invoice Date
                             </label>
@@ -1411,37 +1592,30 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                             />
                           </div>
+
+                          {/* Created By / Assigned Staff */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 ml-1">
+                              <User size={13} className="text-blue-500" /> Created By / Assigned Staff
+                            </label>
+                            <select 
+                              value={createdBy}
+                              onChange={e => setCreatedBy(e.target.value)}
+                              className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none focus:border-amber-500 cursor-pointer"
+                            >
+                              <option value="">Unassigned</option>
+                              {users.map(u => (
+                                <option key={u.id} value={u.name}>{u.name} ({u.role || 'Staff'})</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
 
-                        {/* 3. Created By / Assigned Staff */}
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 ml-1">
-                            <User size={13} className="text-blue-500" /> Created By / Assigned Staff
-                          </label>
-                          <select 
-                            value={createdBy}
-                            onChange={e => setCreatedBy(e.target.value)}
-                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none focus:border-amber-500 cursor-pointer"
-                          >
-                            <option value="">Unassigned</option>
-                            {users.map(u => (
-                              <option key={u.id} value={u.name}>{u.name} ({u.role || 'Staff'})</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment & Financial Summary Area - Positioned Above Item Table */}
-                  <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                      {/* Quick Entry Section (5 cols) */}
-                      <div className="lg:col-span-5 space-y-4">
+                        {/* Quick Wood Entry (Width, Length, Price) */}
                         {isWood && (
                           <form
                             onSubmit={handleAddManualWoodItem}
-                            className="bg-slate-50 dark:bg-slate-800/30 rounded-3xl p-5 border border-slate-100 dark:border-slate-800"
+                            className="bg-white/70 dark:bg-slate-900/40 rounded-2xl p-4 border border-slate-200/70 dark:border-slate-700/60"
                           >
                             <div className="flex items-end gap-2.5">
                               <div className="flex-1 space-y-1">
@@ -1514,8 +1688,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                         )}
                       </div>
 
-                      {/* Financial Breakdown Section (7 cols) - Directly on Page without Dark Container */}
-                      <div className="lg:col-span-7">
+                      {/* Right Column: Totals Breakdown (Total CFT, Subtotal, Discount, Delivery Charge, Grand Total, Paid Amount, Total Due) */}
+                      <div className="lg:col-span-6 lg:border-l lg:border-slate-200/80 lg:dark:border-slate-700/60 lg:pl-6">
                         <div className="space-y-3.5 py-1">
                           {/* Total CFT */}
                           <div className="flex items-center justify-between py-1">
@@ -1531,7 +1705,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
                           <div className="h-px bg-slate-200 dark:bg-slate-800" />
 
-                          {/* Discount (Vertically below Subtotal) */}
+                          {/* Discount */}
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2.5">
                               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Discount</span>
@@ -1580,7 +1754,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           <div className="h-px bg-slate-200 dark:bg-slate-800" />
 
                           {/* Grand Total */}
-                          <div className="flex items-center justify-between py-0.5">
+                          <div
+                            onClick={() => {
+                              const remainingToPay = Math.max(0, Math.round(grandTotal - recordedPaymentsSum))
+                              setPendingPaymentInput(String(remainingToPay > 0 ? remainingToPay : Math.round(grandTotal)))
+                            }}
+                            title="Click to auto-fill Paid Amount"
+                            className="flex items-center justify-between py-1 px-2 -mx-2 rounded-xl cursor-pointer hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors select-none"
+                          >
                             <span className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Grand Total</span>
                             <span className="text-2xl font-black font-mono text-slate-900 dark:text-slate-100">৳{Math.round(grandTotal).toLocaleString()}</span>
                           </div>
@@ -1591,7 +1772,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Paid Amount</span>
                                 {paid > 0 && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                  <span
+                                    className={cn(
+                                      "px-2 py-0.5 rounded-full text-[10px] font-mono font-black border",
+                                      isPaidExceedingGrandTotal
+                                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                    )}
+                                  >
                                     Total: ৳{Math.round(paid).toLocaleString()}
                                   </span>
                                 )}
@@ -1609,18 +1797,33 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                     }
                                   }}
                                   placeholder="0"
-                                  className="w-40 sm:w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-1.5 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 outline-none focus:border-emerald-500"
+                                  className={cn(
+                                    "w-40 sm:w-48 bg-white dark:bg-slate-800 border rounded-xl px-3.5 py-1.5 text-right font-mono font-black outline-none transition-colors",
+                                    isPaidExceedingGrandTotal
+                                      ? "border-rose-500 text-rose-600 dark:text-rose-400 focus:border-rose-600"
+                                      : "border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 focus:border-emerald-500"
+                                  )}
                                 />
                                 <button
                                   type="button"
                                   onClick={handleAddPartialPaymentEntry}
-                                  className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors shadow-xs flex items-center justify-center shrink-0"
+                                  disabled={isPaidExceedingGrandTotal}
+                                  className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors shadow-xs flex items-center justify-center shrink-0"
                                   title="Add Payment Entry"
                                 >
                                   <Plus size={15} />
                                 </button>
                               </div>
                             </div>
+
+                            {isPaidExceedingGrandTotal && (
+                              <div className="flex items-center justify-end gap-1.5 text-rose-600 dark:text-rose-400 text-xs font-bold bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 rounded-xl px-3 py-2">
+                                <AlertCircle size={14} className="shrink-0" />
+                                <span>
+                                  Total Paid (৳{Math.round(paid).toLocaleString()}) cannot exceed Grand Total (৳{Math.round(grandTotal).toLocaleString()}).
+                                </span>
+                              </div>
+                            )}
 
                             {/* Recorded Partial Payment Transaction Entries */}
                             {paymentEntries.length > 0 && (
@@ -1675,15 +1878,25 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             )}
                           </div>
 
-                          {/* Total Due */}
+                          {/* Current Due Amount (Specific to this invoice) */}
+                          <div className="flex items-center justify-between pt-2.5 border-t border-slate-200 dark:border-slate-800">
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                              Current Due Amount
+                            </span>
+                            <span className="text-lg font-black font-mono text-rose-600 dark:text-rose-400">
+                              ৳{Math.round(currentDue).toLocaleString()}
+                            </span>
+                          </div>
+
+                          {/* Total Due (Current Invoice Due + Previous Outstanding Balance) */}
                           <div className="flex items-center justify-between pt-2.5 border-t border-slate-200 dark:border-slate-800">
                             <div className="space-y-0.5">
-                              <span className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-500 block">Total Due</span>
-                              {oldDue > 0 && (
-                                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block">
-                                  Current Invoice Due: ৳{Math.round(currentDue).toLocaleString()} + Previous Due: ৳{Math.round(oldDue).toLocaleString()}
-                                </span>
-                              )}
+                              <span className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-500 block">
+                                Total Due
+                              </span>
+                              <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block">
+                                Current Due: ৳{Math.round(currentDue).toLocaleString()} + Previous Due: ৳{Math.round(oldDue).toLocaleString()}
+                              </span>
                             </div>
                             <span className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
                               ৳{Math.round(totalDue).toLocaleString()}
@@ -1848,18 +2061,59 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {displayedItems.map(({ item, originalIndex: idx }) => {
+                          {displayedItems.map(({ item, originalIndex: idx }, displayIdx) => {
                             const itemTagColor = getTagColor(item.tag)
                             return (
-                            <tr key={item.id || idx} className={cn("hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group", item.marked && "bg-amber-50/40 dark:bg-amber-900/10")}>
+                            <tr
+                              key={item.id || idx}
+                              onClick={e => {
+                                const target = e.target as HTMLElement
+                                const isInteractive = Boolean(target.closest('button, select, option'))
+                                const isCheckbox = Boolean(target.closest('input[type="checkbox"]'))
+                                const isTextOrNumberInput = Boolean(
+                                  target.closest('input:not([type="checkbox"])')
+                                )
+
+                                if (isCheckbox || isInteractive) return
+
+                                // Allow Shift-click or Ctrl/Cmd-click anywhere on the row (even over inputs)
+                                if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                                  e.preventDefault()
+                                  if (e.shiftKey && typeof window !== 'undefined') {
+                                    window.getSelection()?.removeAllRanges()
+                                  }
+                                  handleItemRowSelection(displayIdx, idx, e, false)
+                                  return
+                                }
+
+                                // Clicking non-input cells (like No, Total, or row padding) toggles the item
+                                if (!isTextOrNumberInput) {
+                                  handleItemRowSelection(displayIdx, idx, e, true)
+                                } else {
+                                  // Update anchor row when focusing/clicking an input normally
+                                  lastClickedDisplayIdxRef.current = displayIdx
+                                }
+                              }}
+                              className={cn(
+                                "hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors group cursor-pointer",
+                                item.marked && "bg-amber-50/60 dark:bg-amber-900/15"
+                              )}
+                            >
                               {/* 1. The Markable Box */}
                               <td className="py-2.5 px-2 text-center w-10">
                                 <input 
                                   type="checkbox"
                                   checked={!!item.marked}
-                                  onChange={e => handleItemChange(idx, 'marked', e.target.checked)}
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    if (e.shiftKey && typeof window !== 'undefined') {
+                                      window.getSelection()?.removeAllRanges()
+                                    }
+                                    handleItemRowSelection(displayIdx, idx, e, true)
+                                  }}
+                                  onChange={() => {}}
                                   className="rounded border-slate-300 dark:border-slate-700 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer accent-amber-600"
-                                  title={`Mark item ${idx + 1}`}
+                                  title="Click to toggle, Shift+Click to select range, Ctrl+Click to multi-select"
                                 />
                               </td>
 
