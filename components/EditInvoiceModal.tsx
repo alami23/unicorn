@@ -58,6 +58,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   const [activeItemSearchIdx, setActiveItemSearchIdx] = useState<number | null>(null)
   const [itemSearchTerm, setItemSearchTerm] = useState('')
 
+  // POS Wood Multi-Select Modal States
+  const [isWoodPickerOpen, setIsWoodPickerOpen] = useState(false)
+  const [woodCategories, setWoodCategories] = useState<string[]>([])
+  const [pickerSearchTerm, setPickerSearchTerm] = useState('')
+  const [pickerCategory, setPickerCategory] = useState('All')
+  const [pickerCarNo, setPickerCarNo] = useState('All')
+  const [selectedPickerIds, setSelectedPickerIds] = useState<number[]>([])
+
   // Header & Customer details
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -93,8 +101,21 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   const [discount, setDiscount] = useState<number>(0)
   const [discountType, setDiscountType] = useState<'fixed' | 'percent'>('fixed')
   const [deliveryCharge, setDeliveryCharge] = useState<number>(0)
-  const [paid, setPaid] = useState<number>(0)
   const [oldDue, setOldDue] = useState<number>(0)
+
+  // Partial Payment Transactions State
+  interface PaymentTransactionEntry {
+    id: string
+    dbId?: string
+    date: string
+    method: string
+    amount: number
+    type?: string
+    notes?: string
+    isNew?: boolean
+  }
+  const [paymentEntries, setPaymentEntries] = useState<PaymentTransactionEntry[]>([])
+  const [pendingPaymentInput, setPendingPaymentInput] = useState<string>('')
 
   // Type detector & sales method
   const isWood = useMemo(() => {
@@ -162,9 +183,28 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
             ...p,
             id: p.id,
             name: isWood ? (p.tree_no || p.name) : p.name,
+            treeNo: p.tree_no || p.name || '',
+            carNo: p.car_no || '',
+            category: p.category || 'Wood',
+            width: Number(p.width || 0),
+            length: Number(p.length || 0),
+            cft: Number(p.cft || 0),
+            tag: p.tag || '',
             price: Number(p.sell_price || p.price || 0),
-            stock: Number(p.stock || 0)
+            sellPrice: Number(p.sell_price || p.price || 0),
+            stock: p.is_sold ? 0 : Number(p.stock ?? 1),
+            isSold: Boolean(p.is_sold)
           })))
+        }
+
+        if (isWood) {
+          const { data: catData } = await supabase
+            .from('wood_category')
+            .select('name')
+            .order('name', { ascending: true })
+          if (catData) {
+            setWoodCategories(catData.map((c: any) => c.name).filter(Boolean))
+          }
         }
 
         const { data: tagData } = await supabase
@@ -264,7 +304,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       const computedTotal = woodMode ? (cft * price) : (qty * price)
 
       let carNoVal = item.carNo || item.car_no || ''
-      if (woodMode && carNoVal.trim().toLowerCase() === 'solo') {
+      if (woodMode && ['solo', 'manual'].includes(carNoVal.trim().toLowerCase())) {
         carNoVal = 'M'
       }
 
@@ -346,8 +386,46 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     setDiscount(Number(invoice.discount || 0))
     setDiscountType((invoice.discountType || invoice.discount_type || 'fixed') as 'fixed' | 'percent')
     setDeliveryCharge(Number(invoice.deliveryCharge || invoice.delivery_charge || 0))
-    setPaid(Number(invoice.paid || invoice.paid_amount || 0))
     setOldDue(Number(invoice.oldDue || 0))
+    setPendingPaymentInput('')
+
+    const initialInvoicePaid = Number(invoice.paid ?? invoice.paid_amount ?? 0)
+    const defaultDateStr = invoice.date ? invoice.date.split('T')[0] : new Date().toISOString().split('T')[0]
+    const defaultMethodStr = invoice.paymentMethod || invoice.payment_method || 'Cash'
+
+    // Load existing partial payment transactions for this invoice
+    supabase
+      .from('transactions')
+      .select('*')
+      .eq('ref', invoice.id)
+      .gt('credit', 0)
+      .order('created_at', { ascending: true })
+      .then(({ data: txns }) => {
+        const loadedEntries: PaymentTransactionEntry[] = (txns || []).map((t: any, idx: number) => ({
+          id: t.id || `txn-${idx}-${Date.now()}`,
+          dbId: t.id,
+          date: t.date || defaultDateStr,
+          method: t.method || t.notes || defaultMethodStr,
+          amount: Number(t.credit || 0),
+          type: t.type || (idx === 0 ? 'Invoice' : 'Payment'),
+          notes: t.notes || t.method || defaultMethodStr,
+          isNew: false
+        }))
+
+        const recordedSum = loadedEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+        if (initialInvoicePaid > recordedSum) {
+          loadedEntries.unshift({
+            id: `init-pay-${Date.now()}`,
+            date: defaultDateStr,
+            method: defaultMethodStr,
+            amount: initialInvoicePaid - recordedSum,
+            type: 'Invoice',
+            notes: defaultMethodStr,
+            isNew: true
+          })
+        }
+        setPaymentEntries(loadedEntries)
+      })
 
     if (Array.isArray(invoice.items) && invoice.items.length > 0) {
       setItems(normalizeItems(invoice.items, isWood))
@@ -426,6 +504,53 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     return Math.max(0, Math.round(itemsSubtotal - discountAmount + (Number(deliveryCharge) || 0)))
   }, [itemsSubtotal, discountAmount, deliveryCharge])
 
+  const recordedPaymentsSum = useMemo(() => {
+    return paymentEntries.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0)
+  }, [paymentEntries])
+
+  const paid = useMemo(() => {
+    const pendingVal = parseFloat(pendingPaymentInput) || 0
+    return Math.max(0, Math.round(recordedPaymentsSum + (pendingVal > 0 ? pendingVal : 0)))
+  }, [recordedPaymentsSum, pendingPaymentInput])
+
+  const handleAddPartialPaymentEntry = () => {
+    const amt = parseFloat(pendingPaymentInput) || 0
+    if (amt <= 0) {
+      toast.error('Please enter a valid payment amount greater than 0')
+      return
+    }
+    const todayStr = new Date().toISOString().split('T')[0]
+    const newEntry: PaymentTransactionEntry = {
+      id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      date: todayStr,
+      method: paymentMethod || 'Cash',
+      amount: amt,
+      type: paymentEntries.length === 0 ? 'Invoice' : 'Payment',
+      notes: paymentMethod || 'Cash',
+      isNew: true
+    }
+    setPaymentEntries(prev => [...prev, newEntry])
+    setPendingPaymentInput('')
+    toast.success(`Added partial payment of ৳${amt.toLocaleString()}`)
+  }
+
+  const handleUpdatePaymentEntry = (id: string, field: keyof PaymentTransactionEntry, value: any) => {
+    setPaymentEntries(prev =>
+      prev.map(entry =>
+        entry.id === id
+          ? {
+              ...entry,
+              [field]: field === 'amount' ? (parseFloat(value) || 0) : value
+            }
+          : entry
+      )
+    )
+  }
+
+  const handleRemovePaymentEntry = (id: string) => {
+    setPaymentEntries(prev => prev.filter(entry => entry.id !== id))
+  }
+
   const currentDue = useMemo(() => {
     return Math.max(0, Math.round(grandTotal - (Number(paid) || 0)))
   }, [grandTotal, paid])
@@ -470,7 +595,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       current.isStock = true
       
       if (isWood) {
-        current.carNo = p.car_no?.trim().toLowerCase() === 'solo' ? 'M' : p.car_no
+        current.carNo = ['solo', 'manual'].includes(p.car_no?.trim().toLowerCase() || '') ? 'M' : p.car_no
         current.treeNo = p.tree_no
         current.width = p.width
         current.length = p.length
@@ -495,7 +620,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       const next = [...prev]
       const current = { ...next[index], [field]: value }
 
-      if (isWood && field === 'carNo' && typeof value === 'string' && value.trim().toLowerCase() === 'solo') {
+      if (isWood && field === 'carNo' && typeof value === 'string' && ['solo', 'manual'].includes(value.trim().toLowerCase())) {
         current.carNo = 'M'
       }
 
@@ -548,11 +673,155 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   }
 
   const handleAddItem = () => {
+    if (isWood) {
+      setSelectedPickerIds([])
+      setPickerSearchTerm('')
+      setIsWoodPickerOpen(true)
+      return
+    }
     setItems(prev => {
       const nextSeq = prev.length + 1
       const emptyItem = createEmptyItem(isWood, nextSeq)
       return [...prev, emptyItem]
     })
+  }
+
+  // Available POS Wood products for the selection modal (unsold items + items currently in this invoice)
+  const existingProductIdsInInvoice = useMemo(() => {
+    return new Set(items.map(it => Number(it.product_id)).filter(id => id > 0))
+  }, [items])
+
+  const posWoodInventoryList = useMemo(() => {
+    if (!isWood) return []
+    return allProducts.filter(p => !p.isSold || existingProductIdsInInvoice.has(Number(p.id)))
+  }, [allProducts, isWood, existingProductIdsInInvoice])
+
+  const pickerCategoryOptions = useMemo(() => {
+    const set = new Set<string>(woodCategories)
+    posWoodInventoryList.forEach(p => {
+      if (p.category) set.add(p.category)
+    })
+    return ['All', ...Array.from(set)]
+  }, [woodCategories, posWoodInventoryList])
+
+  const pickerCarNoOptions = useMemo(() => {
+    const set = new Set<string>()
+    posWoodInventoryList.forEach(p => {
+      if (p.carNo) set.add(String(p.carNo))
+    })
+    return ['All', ...Array.from(set)]
+  }, [posWoodInventoryList])
+
+  const filteredPosWoodProducts = useMemo(() => {
+    const q = pickerSearchTerm.trim().toLowerCase()
+    return posWoodInventoryList
+      .filter(p => {
+        const matchesSearch =
+          !q ||
+          String(p.treeNo || '').toLowerCase().includes(q) ||
+          String(p.carNo || '').toLowerCase().includes(q) ||
+          String(p.category || '').toLowerCase().includes(q) ||
+          String(p.tag || '').toLowerCase().includes(q)
+        const matchesCategory = pickerCategory === 'All' || p.category === pickerCategory
+        const matchesCarNo = pickerCarNo === 'All' || String(p.carNo) === pickerCarNo
+        return matchesSearch && matchesCategory && matchesCarNo
+      })
+      .sort((a, b) =>
+        String(a.treeNo || '').localeCompare(String(b.treeNo || ''), undefined, {
+          numeric: true,
+          sensitivity: 'base'
+        })
+      )
+  }, [posWoodInventoryList, pickerSearchTerm, pickerCategory, pickerCarNo])
+
+  const pickerFilteredTotalCft = useMemo(() => {
+    return filteredPosWoodProducts.reduce((sum, p) => sum + (Number(p.cft) || 0), 0)
+  }, [filteredPosWoodProducts])
+
+  const handleTogglePickerItem = (productId: number) => {
+    if (existingProductIdsInInvoice.has(productId)) {
+      toast.info('This item is already in the current invoice')
+      return
+    }
+    setSelectedPickerIds(prev =>
+      prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
+    )
+  }
+
+  const handleToggleSelectAllPickerItems = () => {
+    const selectableIds = filteredPosWoodProducts
+      .filter(p => !existingProductIdsInInvoice.has(Number(p.id)))
+      .map(p => Number(p.id))
+    if (selectableIds.length === 0) return
+
+    const allSelected = selectableIds.every(id => selectedPickerIds.includes(id))
+    if (allSelected) {
+      setSelectedPickerIds(prev => prev.filter(id => !selectableIds.includes(id)))
+    } else {
+      setSelectedPickerIds(prev => Array.from(new Set([...prev, ...selectableIds])))
+    }
+  }
+
+  const handleConfirmAddWoodItems = () => {
+    if (selectedPickerIds.length === 0) {
+      toast.error('Please select at least one item to add')
+      return
+    }
+
+    const selectedProducts = selectedPickerIds
+      .map(id => allProducts.find(p => Number(p.id) === Number(id)))
+      .filter(Boolean)
+
+    if (selectedProducts.length === 0) return
+
+    setItems(prev => {
+      const isSingleEmpty =
+        prev.length === 1 &&
+        !prev[0].treeNo &&
+        !prev[0].name &&
+        !prev[0].width &&
+        !prev[0].length &&
+        !prev[0].cft
+
+      const baseItems = isSingleEmpty ? [] : [...prev]
+      const newEditableItems: EditableItem[] = selectedProducts.map((prod, idx) => {
+        const sellPrice = Number(prod.sellPrice ?? prod.sell_price ?? prod.price ?? 0)
+        const cftVal = Number(prod.cft || 0)
+        const matchedTag = getMatchingTagByPrice(sellPrice, savedTags) || prod.tag || ''
+        const carVal = String(prod.carNo || prod.car_no || '').trim()
+        const normalizedCar = ['solo', 'manual'].includes(carVal.toLowerCase()) ? 'M' : carVal
+
+        return {
+          id: `new-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+          product_id: Number(prod.id),
+          product_type: 'wood',
+          name: String(prod.treeNo || prod.tree_no || prod.name || ''),
+          description: normalizedCar ? `Car: ${normalizedCar}` : 'Stock Item',
+          quantity: 1,
+          unit: 'CFT',
+          price: sellPrice,
+          total: Math.round(cftVal * sellPrice),
+          treeNo: String(prod.treeNo || prod.tree_no || prod.name || ''),
+          carNo: normalizedCar,
+          width: Number(prod.width || 0),
+          length: Number(prod.length || 0),
+          cft: cftVal,
+          tag: matchedTag,
+          isStock: true,
+          marked: false,
+          seq: baseItems.length + idx + 1
+        }
+      })
+
+      return [...baseItems, ...newEditableItems].map((it, i) => ({
+        ...it,
+        seq: i + 1
+      }))
+    })
+
+    toast.success(`${selectedProducts.length} item${selectedProducts.length > 1 ? 's' : ''} added to invoice`)
+    setSelectedPickerIds([])
+    setIsWoodPickerOpen(false)
   }
 
   const handleAddManualWoodItem = (e?: React.FormEvent) => {
@@ -781,7 +1050,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         const chronologicalWoodItems = [...items].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
         const woodItemsToInsert = chronologicalWoodItems.map(item => {
           let carVal = item.carNo ? item.carNo.trim() : ''
-          if (carVal.toLowerCase() === 'solo' || (!carVal && item.isStock === false)) {
+          if (['solo', 'manual'].includes(carVal.toLowerCase()) || (!carVal && item.isStock === false)) {
             carVal = 'M'
           }
           return {
@@ -800,6 +1069,16 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         })
         const { error: insertItemsErr } = await supabase.from(itemsTable).insert(woodItemsToInsert)
         if (insertItemsErr) throw insertItemsErr
+
+        const soldProductIds = chronologicalWoodItems
+          .map(it => Number(it.product_id))
+          .filter(id => id > 0)
+        if (soldProductIds.length > 0) {
+          await supabase
+            .from('wood_inventory')
+            .update({ is_sold: true })
+            .in('id', soldProductIds)
+        }
       } else {
         const furnitureItemsToInsert = items.map(item => ({
           invoice_id: targetDbId,
@@ -814,17 +1093,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         if (insertItemsErr) throw insertItemsErr
       }
 
-      // Update transactions reference if invoice ID was changed
-      if (isIdChanged && targetDbId !== invoice.id) {
-        await supabase
-          .from('transactions')
-          .update({ ref: targetDbId })
-          .eq('ref', invoice.id)
-      }
-
       const previousDueRecorded = Number(invoice.due || invoice.due_amount || 0)
       const dueDifference = currentDue - previousDueRecorded
 
+      let resolvedCustomerId: string | null = invoice.customer_id || null
       if (customerName && customerName !== 'Walk-in Customer') {
         const { data: customerRecord } = await supabase
           .from('customer')
@@ -833,6 +1105,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
           .maybeSingle()
 
         if (customerRecord) {
+          resolvedCustomerId = customerRecord.id
           await supabase
             .from('customer')
             .update({ 
@@ -842,6 +1115,62 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
             })
             .eq('name', customerName)
         }
+      }
+
+      // Sync Partial Payment Transactions in `transactions` table
+      const finalPaymentEntries: PaymentTransactionEntry[] = [
+        ...paymentEntries.filter(e => (Number(e.amount) || 0) > 0)
+      ]
+      const pendingVal = parseFloat(pendingPaymentInput) || 0
+      if (pendingVal > 0) {
+        finalPaymentEntries.push({
+          id: `pay-${Date.now()}`,
+          date: new Date().toISOString().split('T')[0],
+          method: paymentMethod || 'Cash',
+          amount: pendingVal,
+          type: finalPaymentEntries.length === 0 ? 'Invoice' : 'Payment',
+          notes: paymentMethod || 'Cash',
+          isNew: true
+        })
+      }
+
+      await supabase.from('transactions').delete().eq('ref', invoice.id)
+      if (isIdChanged && targetDbId !== invoice.id) {
+        await supabase.from('transactions').delete().eq('ref', targetDbId)
+      }
+
+      if (finalPaymentEntries.length === 0) {
+        await supabase.from('transactions').insert([{
+          id: `TXN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+          customer_id: resolvedCustomerId,
+          date: invoiceDate || new Date().toISOString().split('T')[0],
+          type: 'Invoice',
+          ref: targetDbId,
+          debit: Number(grandTotal),
+          credit: 0,
+          balance: Number(currentDue),
+          method: paymentMethod || 'Cash',
+          notes: paymentMethod || 'Cash'
+        }])
+      } else {
+        let runningBalance = Number(grandTotal)
+        const txnRowsToInsert = finalPaymentEntries.map((entry, idx) => {
+          const creditAmt = Number(entry.amount) || 0
+          runningBalance = Math.max(0, runningBalance - creditAmt)
+          return {
+            id: entry.dbId || `TXN-${idx === 0 ? '' : 'P-'}${Date.now().toString(36).toUpperCase()}-${idx}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`,
+            customer_id: resolvedCustomerId,
+            date: entry.date || invoiceDate || new Date().toISOString().split('T')[0],
+            type: idx === 0 ? 'Invoice' : 'Payment',
+            ref: targetDbId,
+            debit: idx === 0 ? Number(grandTotal) : 0,
+            credit: creditAmt,
+            balance: runningBalance,
+            method: entry.method || paymentMethod || 'Cash',
+            notes: entry.notes || entry.method || paymentMethod || 'Cash'
+          }
+        })
+        await supabase.from('transactions').insert(txnRowsToInsert)
       }
 
       if (creatorNameVal) {
@@ -919,184 +1248,186 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
               <div className="space-y-8">
                 {/* Full-width Form Area (Metadata & Items Table) */}
                 <div className="space-y-6">
-                  {/* Top Metadata Card: Invoice Core & Customer Context */}
-                  <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 space-y-5">
-                    {/* Header Row: Invoice ID, Invoice Date, Staff Assignment */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* 1. Invoice ID (Editable and Validated) */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between ml-1">
-                          <span className="flex items-center gap-1.5">
-                            <Hash size={13} className="text-slate-400" /> Invoice ID
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400">
-                            {isWood ? '#INV-W-YYMMSS' : '#INV-F-YYMMSS'}
-                          </span>
-                        </label>
-                        <input 
-                          type="text" 
-                          value={invoiceId} 
-                          onChange={e => {
-                            let val = e.target.value.toUpperCase()
-                            if (val && !val.startsWith('#')) {
-                              val = '#' + val.replace(/^#+/, '')
-                            }
-                            setInvoiceId(val)
-                          }}
-                          onBlur={() => {
-                            if (invoiceId.trim()) {
-                              setInvoiceId(normalizeInvoiceIdFormat(invoiceId, isWood, invoiceDate))
-                            }
-                          }}
-                          placeholder={isWood ? '#INV-W-260902' : '#INV-F-260902'}
-                          className={cn(
-                            "w-full bg-white dark:bg-slate-800 border rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold outline-none transition-all",
-                            isValidInvoiceIdFormat(invoiceId)
-                              ? "border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                              : "border-rose-400 dark:border-rose-600 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                          )}
-                        />
-                        {!isValidInvoiceIdFormat(invoiceId) && (
-                          <p className="text-[10px] font-medium text-rose-500 ml-1">
-                            Format required: {isWood ? '#INV-W-260902' : '#INV-F-260902'}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* 2. Invoice Date (Editable) */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 ml-1">
-                          <Calendar size={13} className="text-slate-400" /> Invoice Date
-                        </label>
-                        <input 
-                          type="date" 
-                          value={invoiceDate} 
-                          onChange={e => setInvoiceDate(e.target.value)}
-                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                        />
-                      </div>
-
-                      {/* 3. Staff Assignment ("Created By / Assigned Staff") */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 ml-1">
-                          <User size={13} className="text-blue-500" /> Created By / Assigned Staff
-                        </label>
-                        <select 
-                          value={createdBy}
-                          onChange={e => setCreatedBy(e.target.value)}
-                          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none focus:border-amber-500 cursor-pointer"
-                        >
-                          <option value="">Unassigned</option>
-                          {users.map(u => (
-                            <option key={u.id} value={u.name}>{u.name} ({u.role || 'Staff'})</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="h-px bg-slate-200/80 dark:bg-slate-700/60" />
-
-                    {/* Customer Information: Streamlined, No Grid Headings, Prominent Name with Adjacent Phone and Address Below */}
-                    <div className="space-y-3 pt-1">
-                      {/* Top Row: Customer Name (Prominent) & Phone Number (Adjacent) */}
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-start">
-                        {/* Customer Name Dropdown - Prominently Displayed */}
-                        <div className="md:col-span-7 lg:col-span-8 space-y-1 relative">
-                          <div className="flex items-center justify-between ml-1">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                              <User size={13} className="text-amber-500" /> Customer Name
-                            </label>
-                            {oldDue > 0 && (
-                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded-full">
-                                Due: ৳{Math.round(oldDue).toLocaleString()}
+                  {/* Top Metadata Card: Left Side (Customer Name, Phone, Address) | Right Side (Invoice ID, Date, Created By / Assigned Staff) */}
+                  <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                      {/* Left Side: Customer Name, Phone Number, and Address */}
+                      <div className="lg:col-span-6 space-y-3.5">
+                        {/* Top Row: Customer Name & Phone Number */}
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-start">
+                          {/* Customer Name Dropdown */}
+                          <div className="sm:col-span-7 space-y-1.5 relative">
+                            <div className="flex items-center justify-between ml-1">
+                              <label className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                                <User size={13} className="text-amber-500" /> Customer Name
+                              </label>
+                              {oldDue > 0 && (
+                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded-full">
+                                  Due: ৳{Math.round(oldDue).toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                            <div 
+                              className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold flex items-center justify-between cursor-pointer hover:border-amber-400 transition-colors shadow-sm"
+                              onClick={() => setIsCustomerDropdownOpen(!isCustomerDropdownOpen)}
+                            >
+                              <span className="truncate text-slate-900 dark:text-slate-100 font-bold">
+                                {customerName || 'Select Customer'}
                               </span>
+                              <ChevronDown size={16} className={cn("transition-transform text-slate-400 shrink-0 ml-1", isCustomerDropdownOpen && "rotate-180")} />
+                            </div>
+                            
+                            {isCustomerDropdownOpen && (
+                              <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[150] p-2 animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl mb-2">
+                                  <Search size={14} className="text-slate-400 shrink-0" />
+                                  <input
+                                    type="text"
+                                    value={customerSearchTerm}
+                                    onChange={e => setCustomerSearchTerm(e.target.value)}
+                                    placeholder="Search customer name or phone..."
+                                    className="bg-transparent border-none outline-none text-sm w-full font-bold"
+                                    autoFocus
+                                  />
+                                </div>
+                                <div className="max-h-[240px] overflow-y-auto space-y-1 scrollbar-thin px-1">
+                                  <div 
+                                    className="p-2.5 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl cursor-pointer flex items-center gap-2.5 text-amber-600 font-bold text-xs"
+                                    onClick={() => { setIsCustomerDropdownOpen(false); toast.info("Enter or select customer from master list.") }}
+                                  >
+                                    <UserPlus size={16} /> Add / Enter Customer
+                                  </div>
+                                  <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
+                                  {filteredCustomers.map(c => (
+                                    <div key={c.id} onClick={() => selectCustomer(c)} className="p-2.5 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl cursor-pointer group flex items-center justify-between">
+                                      <div className="min-w-0 pr-2">
+                                        <p className="text-sm font-bold group-hover:text-amber-600 transition-colors truncate">{c.name}</p>
+                                        <p className="text-xs text-slate-500 truncate">{c.phone || 'No phone'}</p>
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                        <p className="text-xs font-bold text-slate-400 group-hover:text-amber-500 transition-colors">৳{Math.round(c.total_due || 0)}</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {filteredCustomers.length === 0 && (
+                                    <div className="py-4 text-center text-xs text-slate-400 font-semibold">
+                                      No customers found
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             )}
                           </div>
-                          <div 
-                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold flex items-center justify-between cursor-pointer hover:border-amber-400 transition-colors shadow-sm"
-                            onClick={() => setIsCustomerDropdownOpen(!isCustomerDropdownOpen)}
-                          >
-                            <span className="truncate text-slate-900 dark:text-slate-100 font-bold">
-                              {customerName || 'Select Customer'}
-                            </span>
-                            <ChevronDown size={16} className={cn("transition-transform text-slate-400 shrink-0 ml-1", isCustomerDropdownOpen && "rotate-180")} />
-                          </div>
-                          
-                          {isCustomerDropdownOpen && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[150] p-2 animate-in fade-in slide-in-from-top-2">
-                              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl mb-2">
-                                <Search size={14} className="text-slate-400 shrink-0" />
-                                <input
-                                  type="text"
-                                  value={customerSearchTerm}
-                                  onChange={e => setCustomerSearchTerm(e.target.value)}
-                                  placeholder="Search customer name or phone..."
-                                  className="bg-transparent border-none outline-none text-sm w-full font-bold"
-                                  autoFocus
-                                />
-                              </div>
-                              <div className="max-h-[240px] overflow-y-auto space-y-1 scrollbar-thin px-1">
-                                <div 
-                                  className="p-2.5 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl cursor-pointer flex items-center gap-2.5 text-amber-600 font-bold text-xs"
-                                  onClick={() => { setIsCustomerDropdownOpen(false); toast.info("Enter or select customer from master list.") }}
-                                >
-                                  <UserPlus size={16} /> Add / Enter Customer
-                                </div>
-                                <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-                                {filteredCustomers.map(c => (
-                                  <div key={c.id} onClick={() => selectCustomer(c)} className="p-2.5 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl cursor-pointer group flex items-center justify-between">
-                                    <div className="min-w-0 pr-2">
-                                      <p className="text-sm font-bold group-hover:text-amber-600 transition-colors truncate">{c.name}</p>
-                                      <p className="text-xs text-slate-500 truncate">{c.phone || 'No phone'}</p>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                      <p className="text-xs font-bold text-slate-400 group-hover:text-amber-500 transition-colors">৳{Math.round(c.total_due || 0)}</p>
-                                    </div>
-                                  </div>
-                                ))}
-                                {filteredCustomers.length === 0 && (
-                                  <div className="py-4 text-center text-xs text-slate-400 font-semibold">
-                                    No customers found
-                                  </div>
-                                )}
-                              </div>
+
+                          {/* Customer Phone Number */}
+                          <div className="sm:col-span-5 space-y-1.5">
+                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 ml-1">
+                              <Phone size={12} className="text-slate-400" /> Phone Number
+                            </label>
+                            <div className="relative">
+                              <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                              <input 
+                                type="text" 
+                                readOnly 
+                                disabled
+                                value={customerPhone || 'No phone registered'} 
+                                className="w-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-not-allowed select-none outline-none"
+                              />
                             </div>
-                          )}
+                          </div>
                         </div>
 
-                        {/* Customer Phone Number - Adjacent to Name */}
-                        <div className="md:col-span-5 lg:col-span-4 space-y-1">
+                        {/* Bottom Row: Customer Address */}
+                        <div className="space-y-1.5">
                           <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 ml-1">
-                            <Phone size={12} className="text-slate-400" /> Phone Number
+                            <MapPin size={12} className="text-slate-400" /> Address / Location
                           </label>
                           <div className="relative">
-                            <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <MapPin size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                             <input 
                               type="text" 
                               readOnly 
                               disabled
-                              value={customerPhone || 'No phone registered'} 
-                              className="w-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-not-allowed select-none outline-none"
+                              value={customerAddress || 'No address registered'} 
+                              title={customerAddress || 'No address registered'}
+                              className="w-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-not-allowed select-none outline-none truncate"
                             />
                           </div>
                         </div>
                       </div>
 
-                      {/* Bottom Row: Customer Address - Below Them */}
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 ml-1">
-                          <MapPin size={12} className="text-slate-400" /> Address / Location
-                        </label>
-                        <div className="relative">
-                          <MapPin size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                          <input 
-                            type="text" 
-                            readOnly 
-                            disabled
-                            value={customerAddress || 'No address registered'} 
-                            title={customerAddress || 'No address registered'}
-                            className="w-full bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 rounded-xl pl-9 pr-3.5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-not-allowed select-none outline-none truncate"
-                          />
+                      {/* Right Side: Invoice ID, Invoice Date, Created By / Assigned Staff */}
+                      <div className="lg:col-span-6 space-y-3.5 lg:border-l lg:border-slate-200/80 lg:dark:border-slate-700/60 lg:pl-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-start">
+                          {/* 1. Invoice ID */}
+                          <div className="sm:col-span-6 space-y-1.5">
+                            <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-between ml-1">
+                              <span className="flex items-center gap-1.5">
+                                <Hash size={13} className="text-slate-400" /> Invoice ID
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {isWood ? '#INV-W-YYMMSS' : '#INV-F-YYMMSS'}
+                              </span>
+                            </label>
+                            <input 
+                              type="text" 
+                              value={invoiceId} 
+                              onChange={e => {
+                                let val = e.target.value.toUpperCase()
+                                if (val && !val.startsWith('#')) {
+                                  val = '#' + val.replace(/^#+/, '')
+                                }
+                                setInvoiceId(val)
+                              }}
+                              onBlur={() => {
+                                if (invoiceId.trim()) {
+                                  setInvoiceId(normalizeInvoiceIdFormat(invoiceId, isWood, invoiceDate))
+                                }
+                              }}
+                              placeholder={isWood ? '#INV-W-260902' : '#INV-F-260902'}
+                              className={cn(
+                                "w-full bg-white dark:bg-slate-800 border rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold outline-none transition-all",
+                                isValidInvoiceIdFormat(invoiceId)
+                                  ? "border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                                  : "border-rose-400 dark:border-rose-600 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                              )}
+                            />
+                            {!isValidInvoiceIdFormat(invoiceId) && (
+                              <p className="text-[10px] font-medium text-rose-500 ml-1">
+                                Format required: {isWood ? '#INV-W-260902' : '#INV-F-260902'}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* 2. Invoice Date */}
+                          <div className="sm:col-span-6 space-y-1.5">
+                            <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 ml-1">
+                              <Calendar size={13} className="text-slate-400" /> Invoice Date
+                            </label>
+                            <input 
+                              type="date" 
+                              value={invoiceDate} 
+                              onChange={e => setInvoiceDate(e.target.value)}
+                              className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 3. Created By / Assigned Staff */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 ml-1">
+                            <User size={13} className="text-blue-500" /> Created By / Assigned Staff
+                          </label>
+                          <select 
+                            value={createdBy}
+                            onChange={e => setCreatedBy(e.target.value)}
+                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none focus:border-amber-500 cursor-pointer"
+                          >
+                            <option value="">Unassigned</option>
+                            {users.map(u => (
+                              <option key={u.id} value={u.name}>{u.name} ({u.role || 'Staff'})</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                     </div>
@@ -1105,68 +1436,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                   {/* Payment & Financial Summary Area - Positioned Above Item Table */}
                   <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                      {/* Payment Info Section & Alert (5 cols) */}
+                      {/* Quick Entry Section (5 cols) */}
                       <div className="lg:col-span-5 space-y-4">
-                        <div className="bg-slate-50 dark:bg-slate-800/30 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 space-y-4">
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">
-                            <DollarSign size={16} className="text-emerald-500" /> Payment & Status
-                          </h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider">Payment Method</label>
-                              <select 
-                                value={paymentMethod} 
-                                onChange={e => setPaymentMethod(e.target.value)}
-                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold outline-none"
-                              >
-                                <option value="Cash">Cash</option>
-                                <option value="Card">Card</option>
-                                <option value="bKash">bKash</option>
-                                <option value="Nagad">Nagad</option>
-                                <option value="Bank Transfer">Bank Transfer</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase tracking-wider">Amount Paid (৳)</label>
-                              <input 
-                                type="number" 
-                                value={paid ?? ''} 
-                                onChange={e => setPaid(parseFloat(e.target.value) || 0)}
-                                onWheel={e => e.currentTarget.blur()}
-                                ref={el => {
-                                  if (el) {
-                                    el.addEventListener('wheel', e => e.preventDefault(), { passive: false })
-                                  }
-                                }}
-                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-black text-emerald-600 outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              />
-                            </div>
-                          </div>
-                          {!isWood && (
-                            <div className="pt-2">
-                              <label className="text-[10px] font-bold text-slate-400 mb-2 block uppercase tracking-wider">Delivery Status</label>
-                              <div className="grid grid-cols-2 gap-2">
-                                {(['Pending', 'Delivered'] as const).map(status => (
-                                  <button
-                                    key={status}
-                                    type="button"
-                                    onClick={() => setDeliveryStatus(status)}
-                                    className={cn(
-                                      "py-2 rounded-xl text-xs font-black transition-all border flex items-center justify-center gap-2",
-                                      deliveryStatus === status 
-                                        ? (status === 'Delivered' ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-amber-100 text-amber-700 border-amber-200")
-                                        : "bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700"
-                                    )}
-                                  >
-                                    {status === 'Delivered' ? <Check size={14} /> : <Truck size={14} />}
-                                    {status}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
                         {isWood && (
                           <form
                             onSubmit={handleAddManualWoodItem}
@@ -1241,65 +1512,182 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             </div>
                           </form>
                         )}
-
                       </div>
 
-                      {/* Financial Breakdown Section (7 cols) */}
+                      {/* Financial Breakdown Section (7 cols) - Directly on Page without Dark Container */}
                       <div className="lg:col-span-7">
-                        <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl space-y-5">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-2">
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Subtotal</span>
-                              <span className="text-lg font-bold font-mono text-white block">৳{Math.round(itemsSubtotal).toLocaleString()}</span>
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Discount</span>
-                                <div className="flex bg-slate-800 rounded-lg p-0.5">
-                                  <button onClick={() => setDiscountType('fixed')} className={cn("px-2 py-0.5 rounded text-[9px] font-black", discountType === 'fixed' ? "bg-amber-500 text-black" : "text-slate-400")}>৳</button>
-                                  <button onClick={() => setDiscountType('percent')} className={cn("px-2 py-0.5 rounded text-[9px] font-black", discountType === 'percent' ? "bg-amber-500 text-black" : "text-slate-400")}>%</button>
-                                </div>
-                              </div>
-                              <input 
-                                type="number" 
-                                value={discount ?? ''} 
-                                onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
-                                className="w-full bg-slate-800 border border-slate-700/60 rounded-xl px-3 py-1.5 text-right font-mono font-black text-amber-400 outline-none focus:border-amber-500"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Delivery Charge</span>
-                              <input 
-                                type="number" 
-                                value={deliveryCharge ?? ''} 
-                                onChange={e => setDeliveryCharge(parseFloat(e.target.value) || 0)}
-                                className="w-full bg-slate-800 border border-slate-700/60 rounded-xl px-3 py-1.5 text-right font-mono font-black text-white outline-none focus:border-slate-500"
-                              />
-                            </div>
+                        <div className="space-y-3.5 py-1">
+                          {/* Total CFT */}
+                          <div className="flex items-center justify-between py-1">
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total CFT</span>
+                            <span className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">{Number(totalAllCft.toFixed(2))} CFT</span>
                           </div>
 
-                          <div className="h-px bg-slate-800" />
+                          {/* Subtotal */}
+                          <div className="flex items-center justify-between py-1">
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Subtotal</span>
+                            <span className="text-xl font-black font-mono text-slate-900 dark:text-slate-100">৳{Math.round(itemsSubtotal).toLocaleString()}</span>
+                          </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
-                            <div className="sm:col-span-5 space-y-1">
-                              <span className="text-xs font-black uppercase tracking-widest text-slate-500 block">Grand Total</span>
-                              <span className="text-3xl font-black font-mono text-white block">৳{Math.round(grandTotal).toLocaleString()}</span>
+                          <div className="h-px bg-slate-200 dark:bg-slate-800" />
+
+                          {/* Discount (Vertically below Subtotal) */}
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Discount</span>
+                              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700">
+                                <button
+                                  type="button"
+                                  onClick={() => setDiscountType('fixed')}
+                                  className={cn(
+                                    "px-2 py-0.5 rounded text-[10px] font-black transition-colors",
+                                    discountType === 'fixed' ? "bg-amber-500 text-white" : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                  )}
+                                >
+                                  ৳
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDiscountType('percent')}
+                                  className={cn(
+                                    "px-2 py-0.5 rounded text-[10px] font-black transition-colors",
+                                    discountType === 'percent' ? "bg-amber-500 text-white" : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                                  )}
+                                >
+                                  %
+                                </button>
+                              </div>
                             </div>
-                            <div className="sm:col-span-7 bg-white/5 rounded-2xl p-4 space-y-2.5">
-                              <div className="flex justify-between items-center text-xs">
-                                <span className="text-slate-400 font-bold">Paid</span>
-                                <span className="text-emerald-400 font-mono font-black">৳{Math.round(paid).toLocaleString()}</span>
+                            <input 
+                              type="number" 
+                              value={discount ?? ''} 
+                              onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
+                              className="w-40 sm:w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-1.5 text-right font-mono font-black text-amber-600 dark:text-amber-400 outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          {/* Delivery Charge */}
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Delivery Charge</span>
+                            <input 
+                              type="number" 
+                              value={deliveryCharge ?? ''} 
+                              onChange={e => setDeliveryCharge(parseFloat(e.target.value) || 0)}
+                              className="w-40 sm:w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-1.5 text-right font-mono font-black text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                            />
+                          </div>
+
+                          <div className="h-px bg-slate-200 dark:bg-slate-800" />
+
+                          {/* Grand Total */}
+                          <div className="flex items-center justify-between py-0.5">
+                            <span className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Grand Total</span>
+                            <span className="text-2xl font-black font-mono text-slate-900 dark:text-slate-100">৳{Math.round(grandTotal).toLocaleString()}</span>
+                          </div>
+
+                          {/* Paid Amount (Input Box + Partial Payments Support) */}
+                          <div className="space-y-2.5 pt-1">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Paid Amount</span>
+                                {paid > 0 && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                    Total: ৳{Math.round(paid).toLocaleString()}
+                                  </span>
+                                )}
                               </div>
-                              <div className="flex justify-between items-center text-xs">
-                                <span className="text-slate-400 font-bold">Current Invoice Due</span>
-                                <span className="text-rose-400 font-mono font-black">৳{Math.round(currentDue).toLocaleString()}</span>
-                              </div>
-                              <div className="h-px bg-white/10 my-1" />
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black uppercase text-amber-500">Total Outstanding</span>
-                                <span className="text-base font-black font-mono text-amber-500">৳{Math.round(totalDue).toLocaleString()}</span>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={pendingPaymentInput}
+                                  onChange={e => setPendingPaymentInput(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault()
+                                      handleAddPartialPaymentEntry()
+                                    }
+                                  }}
+                                  placeholder="0"
+                                  className="w-40 sm:w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-1.5 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 outline-none focus:border-emerald-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleAddPartialPaymentEntry}
+                                  className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors shadow-xs flex items-center justify-center shrink-0"
+                                  title="Add Payment Entry"
+                                >
+                                  <Plus size={15} />
+                                </button>
                               </div>
                             </div>
+
+                            {/* Recorded Partial Payment Transaction Entries */}
+                            {paymentEntries.length > 0 && (
+                              <div className="space-y-1.5 pl-2 border-l-2 border-emerald-500/30">
+                                {paymentEntries.map((entry, idx) => (
+                                  <div
+                                    key={entry.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-1.5 text-xs"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                        #{idx + 1}
+                                      </span>
+                                      <input
+                                        type="date"
+                                        value={entry.date}
+                                        onChange={e => handleUpdatePaymentEntry(entry.id, 'date', e.target.value)}
+                                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none"
+                                      />
+                                      <select
+                                        value={entry.method}
+                                        onChange={e => handleUpdatePaymentEntry(entry.id, 'method', e.target.value)}
+                                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none"
+                                      >
+                                        <option value="Cash">Cash</option>
+                                        <option value="Card">Card</option>
+                                        <option value="bKash">bKash</option>
+                                        <option value="Nagad">Nagad</option>
+                                        <option value="Bank Transfer">Bank Transfer</option>
+                                      </select>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        value={entry.amount ?? ''}
+                                        onChange={e => handleUpdatePaymentEntry(entry.id, 'amount', e.target.value)}
+                                        className="w-28 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 outline-none focus:border-emerald-500"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemovePaymentEntry(entry.id)}
+                                        className="p-1 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                                        title="Remove payment entry"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Total Due */}
+                          <div className="flex items-center justify-between pt-2.5 border-t border-slate-200 dark:border-slate-800">
+                            <div className="space-y-0.5">
+                              <span className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-500 block">Total Due</span>
+                              {oldDue > 0 && (
+                                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block">
+                                  Current Invoice Due: ৳{Math.round(currentDue).toLocaleString()} + Previous Due: ৳{Math.round(oldDue).toLocaleString()}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
+                              ৳{Math.round(totalDue).toLocaleString()}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1486,10 +1874,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                   <td className="py-2.5 px-1 text-center">
                                     <input 
                                       type="text"
-                                      value={item.carNo?.trim().toLowerCase() === 'solo' ? 'M' : (item.carNo ?? '')}
+                                      value={['solo', 'manual'].includes(item.carNo?.trim().toLowerCase() || '') ? 'M' : (item.carNo ?? '')}
                                       onChange={e => {
                                         let val = e.target.value
-                                        if (val.trim().toLowerCase() === 'solo') val = 'M'
+                                        if (['solo', 'manual'].includes(val.trim().toLowerCase())) val = 'M'
                                         handleItemChange(idx, 'carNo', val)
                                       }}
                                       placeholder="Car #"
@@ -1686,6 +2074,280 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
               </div>
             )}
           </div>
+
+          {/* POS Wood Item Selection Modal */}
+          <AnimatePresence>
+            {isWood && isWoodPickerOpen && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96, y: 12 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                  className="bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[85vh] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden"
+                >
+                  {/* Modal Header */}
+                  <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-800/40 shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <CheckSquare size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                          POS Wood Inventory Selection
+                        </h3>
+                        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          Select one or more items from POS Wood to add to this invoice
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsWoodPickerOpen(false)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Filter Controls */}
+                  <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                      {/* Search */}
+                      <div className="sm:col-span-5 relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                        <input
+                          type="text"
+                          value={pickerSearchTerm}
+                          onChange={e => setPickerSearchTerm(e.target.value)}
+                          placeholder="Search by Tree No, Car No, Tag..."
+                          className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Category Filter */}
+                      <div className="sm:col-span-3">
+                        <select
+                          value={pickerCategory}
+                          onChange={e => setPickerCategory(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
+                        >
+                          {pickerCategoryOptions.map(cat => (
+                            <option key={cat} value={cat}>
+                              {cat === 'All' ? 'All Categories' : cat}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Car No Filter */}
+                      <div className="sm:col-span-2">
+                        <select
+                          value={pickerCarNo}
+                          onChange={e => setPickerCarNo(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
+                        >
+                          {pickerCarNoOptions.map(cn => (
+                            <option key={cn} value={cn}>
+                              {cn === 'All' ? 'All Car No' : cn}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Total CFT Badge */}
+                      <div className="sm:col-span-2 flex items-center justify-between px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                        <span className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400">CFT</span>
+                        <span className="text-xs font-mono font-black text-amber-700 dark:text-amber-300">
+                          {pickerFilteredTotalCft.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* POS Wood Items Table */}
+                  <div className="flex-1 overflow-y-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                        <tr className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          <th className="py-2.5 px-3 text-center w-10">
+                            <input
+                              type="checkbox"
+                              checked={
+                                filteredPosWoodProducts.some(p => !existingProductIdsInInvoice.has(Number(p.id))) &&
+                                filteredPosWoodProducts
+                                  .filter(p => !existingProductIdsInInvoice.has(Number(p.id)))
+                                  .every(p => selectedPickerIds.includes(Number(p.id)))
+                              }
+                              onChange={handleToggleSelectAllPickerItems}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                              title="Select All Available"
+                            />
+                          </th>
+                          <th className="py-2.5 px-2 text-center w-12">No</th>
+                          <th className="py-2.5 px-3">Car</th>
+                          <th className="py-2.5 px-3">TREE</th>
+                          <th className="py-2.5 px-2 text-center">W</th>
+                          <th className="py-2.5 px-2 text-center">L</th>
+                          <th className="py-2.5 px-3 text-center">CFT</th>
+                          <th className="py-2.5 px-3 text-center">Tag</th>
+                          <th className="py-2.5 px-4 text-right">Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+                        {filteredPosWoodProducts.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="py-12 text-center text-slate-400 font-bold">
+                              No wood items found matching your filter.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredPosWoodProducts.map((product, index) => {
+                            const prodId = Number(product.id)
+                            const isAlreadyInInvoice = existingProductIdsInInvoice.has(prodId)
+                            const isSelected = selectedPickerIds.includes(prodId)
+                            const effectiveTag =
+                              getMatchingTagByPrice(Number(product.sellPrice || 0), savedTags) || product.tag || ''
+                            const tagColor = getTagColor(effectiveTag)
+
+                            return (
+                              <tr
+                                key={prodId}
+                                onClick={() => handleTogglePickerItem(prodId)}
+                                className={cn(
+                                  'transition-colors cursor-pointer select-none',
+                                  isAlreadyInInvoice
+                                    ? 'bg-slate-100/70 dark:bg-slate-800/40 opacity-60 cursor-not-allowed'
+                                    : isSelected
+                                    ? 'bg-amber-500/15 dark:bg-amber-500/20 hover:bg-amber-500/20'
+                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                )}
+                              >
+                                <td
+                                  className="py-2.5 px-3 text-center"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    disabled={isAlreadyInInvoice}
+                                    checked={isSelected || isAlreadyInInvoice}
+                                    onChange={() => handleTogglePickerItem(prodId)}
+                                    className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer disabled:cursor-not-allowed"
+                                  />
+                                </td>
+                                <td className="py-2.5 px-2 text-center font-mono text-[11px] font-bold text-slate-400">
+                                  {index + 1}
+                                </td>
+                                <td className="py-2.5 px-3 font-medium text-slate-600 dark:text-slate-400">
+                                  {product.carNo || '-'}
+                                </td>
+                                <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
+                                  <div className="flex items-center gap-2">
+                                    <span>{product.treeNo}</span>
+                                    {isAlreadyInInvoice && (
+                                      <span className="px-1.5 py-0.5 text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded">
+                                        In Invoice
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-2 text-center font-mono text-slate-600 dark:text-slate-300">
+                                  {product.width}
+                                </td>
+                                <td className="py-2.5 px-2 text-center font-mono text-slate-600 dark:text-slate-300">
+                                  {product.length}
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-mono font-bold text-amber-600 dark:text-amber-400">
+                                  {Number(product.cft || 0).toFixed(2)}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  {effectiveTag ? (
+                                    <span
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase border"
+                                      style={
+                                        tagColor
+                                          ? {
+                                              backgroundColor: `${tagColor}18`,
+                                              color: tagColor,
+                                              borderColor: `${tagColor}40`
+                                            }
+                                          : undefined
+                                      }
+                                    >
+                                      {effectiveTag}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-slate-600">-</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
+                                  {Number(product.sellPrice || 0) > 0
+                                    ? `৳${Number(product.sellPrice).toLocaleString()}`
+                                    : '-'}
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                    <div className="flex items-center gap-4 text-xs">
+                      <div>
+                        <span className="font-bold text-slate-500">Selected: </span>
+                        <span className="font-black text-amber-600 dark:text-amber-400">
+                          {selectedPickerIds.length} item{selectedPickerIds.length === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-500">Selected CFT: </span>
+                        <span className="font-mono font-black text-slate-800 dark:text-slate-200">
+                          {selectedPickerIds
+                            .reduce((acc, id) => {
+                              const found = allProducts.find(p => Number(p.id) === Number(id))
+                              return acc + (Number(found?.cft) || 0)
+                            }, 0)
+                            .toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setItems(prev => [...prev, createEmptyItem(true, prev.length + 1)])
+                          setIsWoodPickerOpen(false)
+                        }}
+                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
+                      >
+                        + Blank Row
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsWoodPickerOpen(false)}
+                        className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={selectedPickerIds.length === 0}
+                        onClick={handleConfirmAddWoodItems}
+                        className="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-amber-600/20 transition-all"
+                      >
+                        <Plus size={14} />
+                        Add Selected ({selectedPickerIds.length})
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </AnimatePresence>
