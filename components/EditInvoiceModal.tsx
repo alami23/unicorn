@@ -126,6 +126,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   }
 
   const [savedTags, setSavedTags] = useState<SavedTag[]>([])
+  const savedTagsRef = useRef<SavedTag[]>([])
+  useEffect(() => {
+    savedTagsRef.current = savedTags
+  }, [savedTags])
 
   // Fetch initial data
   useEffect(() => {
@@ -201,6 +205,13 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     return null
   }, [getTagData])
 
+  const getMatchingTagByPrice = useCallback((priceVal: number, tagsList: SavedTag[] = savedTagsRef.current): string | null => {
+    const numericPrice = Number(priceVal)
+    if (!numericPrice || isNaN(numericPrice) || numericPrice <= 0) return null
+    const matched = tagsList.find(t => Number(t.sell_price) > 0 && Number(t.sell_price) === numericPrice)
+    return matched ? matched.name : null
+  }, [])
+
   const createEmptyItem = useCallback((woodMode: boolean, seqNum: number = 1): EditableItem => {
     return {
       id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -272,13 +283,15 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         width,
         length,
         cft: isNaN(cft) ? 0 : cft,
-        tag: item.tag || '',
+        tag: woodMode
+          ? (getMatchingTagByPrice(price) ?? (item.tag && item.tag !== '-' ? item.tag : ''))
+          : (item.tag || ''),
         isStock: !!(item.product_id || item.productId),
         marked: false,
         seq: idx + 1
       }
     })
-  }, [])
+  }, [getMatchingTagByPrice])
 
   const fetchItemsFromDb = useCallback(async (invId: string, woodMode: boolean) => {
     setIsLoadingItems(true)
@@ -359,6 +372,25 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         })
     }
   }, [isOpen, invoice, isWood, normalizeItems, fetchItemsFromDb])
+
+  // Automatically evaluate each line item's price against predefined price-tag rules when tags load
+  useEffect(() => {
+    if (!isOpen || !isWood || savedTags.length === 0) return
+    setItems(prev => {
+      let changed = false
+      const next = prev.map(item => {
+        const cleanCurrentTag = item.tag === '-' ? '' : (item.tag || '')
+        const matchedTag = getMatchingTagByPrice(item.price, savedTags)
+        const targetTag = matchedTag ?? cleanCurrentTag
+        if (item.tag !== targetTag) {
+          changed = true
+          return { ...item, tag: targetTag }
+        }
+        return item
+      })
+      return changed ? next : prev
+    })
+  }, [isOpen, isWood, savedTags, getMatchingTagByPrice])
 
   // Real-time calculations
   const itemsSubtotal = useMemo(() => {
@@ -443,7 +475,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         current.width = p.width
         current.length = p.length
         current.cft = p.cft
-        current.tag = p.tag || current.tag
+        current.tag = getMatchingTagByPrice(p.price, savedTags) || p.tag || current.tag
         current.description = p.car_no ? `Car: ${current.carNo}` : ''
         current.total = Math.round(Number(p.cft || 0) * Number(p.price || 0))
       } else {
@@ -468,6 +500,12 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       }
 
       let updatedPrice = field === 'price' ? Number(value) || 0 : (Number(current.price) || 0)
+
+      // When price is changed, automatically evaluate against price-tag rules and assign matching tag
+      if (isWood && field === 'price') {
+        const matchedTag = getMatchingTagByPrice(updatedPrice, savedTags)
+        current.tag = matchedTag || ''
+      }
 
       // When tag is changed, update price automatically from matching saved tag
       if (field === 'tag') {
@@ -542,7 +580,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     const nextCounter = mNumbers.length > 0 ? Math.max(...mNumbers) + 1 : 1
     const nextTreeNo = `M-${nextCounter}`
 
-    const matchingTag = savedTags.find(st => Math.abs(Number(st.sell_price) - p) < 0.01)
+    const matchedTagName = getMatchingTagByPrice(p, savedTags) || ''
 
     setItems(prev => {
       const isSingleEmpty =
@@ -569,7 +607,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         width: w,
         length: l,
         cft,
-        tag: matchingTag ? matchingTag.name : '',
+        tag: matchedTagName,
         isStock: false,
         marked: false,
         seq: nextSeq
