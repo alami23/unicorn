@@ -285,7 +285,7 @@ function SoloWoodContent() {
   const addToCart = (product: any) => {
     if (cart.find(item => item.id === product.id)) return
     if (product.stock < 1 || product.isSold) return
-    setCart(prev => [...prev, { ...product }])
+    setCart(prev => [{ ...product }, ...prev])
   }
 
   useEffect(() => {
@@ -348,7 +348,7 @@ function SoloWoodContent() {
         carNo: 'Solo',
         stock: 1
       }
-      return [...prev, newItem]
+      return [newItem, ...prev]
     })
     setManualWidth('')
     setManualLength('')
@@ -458,8 +458,9 @@ function SoloWoodContent() {
       const productIds = cart.filter(item => item.id && typeof item.id === 'number' && !(item.carNo === 'Solo' && item.treeNo.startsWith('M-'))).map(item => item.id);
       const operations: any[] = [];
       
-      // Invoice Items
-      const invoiceItems = cart.map(item => ({
+      // Invoice Items (stored in chronological entry order)
+      const chronologicalCart = [...cart].reverse()
+      const invoiceItems = chronologicalCart.map(item => ({
         invoice_id: finalId,
         product_type: 'wood',
         product_id: item.carNo === 'Solo' && item.treeNo.startsWith('M-') ? 0 : Number(item.id),
@@ -551,7 +552,7 @@ function SoloWoodContent() {
         total: currentTotal,
         type: 'solo_wood',
         date: new Date().toISOString().split('T')[0],
-        items: cart.map(item => ({
+        items: chronologicalCart.map(item => ({
           name: item.treeNo,
           treeNo: item.treeNo,
           carNo: item.carNo,
@@ -835,7 +836,19 @@ function SoloWoodContent() {
                       {item.tag || 'No Tag'}
                     </span>
                     <button 
-                      onClick={() => setCart(cart.filter(i => i.id !== item.id))} 
+                      onClick={() => {
+                        setCart(prev => {
+                          const filtered = prev.filter(i => i.id !== item.id)
+                          let mCounter = 1
+                          const resequencedChronological = [...filtered].reverse().map(it => {
+                            if (/^M-\d+$/i.test(String(it.treeNo || '').trim())) {
+                              return { ...it, treeNo: `M-${mCounter++}` }
+                            }
+                            return it
+                          })
+                          return resequencedChronological.reverse()
+                        })
+                      }} 
                       className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-all"
                     >
                       <Trash2 size={16} />
