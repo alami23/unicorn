@@ -244,11 +244,38 @@ export const getInvoiceCacheKey = (params: InvoiceQueryParams = {}): string => {
   return `invoices:${normType}:${search}:${status}:${dateRange}:${start}:${end}:${page}:${limit}`
 }
 
+export const compareInvoiceIdsDesc = (a: any, b: any): number => {
+  const idA = getDisplayInvoiceId(a?.invoice_number || a?.displayId || a?.id, true)
+  const idB = getDisplayInvoiceId(b?.invoice_number || b?.displayId || b?.id, true)
+
+  const matchA = idA.match(/#?INV-[WF]-(\d{4})(\d+)/i)
+  const matchB = idB.match(/#?INV-[WF]-(\d{4})(\d+)/i)
+
+  if (matchA && matchB) {
+    const yymmDiff = parseInt(matchB[1], 10) - parseInt(matchA[1], 10)
+    if (yymmDiff !== 0) return yymmDiff
+    const serialDiff = parseInt(matchB[2], 10) - parseInt(matchA[2], 10)
+    if (serialDiff !== 0) return serialDiff
+  }
+
+  const cmp = idB.localeCompare(idA, undefined, { numeric: true, sensitivity: 'base' })
+  if (cmp !== 0) return cmp
+
+  const timeA = a?.created_at ? new Date(a.created_at).getTime() : (a?.date ? new Date(a.date).getTime() : 0)
+  const timeB = b?.created_at ? new Date(b.created_at).getTime() : (b?.date ? new Date(b.date).getTime() : 0)
+  return timeB - timeA
+}
+
 export const buildInvoiceQuery = (tableName: string, params: InvoiceQueryParams) => {
   let q = supabase
     .from(tableName)
     .select('*, customer(photo)', { count: 'exact' })
-    .order('created_at', { ascending: false })
+
+  if (tableName === 'wood_invoices') {
+    q = q.order('id', { ascending: false }).order('created_at', { ascending: false })
+  } else {
+    q = q.order('created_at', { ascending: false })
+  }
 
   if (params.searchTerm) {
     q = q.or(`id.ilike.%${params.searchTerm}%,customer_name.ilike.%${params.searchTerm}%`)
@@ -312,9 +339,11 @@ export async function fetchInvoicesData(params: InvoiceQueryParams = {}): Promis
     if (furnRes.error) throw furnRes.error
     if (woodRes.error) throw woodRes.error
 
-    const combined = [...(furnRes.data || []), ...(woodRes.data || [])].sort((a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
+    const combined = [...(furnRes.data || []), ...(woodRes.data || [])].sort((a, b) => {
+      const timeDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      if (timeDiff !== 0) return timeDiff
+      return compareInvoiceIdsDesc(a, b)
+    })
 
     rawData = combined.slice(start, end + 1)
     totalCount = (furnRes.count || 0) + (woodRes.count || 0)
@@ -326,7 +355,7 @@ export async function fetchInvoicesData(params: InvoiceQueryParams = {}): Promis
   } else if (normType === 'Wood') {
     const res = await buildInvoiceQuery('wood_invoices', params).range(start, end)
     if (res.error) throw res.error
-    rawData = res.data || []
+    rawData = [...(res.data || [])].sort(compareInvoiceIdsDesc)
     totalCount = res.count || 0
   }
 

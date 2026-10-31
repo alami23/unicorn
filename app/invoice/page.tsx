@@ -47,7 +47,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense } from 'react'
 import { useInvoices } from '@/hooks/useInvoiceCache'
-import { invalidateInvoiceCache, FormattedInvoice } from '@/lib/invoiceCache'
+import { invalidateInvoiceCache, FormattedInvoice, compareInvoiceIdsDesc } from '@/lib/invoiceCache'
 import { preloadImage, getSynchronousBusiness } from '@/lib/settingsCache'
 
 import {
@@ -307,18 +307,23 @@ function InvoicePageContent() {
 
   // Apply optimistic delivery status overrides to invoices for instant, glitch-free UI updates
   const displayedInvoices = useMemo(() => {
-    if (Object.keys(optimisticDeliveryStatuses).length === 0) return invoices
-    return invoices.map(inv => {
-      const override = optimisticDeliveryStatuses[inv.id] ?? (inv.displayId ? optimisticDeliveryStatuses[inv.displayId] : undefined)
-      if (override !== undefined && inv.deliveryStatus !== override) {
-        return {
-          ...inv,
-          deliveryStatus: override
-        }
-      }
-      return inv
-    })
-  }, [invoices, optimisticDeliveryStatuses])
+    const mapped = Object.keys(optimisticDeliveryStatuses).length === 0
+      ? invoices
+      : invoices.map(inv => {
+          const override = optimisticDeliveryStatuses[inv.id] ?? (inv.displayId ? optimisticDeliveryStatuses[inv.displayId] : undefined)
+          if (override !== undefined && inv.deliveryStatus !== override) {
+            return {
+              ...inv,
+              deliveryStatus: override
+            }
+          }
+          return inv
+        })
+    if (activeTab === 'Wood') {
+      return [...mapped].sort(compareInvoiceIdsDesc)
+    }
+    return mapped
+  }, [invoices, optimisticDeliveryStatuses, activeTab])
 
   // Infinite scroll listener
   useEffect(() => {
