@@ -553,6 +553,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     return items.reduce((sum, item) => sum + (Number(item.cft) || 0), 0)
   }, [items])
 
+  const totalFurnitureItemsQty = useMemo(() => {
+    return items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+  }, [items])
+
   const discountAmount = useMemo(() => {
     if (discountType === 'percent') {
       return Math.round((itemsSubtotal * (Number(discount) || 0)) / 100)
@@ -1691,10 +1695,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                       {/* Right Column: Totals Breakdown (Total CFT, Subtotal, Discount, Delivery Charge, Grand Total, Paid Amount, Total Due) */}
                       <div className="lg:col-span-6 lg:border-l lg:border-slate-200/80 lg:dark:border-slate-700/60 lg:pl-6">
                         <div className="space-y-3.5 py-1">
-                          {/* Total CFT */}
+                          {/* Total CFT (Wood) / Total Items (Furniture) */}
                           <div className="flex items-center justify-between py-1">
-                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total CFT</span>
-                            <span className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">{Number(totalAllCft.toFixed(2))} CFT</span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                              {isWood ? 'Total CFT' : 'Total Items'}
+                            </span>
+                            <span className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
+                              {isWood ? `${Number(totalAllCft.toFixed(2))} CFT` : `${totalFurnitureItemsQty} PCS`}
+                            </span>
                           </div>
 
                           {/* Subtotal */}
