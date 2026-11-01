@@ -1701,7 +1701,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               {isWood ? 'Total CFT' : 'Total Items'}
                             </span>
                             <span className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
-                              {isWood ? `${Number(totalAllCft.toFixed(2))} CFT` : `${totalFurnitureItemsQty} PCS`}
+                              {isWood ? `${totalAllCft.toFixed(5)} CFT` : `${totalFurnitureItemsQty} PCS`}
                             </span>
                           </div>
 
@@ -1961,7 +1961,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               </div>
                               <div className="flex items-baseline gap-1">
                                 <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
-                                  {selectedTotalCft.toFixed(2)}
+                                  {selectedTotalCft.toFixed(5)}
                                 </span>
                                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
                                   CFT
@@ -1982,7 +1982,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               </span>
                               <div className="flex items-baseline gap-1">
                                 <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
-                                  {totalAllCft.toFixed(2)}
+                                  {totalAllCft.toFixed(5)}
                                 </span>
                                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
                                   CFT
