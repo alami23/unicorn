@@ -288,23 +288,44 @@ function SoloWoodContent() {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
       if (!AudioCtx) return
       const ctx = new AudioCtx()
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {})
+      }
+      const now = ctx.currentTime
+
+      // Primary melodic chime tone (louder and crisp)
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
-
       osc.type = 'sine'
-      const now = ctx.currentTime
-      osc.frequency.setValueAtTime(880, now)
-      osc.frequency.exponentialRampToValueAtTime(1174.66, now + 0.08)
+      osc.frequency.setValueAtTime(987.77, now) // B5
+      osc.frequency.exponentialRampToValueAtTime(1318.51, now + 0.06) // E6
 
-      gain.gain.setValueAtTime(0.001, now)
-      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.015)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11)
+      gain.gain.setValueAtTime(0.01, now)
+      gain.gain.linearRampToValueAtTime(0.35, now + 0.015)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2)
 
       osc.connect(gain)
       gain.connect(ctx.destination)
 
+      // Harmonic chime layer for acoustic presence and distinct clarity
+      const osc2 = ctx.createOscillator()
+      const gain2 = ctx.createGain()
+      osc2.type = 'triangle'
+      osc2.frequency.setValueAtTime(1318.51, now)
+      osc2.frequency.exponentialRampToValueAtTime(1975.53, now + 0.07)
+
+      gain2.gain.setValueAtTime(0.01, now)
+      gain2.gain.linearRampToValueAtTime(0.2, now + 0.02)
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.18)
+
+      osc2.connect(gain2)
+      gain2.connect(ctx.destination)
+
       osc.start(now)
-      osc.stop(now + 0.12)
+      osc.stop(now + 0.22)
+      osc2.start(now)
+      osc2.stop(now + 0.22)
+
       osc.onended = () => {
         ctx.close().catch(() => {})
       }
