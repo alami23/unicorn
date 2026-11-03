@@ -282,10 +282,42 @@ function SoloWoodContent() {
     }
   }
 
+  const playItemAddedSound = React.useCallback(() => {
+    try {
+      if (typeof window === 'undefined') return
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+
+      osc.type = 'sine'
+      const now = ctx.currentTime
+      osc.frequency.setValueAtTime(880, now)
+      osc.frequency.exponentialRampToValueAtTime(1174.66, now + 0.08)
+
+      gain.gain.setValueAtTime(0.001, now)
+      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.015)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11)
+
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+
+      osc.start(now)
+      osc.stop(now + 0.12)
+      osc.onended = () => {
+        ctx.close().catch(() => {})
+      }
+    } catch {
+      // Ignore audio playback errors if browser blocks autoplay
+    }
+  }, [])
+
   const addToCart = (product: any) => {
     if (cart.find(item => item.id === product.id)) return
     if (product.stock < 1 || product.isSold) return
     setCart(prev => [{ ...product }, ...prev])
+    playItemAddedSound()
   }
 
   useEffect(() => {
@@ -350,6 +382,7 @@ function SoloWoodContent() {
       }
       return [newItem, ...prev]
     })
+    playItemAddedSound()
     setManualWidth('')
     setManualLength('')
     setTimeout(() => {
