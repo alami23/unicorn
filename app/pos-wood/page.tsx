@@ -126,6 +126,7 @@ function POSWoodContent() {
   const [paidAmount, setPaidAmount] = useState(0)
   const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [availableMethods, setAvailableMethods] = useState<string[]>(['Cash', 'Card', 'bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Mobile Banking', 'Cheque', 'Other'])
+  const [businessName, setBusinessName] = useState('FurniTrack')
   const [checkoutError, setCheckoutError] = useState('')
   const [manualWidth, setManualWidth] = useState('')
   const [manualLength, setManualLength] = useState('')
@@ -251,6 +252,9 @@ function POSWoodContent() {
       
       if (data && data.settings) {
         const settings = data.settings as any;
+        const currentUserId = getCurrentUser()?.id || null;
+        const resolvedBizName = (currentUserId && settings.business_by_user?.[currentUserId]?.name) || settings.business?.name || 'FurniTrack';
+        setBusinessName(resolvedBizName);
         if (settings.finance?.defaultPaymentMethod) {
           setPaymentMethod(settings.finance.defaultPaymentMethod);
         }
@@ -539,7 +543,7 @@ function POSWoodContent() {
 
         // SMS (no need to await if it fails, it's non-critical)
         if (customerData?.phone) {
-          const smsMessage = `Dear ${selectedCustomer}, your wood order ${finalInvoiceNumber} has been confirmed. Total: ৳${currentTotal.toLocaleString()}, Paid: ৳${paidAmount.toLocaleString()}. Thank you for choosing FurniTrack!`
+          const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceNumber)} has been confirmed. Total: ${currentTotal.toLocaleString()}, Paid: ${paidAmount.toLocaleString()}, Due: ${currentDue.toLocaleString()}. Thank you for choosing ${businessName}!`
           sendSMS(customerData.phone, smsMessage).catch(err => console.error('SMS failed:', err))
         }
       } else {

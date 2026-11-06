@@ -64,6 +64,7 @@ function POSFurnitureContent() {
   const [paidAmount, setPaidAmount] = useState(0)
   const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [availableMethods, setAvailableMethods] = useState<string[]>(['Cash', 'Card', 'bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Mobile Banking', 'Cheque', 'Other'])
+  const [businessName, setBusinessName] = useState('FurniTrack')
   const [deliveryDate, setDeliveryDate] = useState('') // Hydration fix
   const [checkoutError, setCheckoutError] = useState('')
   const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean, message: string, type: 'success' | 'error' | 'warning' | 'info', title?: string }>({
@@ -147,6 +148,9 @@ function POSFurnitureContent() {
       const defaultMethods = ['Cash', 'Card', 'bKash', 'Nagad', 'Rocket', 'Bank Transfer', 'Mobile Banking', 'Cheque', 'Other']
       if (data && data.settings) {
         const parsed = data.settings as any
+        const currentUserId = getCurrentUser()?.id || null
+        const resolvedBizName = (currentUserId && parsed.business_by_user?.[currentUserId]?.name) || parsed.business?.name || 'FurniTrack'
+        setBusinessName(resolvedBizName)
         if (parsed.finance?.defaultPaymentMethod) {
           setPaymentMethod(parsed.finance.defaultPaymentMethod)
         }
@@ -370,7 +374,7 @@ function POSFurnitureContent() {
 
       // 5. Send SMS
       if (selectedCustomer !== 'Walk-in Customer' && customerData?.phone) {
-        const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceId)} has been confirmed. Total: ৳${currentTotal.toLocaleString()}, Paid: ৳${paidAmount.toLocaleString()}. Thank you for choosing FurniTrack!`
+        const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceId)} has been confirmed. Total: ${currentTotal.toLocaleString()}, Paid: ${paidAmount.toLocaleString()}, Due: ${currentDue.toLocaleString()}. Thank you for choosing ${businessName}!`
         sendSMS(customerData.phone, smsMessage).catch(err => console.error('SMS failed:', err))
       }
 

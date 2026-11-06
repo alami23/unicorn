@@ -980,7 +980,7 @@ function CustomerPageContent() {
               console.warn('Failed to fetch settings for customer SMS:', err)
             }
             
-            const smsMessage = `Dear ${resolvedCustomerName}, we have received a payment of ৳${payment.amount.toLocaleString()} via ${payment.method}. This has been applied to your outstanding balance. Your current total due is ৳${updatedTotalDue.toLocaleString()}. Thank you! - ${businessName}`
+            const smsMessage = `Dear ${resolvedCustomerName}, we have received a payment of ${payment.amount.toLocaleString()} BDT by ${payment.method}. Your current due amount is ${updatedTotalDue.toLocaleString()} BDT. Thank you! - ${businessName}`
             
             if (targetCustomer.phone) {
               sendSMS(targetCustomer.phone, smsMessage)

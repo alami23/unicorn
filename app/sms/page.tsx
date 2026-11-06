@@ -16,7 +16,7 @@ const initialSmsHistory = [
 ]
 
 const templates = [
-  { title: 'Order Confirmation', text: 'Dear [Name], your order [ID] has been confirmed. Thank you for choosing FurniTrack!' },
+  { title: 'Order Confirmation', text: 'Dear [Customer Name], your order [Invoice ID] has been confirmed. Total: [Total Amount], Paid: [Paid Amount], Due: [Current Due Amount]. Thank you for choosing [Business Name]!' },
   { title: 'Delivery Update', text: 'Hi [Name], your furniture [ID] is out for delivery and will reach you by [Time].' },
   { title: 'Payment Reminder', text: 'Dear [Name], this is a friendly reminder for your outstanding due of [Amount].' },
   { title: 'Promotional', text: 'Special Offer! Get 15% off on all Dining Sets this weekend at FurniTrack.' },
