@@ -820,18 +820,45 @@ function CustomerPageContent() {
         customerPhone={smsCustomer?.phone || ''}
         totalDue={smsCustomer?.totalDue || 0}
         onPaymentReceived={async (payment) => {
+          const targetCustomer = smsCustomer
+          if (!targetCustomer) return
+
           try {
-            // 1. Load invoices for this customer that have due > 0 from Supabase
+            // 1. Fetch customer record to resolve ID and current total_due
+            let currentCustomerQuery = supabase
+              .from('customer')
+              .select('id, name, phone, total_due')
+
+            if (targetCustomer.id) {
+              currentCustomerQuery = currentCustomerQuery.eq('id', targetCustomer.id)
+            } else {
+              currentCustomerQuery = currentCustomerQuery.eq('name', targetCustomer.name)
+            }
+
+            const { data: currentCustomer, error: cusFetchError } = await currentCustomerQuery.maybeSingle()
+            if (cusFetchError) throw cusFetchError
+
+            const resolvedCustomerId = currentCustomer?.id || targetCustomer.id || null
+            const resolvedCustomerName = currentCustomer?.name || targetCustomer.name || ''
+            const startingTotalDue = currentCustomer?.total_due !== undefined
+              ? Number(currentCustomer.total_due)
+              : Number(targetCustomer.totalDue || 0)
+
+            // 2. Load invoices for this customer that have due_amount > 0 from Supabase
+            const filterExpr = resolvedCustomerId
+              ? `customer_id.eq."${resolvedCustomerId}",customer_name.eq."${resolvedCustomerName}"`
+              : `customer_name.eq."${resolvedCustomerName}"`
+
             const [furnRes, woodRes] = await Promise.all([
               supabase
                 .from('furniture_invoices')
                 .select('*')
-                .eq('customer_name', smsCustomer?.name)
+                .or(filterExpr)
                 .gt('due_amount', 0),
               supabase
                 .from('wood_invoices')
                 .select('*')
-                .eq('customer_name', smsCustomer?.name)
+                .or(filterExpr)
                 .gt('due_amount', 0)
             ])
 
@@ -841,22 +868,20 @@ function CustomerPageContent() {
             const invoices = [...(furnRes.data || []), ...(woodRes.data || [])].sort((a, b) => 
               new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             )
-
-            if (!invoices || invoices.length === 0) {
-              toast.info('No outstanding invoices found for this customer.')
-              return
-            }
             
-            let remainingPayment = payment.amount
-            const affectedInvoiceIds: string[] = []
+            let remainingPayment = Number(payment.amount) || 0
+            let runningCustomerBalance = startingTotalDue
 
-            // 3. Distribute payment
+            // 3. Distribute payment across unpaid invoices first (if any exist)
             for (const inv of invoices) {
               if (remainingPayment <= 0) break
               
-              const amountToApply = Math.min(remainingPayment, inv.due_amount)
-              const newPaid = Number(inv.paid_amount) + amountToApply
-              const newDue = Math.max(0, Number(inv.subtotal) - newPaid) // Simplified, in real app consider delivery_charge and discount
+              const currentInvDue = Number(inv.due_amount) || 0
+              if (currentInvDue <= 0) continue
+
+              const amountToApply = Math.min(remainingPayment, currentInvDue)
+              const newPaid = Number(inv.paid_amount || 0) + amountToApply
+              const newDue = Math.max(0, currentInvDue - amountToApply)
               
               const isWood = inv.type?.toLowerCase() === 'wood' || 
                              inv.type?.toLowerCase() === 'solo_wood' || 
@@ -874,34 +899,59 @@ function CustomerPageContent() {
               if (updateError) throw updateError
               
               remainingPayment -= amountToApply
-              affectedInvoiceIds.push(inv.id)
+              runningCustomerBalance = Math.max(0, runningCustomerBalance - amountToApply)
 
-              // Record the transaction
-              await supabase.from('transactions').insert([{
-                id: `TXN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-                customer_id: inv.customer_id,
+              // Record the invoice payment transaction
+              const { error: txError } = await supabase.from('transactions').insert([{
+                id: `TXN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+                customer_id: resolvedCustomerId || inv.customer_id,
                 date: payment.date || new Date().toISOString().split('T')[0],
                 type: 'Payment',
                 ref: inv.id,
+                debit: 0,
                 credit: amountToApply,
-                balance: inv.due_amount - amountToApply,
+                balance: runningCustomerBalance,
                 method: payment.method,
                 notes: payment.notes || payment.method
               }])
+
+              if (txError) throw txError
             }
 
-            // 4. Update customer total due
-            const { data: currentCustomer } = await supabase
-              .from('customer')
-              .select('total_due')
-              .eq('name', smsCustomer?.name)
-              .single()
+            // 4. If remaining payment exists (e.g. customer has an opening balance and no invoices, or payment exceeds invoice dues), record it against Opening Balance
+            if (remainingPayment > 0) {
+              runningCustomerBalance = Math.max(0, runningCustomerBalance - remainingPayment)
 
-            if (currentCustomer) {
-              await supabase
+              const { error: openBalTxError } = await supabase.from('transactions').insert([{
+                id: `TXN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+                customer_id: resolvedCustomerId,
+                date: payment.date || new Date().toISOString().split('T')[0],
+                type: 'Payment',
+                ref: 'Opening Balance',
+                debit: 0,
+                credit: remainingPayment,
+                balance: runningCustomerBalance,
+                method: payment.method,
+                notes: payment.notes || payment.method || 'Opening Balance Payment'
+              }])
+
+              if (openBalTxError) throw openBalTxError
+            }
+
+            // 5. Deduct payment amount from customer's total_due
+            const updatedTotalDue = Math.max(0, startingTotalDue - (Number(payment.amount) || 0))
+            if (resolvedCustomerId) {
+              const { error: cusUpdateError } = await supabase
                 .from('customer')
-                .update({ total_due: Math.max(0, currentCustomer.total_due - payment.amount) })
-                .eq('name', smsCustomer?.name)
+                .update({ total_due: updatedTotalDue })
+                .eq('id', resolvedCustomerId)
+              if (cusUpdateError) throw cusUpdateError
+            } else if (resolvedCustomerName) {
+              const { error: cusUpdateError } = await supabase
+                .from('customer')
+                .update({ total_due: updatedTotalDue })
+                .eq('name', resolvedCustomerName)
+              if (cusUpdateError) throw cusUpdateError
             }
 
             toast.success('Payment received and applied successfully')
@@ -930,15 +980,16 @@ function CustomerPageContent() {
               console.warn('Failed to fetch settings for customer SMS:', err)
             }
             
-            const smsMessage = `Dear ${smsCustomer?.name}, we have received a payment of ৳${payment.amount.toLocaleString()} via ${payment.method}. This has been applied to your outstanding balance. Your current total due is ৳${Math.max(0, (smsCustomer?.totalDue || 0) - payment.amount).toLocaleString()}. Thank you! - ${businessName}`
+            const smsMessage = `Dear ${resolvedCustomerName}, we have received a payment of ৳${payment.amount.toLocaleString()} via ${payment.method}. This has been applied to your outstanding balance. Your current total due is ৳${updatedTotalDue.toLocaleString()}. Thank you! - ${businessName}`
             
-            if (smsCustomer?.phone) {
-              sendSMS(smsCustomer.phone, smsMessage)
+            if (targetCustomer.phone) {
+              sendSMS(targetCustomer.phone, smsMessage)
                 .catch(err => console.error('SMS failed:', err))
             }
           } catch (error: any) {
             console.error('Payment error:', error)
             toast.error(error.message || 'Failed to process payment')
+            throw error
           }
         }}
       />

@@ -21,6 +21,19 @@ export default function PaymentHistoryModal({ isOpen, onClose, customerName, cus
     const fetchPayments = async () => {
       setIsLoading(true)
       try {
+        let resolvedCustomerId = customerId
+
+        if (!resolvedCustomerId && customerName) {
+          const { data: cusData } = await supabase
+            .from('customer')
+            .select('id')
+            .eq('name', customerName)
+            .maybeSingle()
+          if (cusData?.id) {
+            resolvedCustomerId = cusData.id
+          }
+        }
+
         let query = supabase
           .from('transactions')
           .select('*')
@@ -28,25 +41,24 @@ export default function PaymentHistoryModal({ isOpen, onClose, customerName, cus
           .order('date', { ascending: false })
           .order('created_at', { ascending: false })
 
-        if (customerId) {
-          query = query.eq('customer_id', customerId)
+        if (resolvedCustomerId) {
+          query = query.eq('customer_id', resolvedCustomerId)
         } else {
-          // Fallback or depending on how customer relation is handled
-          // If we only have name, we might need a workaround or if the transactions have customer_name
+          setPayments([])
+          setIsLoading(false)
+          return
         }
         
         const { data, error } = await query
         
         if (error) throw error
         
-        // If we don't have customerId but have customerName, we might need to filter manually if there is no customer_name column, but wait, transactions have customer_id
-        // Let's check how transactions store customer info.
-        
         const groupedPayments: any[] = []
         data?.forEach(payment => {
           const paymentAmount = Number(payment.credit) || Number(payment.amount) || 0
           if (Math.round(paymentAmount) <= 0) return // Skip 0 amounts
 
+          const refLabel = payment.ref || 'Opening Balance'
           const lastGroup = groupedPayments[groupedPayments.length - 1]
           
           const timeDiff = lastGroup && lastGroup.created_at && payment.created_at
@@ -56,13 +68,12 @@ export default function PaymentHistoryModal({ isOpen, onClose, customerName, cus
           // Group if same date, same method, and inserted within 5 minutes of each other
           if (lastGroup && lastGroup.date === payment.date && lastGroup.method === payment.method && timeDiff < 5 * 60000) {
              lastGroup.credit += paymentAmount
-             if (payment.ref) {
-               // Check if ref already exists to prevent duplicate (in case of bug)
-               const existingRef = lastGroup.refs.find((r: any) => r.ref === payment.ref)
+             if (refLabel) {
+               const existingRef = lastGroup.refs.find((r: any) => r.ref === refLabel)
                if (existingRef) {
                  existingRef.amount += paymentAmount
                } else {
-                 lastGroup.refs.push({ ref: payment.ref, amount: paymentAmount })
+                 lastGroup.refs.push({ ref: refLabel, amount: paymentAmount })
                }
              }
           } else {
@@ -70,7 +81,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, customerName, cus
                date: payment.date,
                method: payment.method || 'Cash',
                credit: paymentAmount,
-               refs: payment.ref ? [{ ref: payment.ref, amount: paymentAmount }] : [],
+               refs: refLabel ? [{ ref: refLabel, amount: paymentAmount }] : [],
                created_at: payment.created_at
              })
           }
@@ -84,7 +95,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, customerName, cus
       }
     }
 
-    if (isOpen && customerName) {
+    if (isOpen && (customerName || customerId)) {
       fetchPayments()
     }
   }, [isOpen, customerName, customerId])
@@ -167,7 +178,9 @@ export default function PaymentHistoryModal({ isOpen, onClose, customerName, cus
                                {payment.refs.map((r: any, idx: number) => (
                                  <div key={idx} className="text-sm flex items-center gap-2 w-fit">
                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-800 dark:bg-slate-200" />
-                                   <span className="font-mono text-slate-900 dark:text-slate-100 tracking-tight text-[15px]">{getDisplayInvoiceId(r.ref)}</span>
+                                   <span className="font-mono text-slate-900 dark:text-slate-100 tracking-tight text-[15px]">
+                                     {String(r.ref).toLowerCase() === 'opening balance' ? 'Opening Balance' : getDisplayInvoiceId(r.ref)}
+                                   </span>
                                    <span className="text-slate-900 dark:text-slate-100">=</span>
                                    <span className="font-medium text-slate-900 dark:text-slate-100 text-[15px]">৳{Math.round(r.amount).toLocaleString()}</span>
                                  </div>

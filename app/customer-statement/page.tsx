@@ -369,7 +369,7 @@ function CustomerStatementContent() {
                 </div>
                 <div>
                   <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Current Due</p>
-                  <p className="text-base md:text-lg font-bold text-rose-500 dark:text-rose-400">৳{customerTransactions.length > 0 ? customerTransactions[customerTransactions.length - 1].balance.toLocaleString() : '0'}</p>
+                  <p className="text-base md:text-lg font-bold text-rose-500 dark:text-rose-400">৳{Number(customer.totalDue ?? (customerTransactions.length > 0 ? customerTransactions[customerTransactions.length - 1].balance : 0)).toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -416,7 +416,7 @@ function CustomerStatementContent() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-amber-600 dark:text-amber-400 font-medium">{getDisplayInvoiceId(txn.ref)}</td>
+                        <td className="px-6 py-4 text-sm text-amber-600 dark:text-amber-400 font-medium">{String(txn.ref).toLowerCase() === 'opening balance' ? 'Opening Balance' : getDisplayInvoiceId(txn.ref)}</td>
                         <td className="px-6 py-4 text-sm text-right font-medium text-slate-900 dark:text-slate-100">{txn.debit > 0 ? `৳${(txn.debit || 0).toLocaleString()}` : '-'}</td>
                         <td className="px-6 py-4 text-sm text-right font-medium text-emerald-600 dark:text-emerald-400">{txn.credit > 0 ? `৳${(txn.credit || 0).toLocaleString()}` : '-'}</td>
                         <td className="px-6 py-4 text-sm text-right font-medium text-rose-500 dark:text-rose-400">{(txn.debit - txn.credit) > 0 ? `৳${(txn.debit - txn.credit).toLocaleString()}` : '-'}</td>
@@ -427,7 +427,7 @@ function CustomerStatementContent() {
                   <tfoot className="bg-slate-50 dark:bg-slate-800/50 font-bold text-slate-900 dark:text-slate-100 print:bg-white">
                     <tr>
                       <td colSpan={6} className="px-6 py-4 text-right uppercase tracking-wider text-xs text-slate-500 dark:text-slate-400">Closing Balance</td>
-                      <td className="px-6 py-4 text-right text-lg">৳{(customerTransactions.length > 0 ? customerTransactions[customerTransactions.length - 1].balance : 0).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right text-lg">৳{Number(customer.totalDue ?? (customerTransactions.length > 0 ? customerTransactions[customerTransactions.length - 1].balance : 0)).toLocaleString()}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -444,7 +444,7 @@ function CustomerStatementContent() {
                       )}>{txn.type}</span>
                     </div>
                     <div>
-                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{getDisplayInvoiceId(txn.ref)}</span>
+                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{String(txn.ref).toLowerCase() === 'opening balance' ? 'Opening Balance' : getDisplayInvoiceId(txn.ref)}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="text-slate-500">Bill: {txn.debit > 0 ? `৳${(txn.debit || 0).toLocaleString()}` : '-'}</div>

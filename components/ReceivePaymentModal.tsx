@@ -14,7 +14,7 @@ interface ReceivePaymentModalProps {
   customerPhone: string
   totalDue: number
   invoiceId?: string
-  onPaymentReceived?: (payment: { amount: number, method: string, date: string, notes: string }) => void
+  onPaymentReceived?: (payment: { amount: number, method: string, date: string, notes: string }) => Promise<void> | void
 }
 
 export default function ReceivePaymentModal({ isOpen, onClose, customerName, customerPhone, totalDue, invoiceId, onPaymentReceived }: ReceivePaymentModalProps) {
@@ -63,23 +63,22 @@ export default function ReceivePaymentModal({ isOpen, onClose, customerName, cus
 
     setIsSubmitting(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800))
-      
-      setIsSuccess(true)
-      
       if (onPaymentReceived) {
-        onPaymentReceived({
+        await onPaymentReceived({
           amount: parsedAmount,
           method,
           date,
           notes
         })
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 600))
       }
+      
+      setIsSuccess(true)
 
       setTimeout(() => {
         onClose()
-      }, 1200)
+      }, 1000)
     } finally {
       setIsSubmitting(false)
     }
