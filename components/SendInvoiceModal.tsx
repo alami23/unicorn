@@ -86,12 +86,12 @@ export default function SendInvoiceModal({
   const activeLink = activeUrlType === 'short' && shortUrl ? shortUrl : previewUrl
 
   // Dynamic message template
-  const defaultMessage = `Dear ${customerName}, here is your Invoice ${invNumber}. Bill: ৳${totalAmount}, Due: ৳${dueAmount}. View and download your official invoice PDF online: ${activeLink}`
+  const defaultMessage = `Dear ${customerName}, here is your Invoice ${invNumber}. Bill: ${totalAmount} BDT, Due: ${dueAmount} BDT. View and download your official invoice PDF online: ${activeLink}`
   const [smsMessage, setSmsMessage] = useState(defaultMessage)
 
   // Keep SMS message in sync when link changes
   useEffect(() => {
-    setSmsMessage(`Dear ${customerName}, here is your Invoice ${invNumber}. Bill: ৳${totalAmount}, Due: ৳${dueAmount}. View and download your official invoice PDF online: ${activeLink}`)
+    setSmsMessage(`Dear ${customerName}, here is your Invoice ${invNumber}. Bill: ${totalAmount} BDT, Due: ${dueAmount} BDT. View and download your official invoice PDF online: ${activeLink}`)
   }, [activeLink, customerName, invNumber, totalAmount, dueAmount])
 
   // Copy URL to clipboard

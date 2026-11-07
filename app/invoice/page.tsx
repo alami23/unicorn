@@ -746,7 +746,7 @@ function InvoicePageContent() {
       const formattedPaid = Math.round(amountPaid).toLocaleString()
       const formattedDue = Math.round(amountDue).toLocaleString()
 
-      const reminderMsg = `Dear ${customerName}, here is the payment reminder for Invoice ${invoiceNumber} from ${businessName}.\n• Total Bill: ৳${formattedTotal}\n• Paid Amount: ৳${formattedPaid}\n• Due Amount: ৳${formattedDue}\nPlease clear the due amount at your earliest convenience. Thank you!`
+      const reminderMsg = `Dear ${customerName}, here is the payment reminder for Invoice ${invoiceNumber} from ${businessName}.\n- Total Bill: ${formattedTotal} BDT\n- Paid Amount: ${formattedPaid} BDT\n- Due Amount: ${formattedDue} BDT\nPlease clear the due amount at your earliest convenience. Thank you!`
 
       // 6. If phone number is missing, open modal so user can input phone number
       if (!phoneToSend || !phoneToSend.trim()) {
@@ -1503,7 +1503,7 @@ function InvoicePageContent() {
               }])
 
               toast.success('Payment received')
-              addNotification('invoice_update', 'Payment Received', `Received ৳${payment.amount} for Invoice ${getDisplayInvoiceId(selectedInvoice.id)} via ${payment.method}`)
+              addNotification('invoice_update', 'Payment Received', `Received ${payment.amount} BDT for Invoice ${getDisplayInvoiceId(selectedInvoice.id)} via ${payment.method}`)
               invalidateInvoiceCache()
               refresh()
 

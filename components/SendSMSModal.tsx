@@ -16,7 +16,7 @@ interface SendSMSModalProps {
 }
 
 const templates = [
-  { title: 'Order Confirmation', text: 'Dear [Customer Name], your order [Invoice ID] has been confirmed. Total: [Total Amount], Paid: [Paid Amount], Due: [Current Due Amount]. Thank you for choosing [Business Name]!' },
+  { title: 'Order Confirmation', text: 'Dear [Customer Name], your order #[Invoice ID] has been confirmed.\nTotal: [Total Amount].\nPaid: [Paid Amount].\nDue: [Current Due Amount].\nThank you for choosing [Business Name]' },
   { title: 'Delivery Update', text: 'Hi [Name], your furniture is out for delivery and will reach you soon.' },
   { title: 'Payment Reminder', text: 'Dear [Name], this is a friendly reminder for your outstanding due.' },
   { title: 'Promotional', text: 'Special Offer! Get 15% off on all Dining Sets this weekend at FurniTrack.' },

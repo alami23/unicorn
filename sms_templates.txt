@@ -1,0 +1,243 @@
+================================================================================
+APPLICATION SMS, OTP & NOTIFICATION TEMPLATES (STRICT GSM-7 ENGLISH FORMAT)
+================================================================================
+
+--------------------------------------------------------------------------------
+SECTION 1: OTP & AUTHENTICATION SMS TEMPLATES
+--------------------------------------------------------------------------------
+
+1. Trigger Event: Account Verification / Password Recovery / Database Clear / Account Deletion OTP
+   Source: /app/api/auth/send-otp/route.ts
+   Triggered From:
+   - User Signup (/app/signup/page.tsx)
+   - Forgot Password Recovery (/app/login/page.tsx)
+   - Clear Database Verification (/app/settings/page.tsx)
+   - Delete Account Verification (/app/settings/page.tsx)
+   Template:
+   "Your POS Account verification OTP is: [OTP Code]. Valid for 5 minutes."
+
+
+--------------------------------------------------------------------------------
+SECTION 2: AUTOMATED TRANSACTIONAL SMS TEMPLATES
+--------------------------------------------------------------------------------
+
+2. Trigger Event: Invoice Confirmation (POS Furniture Checkout)
+   Source: /app/pos-furniture/page.tsx
+   Template:
+   "Dear {customer_name}, your order #{invoice_number} has been confirmed.
+   Total: {total_amount}.
+   Paid: {paid_amount}.
+   Due: {due_amount}.
+   Thank you for choosing [Business Name]"
+
+3. Trigger Event: Invoice Confirmation (POS Wood Checkout)
+   Source: /app/pos-wood/page.tsx
+   Template:
+   "Dear {customer_name}, your order #{invoice_number} has been confirmed.
+   Total: {total_amount}.
+   Paid: {paid_amount}.
+   Due: {due_amount}.
+   Thank you for choosing [Business Name]"
+
+4. Trigger Event: Invoice Confirmation (Solo Wood Checkout)
+   Source: /app/solo-wood/page.tsx
+   Template:
+   "Dear {customer_name}, your order #{invoice_number} has been confirmed.
+   Total: {total_amount}.
+   Paid: {paid_amount}.
+   Due: {due_amount}.
+   Thank you for choosing [Business Name]"
+
+5. Trigger Event: Payment Received Receipt (Customer Module)
+   Source: /app/customer/page.tsx
+   Template:
+   "Dear [Customer Name], we have received a payment of [Amount] BDT by [Payment Method]. Your current due amount is [Current Due Amount] BDT. Thank you! - [Business Name]"
+
+6. Trigger Event: Payment Received Receipt (Invoice Module)
+   Source: /app/invoice/page.tsx
+   Template:
+   "Dear [Customer Name], we have received a payment of [Amount] BDT by [Payment Method]. Your current due amount is [Current Due Amount] BDT. Thank you! - [Business Name]"
+
+
+--------------------------------------------------------------------------------
+SECTION 3: PAYMENT REMINDER & INVOICE SHARING SMS TEMPLATES
+--------------------------------------------------------------------------------
+
+7. Trigger Event: Customer Due Reminder (Customer With Invoice History)
+   Source: /app/customer/page.tsx
+   Template:
+   "Dear [Customer Name], this is a payment reminder from [Business Name].
+   - Total Purchases: [Total Purchases] BDT
+   - Paid Amount: [Paid Amount] BDT
+   - Outstanding Due: [Outstanding Due] BDT
+   Please clear your due amount at your earliest convenience. Thank you!"
+
+8. Trigger Event: Customer Due Reminder (Customer With Opening Balance Only)
+   Source: /app/customer/page.tsx
+   Template:
+   "Dear [Customer Name], this is a payment reminder from [Business Name] regarding your outstanding due of [Outstanding Due] BDT.
+   Please clear it at your earliest convenience. Thank you!"
+
+9. Trigger Event: Invoice Due Reminder (Specific Unpaid Invoice)
+   Source: /app/invoice/page.tsx
+   Template:
+   "Dear [Customer Name], here is the payment reminder for Invoice [Invoice Number] from [Business Name].
+   - Total Bill: [Total Bill] BDT
+   - Paid Amount: [Paid Amount] BDT
+   - Due Amount: [Due Amount] BDT
+   Please clear the due amount at your earliest convenience. Thank you!"
+
+10. Trigger Event: Outstanding Due Reminder (Reports Module)
+    Source: /app/reports/page.tsx
+    Template:
+    "Dear [Customer Name], you have an outstanding due of BDT [Total Due] at our showroom. Please settle it soon. Thank you!"
+
+11. Trigger Event: Share / Send Online Invoice PDF Link
+    Source: /components/SendInvoiceModal.tsx
+    Template:
+    "Dear [Customer Name], here is your Invoice [Invoice ID]. Bill: [Total Amount] BDT, Due: [Due Amount] BDT. View and download your official invoice PDF online: [Invoice Short Link]"
+
+12. Trigger Event: SMS Gateway Configuration Test
+    Source: /app/settings/page.tsx
+    Template:
+    "Test message from FurniTrack Settings"
+
+
+--------------------------------------------------------------------------------
+SECTION 4: QUICK-SELECT MANUAL SMS TEMPLATES
+--------------------------------------------------------------------------------
+
+13. Trigger Event: Quick Template - Order Confirmation
+    Source: /app/sms/page.tsx & /components/SendSMSModal.tsx
+    Template:
+    "Dear {customer_name}, your order #{invoice_number} has been confirmed.
+    Total: {total_amount}.
+    Paid: {paid_amount}.
+    Due: {due_amount}.
+    Thank you for choosing [Business Name]"
+
+14. Trigger Event: Quick Template - Delivery Update (SMS Page)
+    Source: /app/sms/page.tsx
+    Template:
+    "Hi [Name], your furniture [ID] is out for delivery and will reach you by [Time]."
+
+15. Trigger Event: Quick Template - Delivery Update (Send SMS Modal)
+    Source: /components/SendSMSModal.tsx
+    Template:
+    "Hi [Name], your furniture is out for delivery and will reach you soon."
+
+16. Trigger Event: Quick Template - Payment Reminder (SMS Page)
+    Source: /app/sms/page.tsx
+    Template:
+    "Dear [Name], this is a friendly reminder for your outstanding due of [Amount]."
+
+17. Trigger Event: Quick Template - Payment Reminder (Send SMS Modal)
+    Source: /components/SendSMSModal.tsx
+    Template:
+    "Dear [Name], this is a friendly reminder for your outstanding due."
+
+18. Trigger Event: Quick Template - Promotional Offer
+    Source: /app/sms/page.tsx & /components/SendSMSModal.tsx
+    Template:
+    "Special Offer! Get 15% off on all Dining Sets this weekend at FurniTrack."
+
+
+--------------------------------------------------------------------------------
+SECTION 5: IN-APP SYSTEM NOTIFICATION TEMPLATES
+--------------------------------------------------------------------------------
+
+19. Trigger Event: New Furniture Sale Notification (type: 'sale')
+    Source: /app/pos-furniture/page.tsx
+    Title: "New Furniture Sale"
+    Template:
+    "Invoice [Invoice ID] created. Paid: [Paid Amount] BDT ([Payment Method]), Due: [Current Due Amount] BDT"
+
+20. Trigger Event: New Wood Sale Notification (type: 'sale')
+    Source: /app/pos-wood/page.tsx
+    Title: "New Wood Sale"
+    Template:
+    "Invoice [Invoice ID] created. Paid: [Paid Amount] BDT ([Payment Method]), Due: [Current Due Amount] BDT"
+
+21. Trigger Event: New Solo Wood Sale Notification (type: 'sale')
+    Source: /app/solo-wood/page.tsx
+    Title: "New Solo Wood Sale"
+    Template:
+    "Invoice [Invoice ID] created. Paid: [Paid Amount] BDT ([Payment Method]), Due: [Current Due Amount] BDT"
+
+22. Trigger Event: Invoice Payment Received Notification (type: 'invoice_update')
+    Source: /app/invoice/page.tsx
+    Title: "Payment Received"
+    Template:
+    "Received [Amount] BDT for Invoice [Invoice ID] via [Payment Method]"
+
+23. Trigger Event: Invoice Modified Notification (type: 'invoice_update')
+    Source: /components/EditInvoiceModal.tsx
+    Title: "Invoice Updated"
+    Template:
+    "Invoice [Invoice ID] was modified."
+
+24. Trigger Event: Furniture Added Notification (type: 'inventory_update')
+    Source: /app/furniture-inventory/page.tsx
+    Title: "Furniture Added"
+    Template:
+    "New furniture item added."
+
+25. Trigger Event: Furniture Updated Notification (type: 'inventory_update')
+    Source: /app/furniture-inventory/page.tsx
+    Title: "Furniture Updated"
+    Template:
+    "Furniture ID [Item ID] has been updated."
+
+26. Trigger Event: Furniture Category Added Notification (type: 'inventory_update')
+    Source: /app/furniture-category/page.tsx
+    Title: "Category Added"
+    Template:
+    "Category [Category Name] was added."
+
+27. Trigger Event: Furniture Category Updated Notification (type: 'inventory_update')
+    Source: /app/furniture-category/page.tsx
+    Title: "Category Updated"
+    Template:
+    "Category [Category Name] was updated."
+
+28. Trigger Event: Wood Added Notification (type: 'inventory_update')
+    Source: /app/wood-inventory/page.tsx
+    Title: "Wood Added"
+    Template:
+    "New wood item added."
+
+29. Trigger Event: Wood Updated Notification (type: 'inventory_update')
+    Source: /app/wood-inventory/page.tsx
+    Title: "Wood Updated"
+    Template:
+    "Wood ID [Item ID] has been updated."
+
+30. Trigger Event: Wood Items Excel Import Notification (type: 'inventory_update')
+    Source: /app/wood-inventory/make-excel/page.tsx
+    Title: "Wood Items Imported"
+    Template:
+    "Imported [Count] items directly from Excel Maker."
+
+31. Trigger Event: Staff Member Added Notification (type: 'settings_update')
+    Source: /app/staff/page.tsx
+    Title: "Staff Added"
+    Template:
+    "New staff member [Staff Name] registered."
+
+32. Trigger Event: Staff Member Updated Notification (type: 'settings_update')
+    Source: /app/staff/page.tsx
+    Title: "Staff Updated"
+    Template:
+    "Staff member [Staff Name] details updated."
+
+33. Trigger Event: Global Settings Saved Notification (type: 'settings_update')
+    Source: /app/settings/page.tsx
+    Title: "Settings Saved"
+    Template:
+    "Global application settings have been updated."
+
+34. Trigger Event: Business Onboarding Complete Notification (type: 'settings_update')
+    Source: /components/OnboardingModal.tsx
+    Title: "Business Onboarding Complete"
+    Template:
+    "Your business details and system configuration have been updated."

@@ -374,7 +374,7 @@ function POSFurnitureContent() {
 
       // 5. Send SMS
       if (selectedCustomer !== 'Walk-in Customer' && customerData?.phone) {
-        const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceId)} has been confirmed. Total: ${currentTotal.toLocaleString()}, Paid: ${paidAmount.toLocaleString()}, Due: ${currentDue.toLocaleString()}. Thank you for choosing ${businessName}!`
+        const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceId)} has been confirmed.\nTotal: ${currentTotal.toLocaleString()}.\nPaid: ${paidAmount.toLocaleString()}.\nDue: ${currentDue.toLocaleString()}.\nThank you for choosing ${businessName}`
         sendSMS(customerData.phone, smsMessage).catch(err => console.error('SMS failed:', err))
       }
 
@@ -395,7 +395,7 @@ function POSFurnitureContent() {
       if (txnError) throw txnError
 
       // Success UI
-      addNotification('sale', 'New Furniture Sale', `Invoice ${getDisplayInvoiceId(finalInvoiceId)} created. Paid: ৳${paidAmount.toLocaleString()} (${paymentMethod || 'Cash'}), Due: ৳${currentDue.toLocaleString()}`);
+      addNotification('sale', 'New Furniture Sale', `Invoice ${getDisplayInvoiceId(finalInvoiceId)} created. Paid: ${paidAmount.toLocaleString()} BDT (${paymentMethod || 'Cash'}), Due: ${currentDue.toLocaleString()} BDT`);
 
       const createdInvoiceObject = {
         id: finalInvoiceId,

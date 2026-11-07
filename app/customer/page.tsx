@@ -309,9 +309,9 @@ function CustomerPageContent() {
 
       let reminderMsg = ''
       if (formattedTotal && formattedPaid) {
-        reminderMsg = `Dear ${cus.name}, this is a payment reminder from ${businessName}.\n• Total Purchases: ৳${formattedTotal}\n• Paid Amount: ৳${formattedPaid}\n• Outstanding Due: ৳${formattedDue}\nPlease clear your due amount at your earliest convenience. Thank you!`
+        reminderMsg = `Dear ${cus.name}, this is a payment reminder from ${businessName}.\n- Total Purchases: ${formattedTotal} BDT\n- Paid Amount: ${formattedPaid} BDT\n- Outstanding Due: ${formattedDue} BDT\nPlease clear your due amount at your earliest convenience. Thank you!`
       } else {
-        reminderMsg = `Dear ${cus.name}, this is a payment reminder from ${businessName} regarding your outstanding due of ৳${formattedDue}.\nPlease clear it at your earliest convenience. Thank you!`
+        reminderMsg = `Dear ${cus.name}, this is a payment reminder from ${businessName} regarding your outstanding due of ${formattedDue} BDT.\nPlease clear it at your earliest convenience. Thank you!`
       }
 
       // 6. Check phone

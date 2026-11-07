@@ -568,7 +568,7 @@ function SoloWoodContent() {
 
         // SMS (non-critical)
         if (customerData?.phone) {
-          const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceNumber)} has been confirmed. Total: ${currentTotal.toLocaleString()}, Paid: ${paidAmount.toLocaleString()}, Due: ${currentDue.toLocaleString()}. Thank you for choosing ${businessName}!`
+          const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceNumber)} has been confirmed.\nTotal: ${currentTotal.toLocaleString()}.\nPaid: ${paidAmount.toLocaleString()}.\nDue: ${currentDue.toLocaleString()}.\nThank you for choosing ${businessName}`
           sendSMS(customerData.phone, smsMessage).catch(console.error)
         }
       } else {
@@ -596,7 +596,7 @@ function SoloWoodContent() {
         audio.play().catch(() => {})
       } catch (e) {}
 
-      addNotification('sale', 'New Solo Wood Sale', `Invoice ${finalInvoiceNumber} created. Paid: ৳${paidAmount.toLocaleString()} (${paymentMethod || 'Cash'}), Due: ৳${currentDue.toLocaleString()}`);
+      addNotification('sale', 'New Solo Wood Sale', `Invoice ${finalInvoiceNumber} created. Paid: ${paidAmount.toLocaleString()} BDT (${paymentMethod || 'Cash'}), Due: ${currentDue.toLocaleString()} BDT`);
 
       setSelectedInvoice({
         id: finalId,

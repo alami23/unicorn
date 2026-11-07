@@ -881,7 +881,7 @@ function SettingsPageContent() {
     }
     setIsTestingSms(true);
     try {
-      await sendSMS(testNumber, "Test message from FurniTrack Settings 🚀", {
+      await sendSMS(testNumber, "Test message from FurniTrack Settings", {
         apiKey: settings.integrations?.smsApiKey,
         senderId: settings.integrations?.smsSenderId,
       });

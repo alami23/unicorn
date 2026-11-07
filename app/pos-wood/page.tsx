@@ -543,7 +543,7 @@ function POSWoodContent() {
 
         // SMS (no need to await if it fails, it's non-critical)
         if (customerData?.phone) {
-          const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceNumber)} has been confirmed. Total: ${currentTotal.toLocaleString()}, Paid: ${paidAmount.toLocaleString()}, Due: ${currentDue.toLocaleString()}. Thank you for choosing ${businessName}!`
+          const smsMessage = `Dear ${selectedCustomer}, your order ${getDisplayInvoiceId(finalInvoiceNumber)} has been confirmed.\nTotal: ${currentTotal.toLocaleString()}.\nPaid: ${paidAmount.toLocaleString()}.\nDue: ${currentDue.toLocaleString()}.\nThank you for choosing ${businessName}`
           sendSMS(customerData.phone, smsMessage).catch(err => console.error('SMS failed:', err))
         }
       } else {
@@ -566,7 +566,7 @@ function POSWoodContent() {
       if (errors.length > 0) throw errors[0];
 
       // Success UI
-      addNotification('sale', 'New Wood Sale', `Invoice ${finalInvoiceNumber} created. Paid: ৳${paidAmount.toLocaleString()} (${paymentMethod || 'Cash'}), Due: ৳${currentDue.toLocaleString()}`);
+      addNotification('sale', 'New Wood Sale', `Invoice ${finalInvoiceNumber} created. Paid: ${paidAmount.toLocaleString()} BDT (${paymentMethod || 'Cash'}), Due: ${currentDue.toLocaleString()} BDT`);
       
       setSelectedInvoice({
         id: finalId,
