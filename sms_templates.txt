@@ -51,12 +51,18 @@ SECTION 2: AUTOMATED TRANSACTIONAL SMS TEMPLATES
 5. Trigger Event: Payment Received Receipt (Customer Module)
    Source: /app/customer/page.tsx
    Template:
-   "Dear [Customer Name], we have received a payment of [Amount] BDT by [Payment Method]. Your current due amount is [Current Due Amount] BDT. Thank you! - [Business Name]"
+   "Dear [Customer Name]
+   Received a payment of [Amount] by [Payment Method].
+   Your due amount is [Current Due Amount].
+   Thank you! - [Business Name]"
 
 6. Trigger Event: Payment Received Receipt (Invoice Module)
    Source: /app/invoice/page.tsx
    Template:
-   "Dear [Customer Name], we have received a payment of [Amount] BDT by [Payment Method]. Your current due amount is [Current Due Amount] BDT. Thank you! - [Business Name]"
+   "Dear [Customer Name]
+   Received a payment of [Amount] by [Payment Method].
+   Your due amount is [Current Due Amount].
+   Thank you! - [Business Name]"
 
 
 --------------------------------------------------------------------------------

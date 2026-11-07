@@ -1523,7 +1523,7 @@ function InvoicePageContent() {
                 } catch (e) {}
               }
               const businessName = (currentUserId && settings?.business_by_user?.[currentUserId]?.name) || settings?.business?.name || ''
-              const smsMessage = `Dear ${selectedInvoice.customer}, we have received a payment of ${Math.round(payment.amount).toLocaleString()} BDT by ${payment.method}. Your current due amount is ${Math.round(newDue).toLocaleString()} BDT. Thank you! - ${businessName}`
+              const smsMessage = `Dear ${selectedInvoice.customer}\nReceived a payment of ${Math.round(payment.amount).toLocaleString()} by ${payment.method}.\nYour due amount is ${Math.round(newDue).toLocaleString()}.\nThank you! - ${businessName}`
               
               let phoneToSend = selectedInvoice.customerPhone
               if (!phoneToSend && selectedInvoice.customer && selectedInvoice.customer !== 'Walk-in Customer') {
