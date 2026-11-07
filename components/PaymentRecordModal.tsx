@@ -22,39 +22,164 @@ export default function PaymentHistoryModal({ isOpen, onClose, customerName, cus
       setIsLoading(true)
       try {
         let resolvedCustomerId = customerId
+        let resolvedCustomerName = (customerName || '').trim()
 
-        if (!resolvedCustomerId && customerName) {
-          const { data: cusData } = await supabase
-            .from('customer')
-            .select('id')
-            .eq('name', customerName)
-            .maybeSingle()
-          if (cusData?.id) {
-            resolvedCustomerId = cusData.id
+        if ((!resolvedCustomerId || !resolvedCustomerName) && (customerName || customerId)) {
+          let cusQuery = supabase.from('customer').select('id, name')
+          if (resolvedCustomerId) {
+            cusQuery = cusQuery.eq('id', resolvedCustomerId)
+          } else {
+            cusQuery = cusQuery.ilike('name', resolvedCustomerName)
+          }
+          const { data: cusData } = await cusQuery.maybeSingle()
+          if (cusData) {
+            resolvedCustomerId = cusData.id || resolvedCustomerId
+            resolvedCustomerName = (cusData.name || resolvedCustomerName).trim()
           }
         }
 
-        let query = supabase
-          .from('transactions')
-          .select('*')
-          .eq('type', 'Payment')
-          .order('date', { ascending: false })
-          .order('created_at', { ascending: false })
-
-        if (resolvedCustomerId) {
-          query = query.eq('customer_id', resolvedCustomerId)
-        } else {
+        if (!resolvedCustomerId && !resolvedCustomerName) {
           setPayments([])
           setIsLoading(false)
           return
         }
-        
-        const { data, error } = await query
-        
-        if (error) throw error
-        
+
+        // Fetch invoices linked by either customer_id or customer_name to verify current ownership
+        const invFilter = resolvedCustomerId && resolvedCustomerName
+          ? `customer_id.eq."${resolvedCustomerId}",customer_name.ilike."${resolvedCustomerName}"`
+          : resolvedCustomerId
+            ? `customer_id.eq."${resolvedCustomerId}"`
+            : `customer_name.ilike."${resolvedCustomerName}"`
+
+        const [furnRes, woodRes] = await Promise.all([
+          supabase
+            .from('furniture_invoices')
+            .select('id, invoice_number, customer_id, customer_name, paid_amount, payment_method, created_at')
+            .or(invFilter),
+          supabase
+            .from('wood_invoices')
+            .select('id, invoice_number, customer_id, customer_name, paid_amount, payment_method, created_at')
+            .or(invFilter)
+        ])
+
+        const candidateInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+        const ownedInvoiceRefs = new Set<string>()
+        const reassignedAwayRefs = new Set<string>()
+        const ownedInvoicesMap = new Map<string, any>()
+
+        candidateInvoices.forEach((inv: any) => {
+          const invCustName = (inv.customer_name || '').trim()
+          const isOwnedByName =
+            resolvedCustomerName &&
+            invCustName &&
+            invCustName.toLowerCase() === resolvedCustomerName.toLowerCase()
+          const isOwnedByIdOnly =
+            !invCustName &&
+            resolvedCustomerId &&
+            String(inv.customer_id) === String(resolvedCustomerId)
+
+          if (isOwnedByName || isOwnedByIdOnly) {
+            if (inv.id) {
+              ownedInvoiceRefs.add(String(inv.id))
+              ownedInvoicesMap.set(String(inv.id), inv)
+            }
+            if (inv.invoice_number) {
+              ownedInvoiceRefs.add(String(inv.invoice_number))
+            }
+          } else {
+            if (inv.id) reassignedAwayRefs.add(String(inv.id))
+            if (inv.invoice_number) reassignedAwayRefs.add(String(inv.invoice_number))
+          }
+        })
+
+        // Query transactions by customer_id AND by owned invoice refs
+        const txnQueries: Promise<any>[] = []
+        if (resolvedCustomerId) {
+          txnQueries.push(
+            Promise.resolve(
+              supabase
+                .from('transactions')
+                .select('*')
+                .eq('customer_id', resolvedCustomerId)
+                .gt('credit', 0)
+                .order('date', { ascending: false })
+                .order('created_at', { ascending: false })
+            )
+          )
+        }
+        const ownedRefList = Array.from(ownedInvoiceRefs)
+        if (ownedRefList.length > 0) {
+          txnQueries.push(
+            Promise.resolve(
+              supabase
+                .from('transactions')
+                .select('*')
+                .in('ref', ownedRefList)
+                .gt('credit', 0)
+                .order('date', { ascending: false })
+                .order('created_at', { ascending: false })
+            )
+          )
+        }
+
+        const txnResults = await Promise.all(txnQueries)
+        const mergedTxnsMap = new Map<string, any>()
+        txnResults.forEach(res => {
+          if (res?.data && Array.isArray(res.data)) {
+            res.data.forEach((t: any) => {
+              if (t && t.id && !mergedTxnsMap.has(String(t.id))) {
+                mergedTxnsMap.set(String(t.id), t)
+              }
+            })
+          }
+        })
+
+        // Filter out any transactions belonging to invoices reassigned to another customer
+        const validPayments: any[] = Array.from(mergedTxnsMap.values()).filter((t: any) => {
+          const tType = String(t.type || '').toLowerCase()
+          if (tType === 'return') return false
+          const refStr = String(t.ref || '').trim()
+          if (refStr && reassignedAwayRefs.has(refStr)) {
+            return false
+          }
+          if (refStr && refStr.toLowerCase() !== 'opening balance') {
+            if (ownedInvoiceRefs.has(refStr)) return true
+            return String(t.customer_id || '') === String(resolvedCustomerId || '')
+          }
+          return String(t.customer_id || '') === String(resolvedCustomerId || '')
+        })
+
+        // Ensure any owned invoice whose paid_amount exceeds recorded transaction credits is also represented
+        ownedInvoicesMap.forEach((inv: any, invId: string) => {
+          const invPaid = Number(inv.paid_amount || 0)
+          if (invPaid <= 0) return
+          const recordedForInv = validPayments
+            .filter(t => String(t.ref) === invId || (inv.invoice_number && String(t.ref) === String(inv.invoice_number)))
+            .reduce((sum, t) => sum + (Number(t.credit) || 0), 0)
+          if (invPaid > recordedForInv) {
+            const invDate = inv.created_at ? new Date(inv.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+            validPayments.push({
+              id: `inv-paid-${invId}`,
+              date: invDate,
+              method: inv.payment_method || 'Cash',
+              credit: invPaid - recordedForInv,
+              ref: invId,
+              created_at: inv.created_at || invDate
+            })
+          }
+        })
+
+        validPayments.sort((a, b) => {
+          const dA = new Date(a.date || a.created_at || 0).getTime()
+          const dB = new Date(b.date || b.created_at || 0).getTime()
+          if (dB !== dA) return dB - dA
+          const cA = new Date(a.created_at || 0).getTime()
+          const cB = new Date(b.created_at || 0).getTime()
+          return cB - cA
+        })
+
         const groupedPayments: any[] = []
-        data?.forEach(payment => {
+        validPayments.forEach(payment => {
           const paymentAmount = Number(payment.credit) || Number(payment.amount) || 0
           if (Math.round(paymentAmount) <= 0) return // Skip 0 amounts
 

@@ -496,7 +496,7 @@ function InvoicePageContent() {
       if (inv.customer && inv.customer !== 'Walk-in Customer') {
         const { data: customerData } = await supabase
           .from('customer')
-          .select('total_due, phone, address')
+          .select('id, total_due, phone, address')
           .eq('name', inv.customer)
           .maybeSingle()
         
@@ -508,6 +508,7 @@ function InvoicePageContent() {
 
       setSelectedInvoice({
         ...inv,
+        customer_id: inv.customer_id || inv.customerId || customerDetails?.id || null,
         items: items || [],
         oldDue,
         customerPhone: inv.customerPhone || customerDetails?.phone || '',

@@ -6,6 +6,8 @@ export interface FormattedInvoice {
   id: string
   displayId: string
   customer: string
+  customerId?: string | null
+  customer_id?: string | null
   customerPhone?: string
   customerPhoto?: string
   customerAddress?: string
@@ -211,6 +213,8 @@ export const formatInvoice = (
     id: inv.id,
     displayId: getDisplayInvoiceId(inv.id),
     customer: inv.customer_name,
+    customerId: inv.customer_id || null,
+    customer_id: inv.customer_id || null,
     customerPhone: inv.customer_phone,
     customerPhoto: inv.customer?.photo,
     customerAddress: inv.customer_address,

@@ -65,13 +65,18 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
             : `customer_name.eq."${initialData.name}"`
 
           const [furnRes, woodRes] = await Promise.all([
-            supabase.from('furniture_invoices').select('due_amount').or(filterExpr),
-            supabase.from('wood_invoices').select('due_amount').or(filterExpr)
+            supabase.from('furniture_invoices').select('customer_id, customer_name, due_amount').or(filterExpr),
+            supabase.from('wood_invoices').select('customer_id, customer_name, due_amount').or(filterExpr)
           ])
 
           if (!isMounted) return
 
-          const allInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+          const targetNameLower = (initialData.name || '').trim().toLowerCase()
+          const allInvoices = [...(furnRes.data || []), ...(woodRes.data || [])].filter(inv => {
+            const invNameLower = (inv.customer_name || '').trim().toLowerCase()
+            if (invNameLower && targetNameLower) return invNameLower === targetNameLower
+            return Boolean(initialData.id && String(inv.customer_id) === String(initialData.id))
+          })
           const computedInvoiceDue = allInvoices.reduce(
             (sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)),
             0
@@ -192,16 +197,25 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
           : `customer_name.eq."${initialData.name}"`
 
         const [furnRes, woodRes] = await Promise.all([
-          supabase.from('furniture_invoices').select('due_amount').or(filterExpr),
-          supabase.from('wood_invoices').select('due_amount').or(filterExpr)
+          supabase.from('furniture_invoices').select('customer_id, customer_name, due_amount').or(filterExpr),
+          supabase.from('wood_invoices').select('customer_id, customer_name, due_amount').or(filterExpr)
         ])
 
-        const allInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+        const validNames = new Set(
+          [initialData.name, formData.name]
+            .map(n => (n || '').trim().toLowerCase())
+            .filter(Boolean)
+        )
+        const allInvoices = [...(furnRes.data || []), ...(woodRes.data || [])].filter(inv => {
+          const invNameLower = (inv.customer_name || '').trim().toLowerCase()
+          if (invNameLower) return validNames.has(invNameLower)
+          return Boolean(initialData.id && String(inv.customer_id) === String(initialData.id))
+        })
         latestInvoiceDue = allInvoices.reduce(
           (sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)),
           0
         )
-        latestOrdersCount = Math.max(latestOrdersCount, allInvoices.length)
+        latestOrdersCount = allInvoices.length
       }
 
       const cleanOpeningBalance = Math.max(0, Number(formData.initialBalance) || 0)

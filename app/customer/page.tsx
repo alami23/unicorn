@@ -117,9 +117,14 @@ function CustomerPageContent() {
       if (data) {
         // Map snake_case from DB to camelCase for UI and separate active invoice due from opening balance
         const mappedCustomers = data.map(c => {
-          const customerInvoices = invoicesData.filter(
-            inv => (inv.customer_id && inv.customer_id === c.id) || inv.customer_name === c.name
-          )
+          const cNameLower = (c.name || '').trim().toLowerCase()
+          const customerInvoices = invoicesData.filter(inv => {
+            const invNameLower = (inv.customer_name || '').trim().toLowerCase()
+            if (invNameLower) {
+              return invNameLower === cNameLower
+            }
+            return Boolean(inv.customer_id && String(inv.customer_id) === String(c.id))
+          })
           const invoiceCount = customerInvoices.length
           const activeInvoiceDue = customerInvoices.reduce(
             (sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)),
@@ -135,7 +140,7 @@ function CustomerPageContent() {
             phone: c.phone,
             address: c.address,
             type: c.type,
-            totalOrders: Math.max(c.total_orders || 0, invoiceCount),
+            totalOrders: invoiceCount,
             totalDue: effectiveTotalDue,
             initialBalance: openingBalance,
             invoiceDue: activeInvoiceDue,
@@ -165,11 +170,20 @@ function CustomerPageContent() {
         const filterExpr = filterParts.join(',')
 
         const [furnRes, woodRes] = await Promise.all([
-          supabase.from('furniture_invoices').select('id, due_amount').or(filterExpr),
-          supabase.from('wood_invoices').select('id, due_amount').or(filterExpr)
+          supabase.from('furniture_invoices').select('id, customer_id, customer_name, due_amount').or(filterExpr),
+          supabase.from('wood_invoices').select('id, customer_id, customer_name, due_amount').or(filterExpr)
         ])
 
-        const allCustomerInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+        const validNames = new Set(
+          [customer.name, editingCustomer.name]
+            .map(n => (n || '').trim().toLowerCase())
+            .filter(Boolean)
+        )
+        const allCustomerInvoices = [...(furnRes.data || []), ...(woodRes.data || [])].filter(inv => {
+          const invNameLower = (inv.customer_name || '').trim().toLowerCase()
+          if (invNameLower) return validNames.has(invNameLower)
+          return Boolean(inv.customer_id && String(inv.customer_id) === String(customer.id))
+        })
         const activeInvoiceDue = allCustomerInvoices.reduce(
           (sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)),
           0
@@ -177,7 +191,7 @@ function CustomerPageContent() {
 
         const newOpeningBalance = Math.max(0, Number(customer.initialBalance ?? 0))
         const recalculatedTotalDue = Math.max(0, activeInvoiceDue + newOpeningBalance)
-        const recalculatedTotalOrders = Math.max(customer.totalOrders || 0, allCustomerInvoices.length)
+        const recalculatedTotalOrders = allCustomerInvoices.length
 
         const customerData = {
           id: customer.id,

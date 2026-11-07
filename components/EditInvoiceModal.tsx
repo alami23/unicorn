@@ -68,6 +68,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
   // Header & Customer details
   const [customerName, setCustomerName] = useState('')
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
   const [invoiceDate, setInvoiceDate] = useState('')
@@ -77,9 +78,11 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
   const [createdBy, setCreatedBy] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('Cash')
 
-  // Original IDs tracking to safely handle tenant prefixes & modifications
+  // Original IDs & Customer tracking to safely handle tenant prefixes, modifications, & customer reassignments
   const originalDisplayIdRef = useRef<string>('')
   const originalDbIdRef = useRef<string>('')
+  const originalCustomerNameRef = useRef<string>('')
+  const originalCustomerIdRef = useRef<string | null>(null)
 
   // Items
   const [items, setItems] = useState<EditableItem[]>([])
@@ -115,6 +118,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     amount: number
     type?: string
     notes?: string
+    createdAt?: string
     isNew?: boolean
   }
   const [paymentEntries, setPaymentEntries] = useState<PaymentTransactionEntry[]>([])
@@ -394,7 +398,13 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     removedProductIdsRef.current = new Set()
     lastClickedDisplayIdxRef.current = null
 
-    setCustomerName(invoice.customer || invoice.customer_name || 'Walk-in Customer')
+    const initialCustName = (invoice.customer || invoice.customer_name || 'Walk-in Customer').trim()
+    const initialCustId = invoice.customer_id || invoice.customerId || null
+    setCustomerName(initialCustName)
+    setSelectedCustomerId(initialCustId)
+    originalCustomerNameRef.current = initialCustName
+    originalCustomerIdRef.current = initialCustId
+
     setCustomerPhone(invoice.customerPhone || invoice.customer_phone || '')
     setCustomerAddress(invoice.customerAddress || invoice.customer_address || '')
     setInvoiceDate(invoice.date ? invoice.date.split('T')[0] : new Date().toISOString().split('T')[0])
@@ -424,11 +434,22 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
     const defaultDateStr = invoice.date ? invoice.date.split('T')[0] : new Date().toISOString().split('T')[0]
     const defaultMethodStr = invoice.paymentMethod || invoice.payment_method || 'Cash'
 
-    // Load existing partial payment transactions for this invoice
+    const candidateRefs = Array.from(
+      new Set(
+        [
+          invoice.id,
+          invoice.invoice_number,
+          initialDisplayId,
+          getDisplayInvoiceId(invoice.id, isWood)
+        ].filter(Boolean)
+      )
+    )
+
+    // Load existing payment transactions for this invoice across all candidate refs
     supabase
       .from('transactions')
       .select('*')
-      .eq('ref', invoice.id)
+      .in('ref', candidateRefs)
       .gt('credit', 0)
       .order('created_at', { ascending: true })
       .then(({ data: txns }) => {
@@ -438,8 +459,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
           date: t.date || defaultDateStr,
           method: t.method || t.notes || defaultMethodStr,
           amount: Number(t.credit || 0),
-          type: t.type || (idx === 0 ? 'Invoice' : 'Payment'),
+          type: 'Payment',
           notes: t.notes || t.method || defaultMethodStr,
+          createdAt: t.created_at,
           isNew: false
         }))
 
@@ -450,7 +472,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
             date: defaultDateStr,
             method: defaultMethodStr,
             amount: initialInvoicePaid - recordedSum,
-            type: 'Invoice',
+            type: 'Payment',
             notes: defaultMethodStr,
             isNew: true
           })
@@ -473,14 +495,18 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       fetchItemsFromDb(invoice.id, isWood)
     }
 
-    if (invoice.customer && invoice.customer !== 'Walk-in Customer') {
+    if (initialCustName && initialCustName !== 'Walk-in Customer') {
       supabase
         .from('customer')
-        .select('phone, address, total_due')
-        .eq('name', invoice.customer)
+        .select('id, phone, address, total_due')
+        .eq('name', initialCustName)
         .maybeSingle()
         .then(({ data: cust }) => {
           if (cust) {
+            if (!originalCustomerIdRef.current && cust.id) {
+              originalCustomerIdRef.current = cust.id
+              setSelectedCustomerId(cust.id)
+            }
             if (!invoice.customerPhone && cust.phone) setCustomerPhone(cust.phone)
             if (!invoice.customerAddress && cust.address) setCustomerAddress(cust.address)
             const currentInvoiceDue = Number(invoice.due || invoice.due_amount || 0)
@@ -598,7 +624,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       date: todayStr,
       method: paymentMethod || 'Cash',
       amount: amt,
-      type: paymentEntries.length === 0 ? 'Invoice' : 'Payment',
+      type: 'Payment',
       notes: paymentMethod || 'Cash',
       isNew: true
     }
@@ -650,9 +676,17 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
   const selectCustomer = (c: any) => {
     setCustomerName(c.name)
+    setSelectedCustomerId(c.id || null)
     setCustomerPhone(c.phone || '')
     setCustomerAddress(c.address || '')
-    setOldDue(Math.max(0, (c.total_due || 0)))
+    const isSameAsOriginal =
+      (originalCustomerIdRef.current && c.id && String(c.id) === String(originalCustomerIdRef.current)) ||
+      c.name.trim().toLowerCase() === originalCustomerNameRef.current.trim().toLowerCase()
+    const currentInvoiceDue = Number(invoice?.due ?? invoice?.due_amount ?? 0)
+    const computedOldDue = isSameAsOriginal
+      ? Math.max(0, (Number(c.total_due) || 0) - currentInvoiceDue)
+      : Math.max(0, Number(c.total_due) || 0)
+    setOldDue(computedOldDue)
     setIsCustomerDropdownOpen(false)
   }
 
@@ -1141,8 +1175,70 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       const creatorNameVal = createdBy.trim() || null
       const creatorIdVal = matchedUser?.id || null
 
+      // Resolve previous (original) customer and target (new) customer before updating invoice & transactions
+      const prevCustomerName = (originalCustomerNameRef.current || invoice.customer || invoice.customer_name || '').trim()
+      let prevCustomerId: string | null = originalCustomerIdRef.current || invoice.customer_id || invoice.customerId || null
+      let prevCustomerRecord: any = null
+
+      if (prevCustomerId) {
+        const { data: prevById } = await supabase
+          .from('customer')
+          .select('id, name, total_due, total_orders')
+          .eq('id', prevCustomerId)
+          .maybeSingle()
+        if (prevById) {
+          prevCustomerRecord = prevById
+          prevCustomerId = prevById.id
+        }
+      }
+      if (!prevCustomerRecord && prevCustomerName && prevCustomerName.toLowerCase() !== 'walk-in customer') {
+        const { data: prevByName } = await supabase
+          .from('customer')
+          .select('id, name, total_due, total_orders')
+          .ilike('name', prevCustomerName)
+          .maybeSingle()
+        if (prevByName) {
+          prevCustomerRecord = prevByName
+          prevCustomerId = prevByName.id
+        }
+      }
+
+      const nextCustomerName = customerName.trim()
+      let nextCustomerId: string | null = null
+      let nextCustomerRecord: any = null
+
+      if (nextCustomerName && nextCustomerName.toLowerCase() !== 'walk-in customer') {
+        if (selectedCustomerId) {
+          const { data: nextById } = await supabase
+            .from('customer')
+            .select('id, name, total_due, total_orders, phone, address')
+            .eq('id', selectedCustomerId)
+            .maybeSingle()
+          if (nextById && nextById.name.trim().toLowerCase() === nextCustomerName.toLowerCase()) {
+            nextCustomerRecord = nextById
+            nextCustomerId = nextById.id
+          }
+        }
+        if (!nextCustomerRecord) {
+          const { data: nextByName } = await supabase
+            .from('customer')
+            .select('id, name, total_due, total_orders, phone, address')
+            .ilike('name', nextCustomerName)
+            .maybeSingle()
+          if (nextByName) {
+            nextCustomerRecord = nextByName
+            nextCustomerId = nextByName.id
+          }
+        }
+      }
+
+      const isCustomerChanged =
+        String(prevCustomerId || '') !== String(nextCustomerId || '') ||
+        prevCustomerName.toLowerCase() !== nextCustomerName.toLowerCase()
+
       const invoiceUpdatePayload: any = {
-        customer_name: customerName.trim(),
+        customer_id: nextCustomerId,
+        customer_name: nextCustomerName,
         customer_phone: customerPhone.trim() || null,
         customer_address: customerAddress.trim() || null,
         subtotal: itemsSubtotal,
@@ -1280,28 +1376,43 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
       const previousDueRecorded = Number(invoice.due || invoice.due_amount || 0)
       const dueDifference = currentDue - previousDueRecorded
 
-      let resolvedCustomerId: string | null = invoice.customer_id || null
-      if (customerName && customerName !== 'Walk-in Customer') {
-        const { data: customerRecord } = await supabase
-          .from('customer')
-          .select('id, total_due')
-          .eq('name', customerName)
-          .maybeSingle()
-
-        if (customerRecord) {
-          resolvedCustomerId = customerRecord.id
+      if (isCustomerChanged) {
+        // 1. Deduct previous invoice due and order count from previous customer
+        if (prevCustomerRecord && prevCustomerRecord.id) {
           await supabase
             .from('customer')
-            .update({ 
-              total_due: Math.max(0, (customerRecord.total_due || 0) + dueDifference),
-              phone: customerPhone.trim() || undefined,
-              address: customerAddress.trim() || undefined
+            .update({
+              total_due: Math.max(0, (Number(prevCustomerRecord.total_due) || 0) - previousDueRecorded),
+              total_orders: Math.max(0, (Number(prevCustomerRecord.total_orders) || 1) - 1)
             })
-            .eq('name', customerName)
+            .eq('id', prevCustomerRecord.id)
         }
+
+        // 2. Add current invoice due and order count to new customer
+        if (nextCustomerRecord && nextCustomerRecord.id) {
+          await supabase
+            .from('customer')
+            .update({
+              total_due: Math.max(0, (Number(nextCustomerRecord.total_due) || 0) + currentDue),
+              total_orders: (Number(nextCustomerRecord.total_orders) || 0) + 1,
+              phone: customerPhone.trim() || nextCustomerRecord.phone || undefined,
+              address: customerAddress.trim() || nextCustomerRecord.address || undefined
+            })
+            .eq('id', nextCustomerRecord.id)
+        }
+      } else if (nextCustomerRecord && nextCustomerRecord.id) {
+        // Same customer: adjust total_due by dueDifference
+        await supabase
+          .from('customer')
+          .update({
+            total_due: Math.max(0, (Number(nextCustomerRecord.total_due) || 0) + dueDifference),
+            phone: customerPhone.trim() || nextCustomerRecord.phone || undefined,
+            address: customerAddress.trim() || nextCustomerRecord.address || undefined
+          })
+          .eq('id', nextCustomerRecord.id)
       }
 
-      // Sync Partial Payment Transactions in `transactions` table
+      // Sync Invoice & Payment Transactions in `transactions` table and transfer all records to `nextCustomerId`
       const finalPaymentEntries: PaymentTransactionEntry[] = [
         ...paymentEntries.filter(e => (Number(e.amount) || 0) > 0)
       ]
@@ -1312,22 +1423,36 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
           date: new Date().toISOString().split('T')[0],
           method: paymentMethod || 'Cash',
           amount: pendingVal,
-          type: finalPaymentEntries.length === 0 ? 'Invoice' : 'Payment',
+          type: 'Payment',
           notes: paymentMethod || 'Cash',
           isNew: true
         })
       }
 
-      await supabase.from('transactions').delete().eq('ref', invoice.id)
-      if (isIdChanged && targetDbId !== invoice.id) {
-        await supabase.from('transactions').delete().eq('ref', targetDbId)
-      }
+      const allInvoiceRefs = Array.from(
+        new Set(
+          [
+            invoice.id,
+            originalDbIdRef.current,
+            originalDisplayIdRef.current,
+            invoice.invoice_number,
+            cleanDisplayId,
+            targetDbId,
+            getDisplayInvoiceId(invoice.id, isWood),
+            getDisplayInvoiceId(targetDbId, isWood)
+          ].filter(Boolean)
+        )
+      )
+
+      await supabase.from('transactions').delete().in('ref', allInvoiceRefs)
+
+      const invoiceDateStr = invoiceDate || new Date().toISOString().split('T')[0]
 
       if (finalPaymentEntries.length === 0) {
         await supabase.from('transactions').insert([{
           id: `TXN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-          customer_id: resolvedCustomerId,
-          date: invoiceDate || new Date().toISOString().split('T')[0],
+          customer_id: nextCustomerId,
+          date: invoiceDateStr,
           type: 'Invoice',
           ref: targetDbId,
           debit: Number(grandTotal),
@@ -1338,23 +1463,41 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         }])
       } else {
         let runningBalance = Number(grandTotal)
-        const txnRowsToInsert = finalPaymentEntries.map((entry, idx) => {
+        const invoiceDebitRow = {
+          id: `TXN-INV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+          customer_id: nextCustomerId,
+          date: invoiceDateStr,
+          type: 'Invoice',
+          ref: targetDbId,
+          debit: Number(grandTotal),
+          credit: 0,
+          balance: Number(grandTotal),
+          method: paymentMethod || 'Cash',
+          notes: paymentMethod || 'Cash'
+        }
+
+        const paymentRowsToInsert = finalPaymentEntries.map((entry, idx) => {
           const creditAmt = Number(entry.amount) || 0
           runningBalance = Math.max(0, runningBalance - creditAmt)
-          return {
-            id: entry.dbId || `TXN-${idx === 0 ? '' : 'P-'}${Date.now().toString(36).toUpperCase()}-${idx}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`,
-            customer_id: resolvedCustomerId,
-            date: entry.date || invoiceDate || new Date().toISOString().split('T')[0],
-            type: idx === 0 ? 'Invoice' : 'Payment',
+          const rowPayload: any = {
+            id: entry.dbId || `TXN-P-${Date.now().toString(36).toUpperCase()}-${idx}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`,
+            customer_id: nextCustomerId,
+            date: entry.date || invoiceDateStr,
+            type: 'Payment',
             ref: targetDbId,
-            debit: idx === 0 ? Number(grandTotal) : 0,
+            debit: 0,
             credit: creditAmt,
             balance: runningBalance,
             method: entry.method || paymentMethod || 'Cash',
             notes: entry.notes || entry.method || paymentMethod || 'Cash'
           }
+          if (entry.createdAt) {
+            rowPayload.created_at = entry.createdAt
+          }
+          return rowPayload
         })
-        await supabase.from('transactions').insert(txnRowsToInsert)
+
+        await supabase.from('transactions').insert([invoiceDebitRow, ...paymentRowsToInsert])
       }
 
       if (creatorNameVal) {

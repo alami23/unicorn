@@ -121,30 +121,98 @@ function CustomerStatementContent() {
             lastPurchase: found.last_purchase
           })
 
-          // Fetch transactions for this customer
-          let query = supabase
+          // Fetch invoices linked to this customer to verify current ownership after any reassignments
+          const custNameTrimmed = (found.name || '').trim()
+          const invFilter = custNameTrimmed
+            ? `customer_id.eq."${targetId}",customer_name.ilike."${custNameTrimmed}"`
+            : `customer_id.eq."${targetId}"`
+
+          const [furnRes, woodRes] = await Promise.all([
+            supabase
+              .from('furniture_invoices')
+              .select('id, invoice_number, customer_id, customer_name')
+              .or(invFilter),
+            supabase
+              .from('wood_invoices')
+              .select('id, invoice_number, customer_id, customer_name')
+              .or(invFilter)
+          ])
+
+          const candidateInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+          const ownedInvoiceRefs = new Set<string>()
+          const reassignedAwayRefs = new Set<string>()
+
+          candidateInvoices.forEach((inv: any) => {
+            const invCustName = (inv.customer_name || '').trim()
+            const isOwned =
+              (custNameTrimmed && invCustName && invCustName.toLowerCase() === custNameTrimmed.toLowerCase()) ||
+              (!invCustName && String(inv.customer_id) === String(targetId))
+
+            if (isOwned) {
+              if (inv.id) ownedInvoiceRefs.add(String(inv.id))
+              if (inv.invoice_number) ownedInvoiceRefs.add(String(inv.invoice_number))
+            } else {
+              if (inv.id) reassignedAwayRefs.add(String(inv.id))
+              if (inv.invoice_number) reassignedAwayRefs.add(String(inv.invoice_number))
+            }
+          })
+
+          // Fetch transactions by customer_id and by owned invoice refs
+          let custTxnQuery = supabase
             .from('transactions')
             .select('*')
             .eq('customer_id', targetId)
             .order('date', { ascending: true })
-          
-          if (startDate) query = query.gte('date', startDate)
-          if (endDate) query = query.lte('date', endDate)
+          if (startDate) custTxnQuery = custTxnQuery.gte('date', startDate)
+          if (endDate) custTxnQuery = custTxnQuery.lte('date', endDate)
 
-          const { data: txns, error: txError } = await query
-          if (txError) throw txError
-
-          if (txns) {
-            setCustomerTransactions(txns.map(t => ({
-              id: t.id,
-              date: t.date,
-              type: t.type,
-              ref: t.ref,
-              debit: Number(t.debit || 0),
-              credit: Number(t.credit || 0),
-              balance: Number(t.balance || 0)
-            })))
+          const txnQueries: Promise<any>[] = [Promise.resolve(custTxnQuery)]
+          const ownedRefArray = Array.from(ownedInvoiceRefs)
+          if (ownedRefArray.length > 0) {
+            let refTxnQuery = supabase
+              .from('transactions')
+              .select('*')
+              .in('ref', ownedRefArray)
+              .order('date', { ascending: true })
+            if (startDate) refTxnQuery = refTxnQuery.gte('date', startDate)
+            if (endDate) refTxnQuery = refTxnQuery.lte('date', endDate)
+            txnQueries.push(Promise.resolve(refTxnQuery))
           }
+
+          const txnResults = await Promise.all(txnQueries)
+          const mergedMap = new Map<string, any>()
+          txnResults.forEach(res => {
+            if (res?.data && Array.isArray(res.data)) {
+              res.data.forEach((t: any) => {
+                if (t && t.id && !mergedMap.has(String(t.id))) {
+                  mergedMap.set(String(t.id), t)
+                }
+              })
+            }
+          })
+
+          const filteredTxns = Array.from(mergedMap.values())
+            .filter((t: any) => {
+              const refStr = String(t.ref || '').trim()
+              if (refStr && reassignedAwayRefs.has(refStr)) return false
+              return true
+            })
+            .sort((a: any, b: any) => {
+              const dA = new Date(a.date || a.created_at || 0).getTime()
+              const dB = new Date(b.date || b.created_at || 0).getTime()
+              if (dA !== dB) return dA - dB
+              return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+            })
+
+          setCustomerTransactions(filteredTxns.map(t => ({
+            id: t.id,
+            date: t.date,
+            type: t.type,
+            ref: t.ref,
+            debit: Number(t.debit || 0),
+            credit: Number(t.credit || 0),
+            balance: Number(t.balance || 0)
+          })))
         }
       } else {
         setCustomer(null)
