@@ -746,7 +746,7 @@ function InvoicePageContent() {
       const formattedPaid = Math.round(amountPaid).toLocaleString()
       const formattedDue = Math.round(amountDue).toLocaleString()
 
-      const reminderMsg = `Dear ${customerName}, here is the payment reminder for Invoice ${invoiceNumber} from ${businessName}.\n- Total Bill: ${formattedTotal} BDT\n- Paid Amount: ${formattedPaid} BDT\n- Due Amount: ${formattedDue} BDT\nPlease clear the due amount at your earliest convenience. Thank you!`
+      const reminderMsg = `Dear ${customerName}\npayment reminder for Invoice ${invoiceNumber} from ${businessName}.\nTotal Bill: ${formattedTotal}\nPaid Amount: ${formattedPaid}\nDue Amount: ${formattedDue}\nPlease clear the due amount at your earliest convenience. Thank you!`
 
       // 6. If phone number is missing, open modal so user can input phone number
       if (!phoneToSend || !phoneToSend.trim()) {
@@ -1523,7 +1523,7 @@ function InvoicePageContent() {
                 } catch (e) {}
               }
               const businessName = (currentUserId && settings?.business_by_user?.[currentUserId]?.name) || settings?.business?.name || ''
-              const smsMessage = `Dear ${selectedInvoice.customer}\nReceived a payment of ${Math.round(payment.amount).toLocaleString()} by ${payment.method}.\nYour due amount is ${Math.round(newDue).toLocaleString()}.\nThank you! - ${businessName}`
+              const smsMessage = `Dear ${selectedInvoice.customer}\nReceived payment ${Math.round(payment.amount).toLocaleString()} by ${payment.method}.\nDue Amount - ${Math.round(newDue).toLocaleString()}.\nThank you! - ${businessName}.`
               
               let phoneToSend = selectedInvoice.customerPhone
               if (!phoneToSend && selectedInvoice.customer && selectedInvoice.customer !== 'Walk-in Customer') {

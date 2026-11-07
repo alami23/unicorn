@@ -304,15 +304,10 @@ function CustomerPageContent() {
 
       // 5. Compose structured due reminder message with total bill, paid amount, and due
       const formattedDue = Math.round(totalDue).toLocaleString()
-      const formattedTotal = totalBill > 0 ? Math.round(totalBill).toLocaleString() : null
-      const formattedPaid = totalPaid > 0 ? Math.round(totalPaid).toLocaleString() : null
+      const formattedTotal = Math.round(totalBill).toLocaleString()
+      const formattedPaid = Math.round(totalPaid).toLocaleString()
 
-      let reminderMsg = ''
-      if (formattedTotal && formattedPaid) {
-        reminderMsg = `Dear ${cus.name}, this is a payment reminder from ${businessName}.\n- Total Purchases: ${formattedTotal} BDT\n- Paid Amount: ${formattedPaid} BDT\n- Outstanding Due: ${formattedDue} BDT\nPlease clear your due amount at your earliest convenience. Thank you!`
-      } else {
-        reminderMsg = `Dear ${cus.name}, this is a payment reminder from ${businessName} regarding your outstanding due of ${formattedDue} BDT.\nPlease clear it at your earliest convenience. Thank you!`
-      }
+      const reminderMsg = `Dear ${cus.name}, payment reminder from ${businessName}.\nTotal Purchases: ${formattedTotal}.\nPaid Amount: ${formattedPaid}.\nDue Amount: ${formattedDue}.\nPlease clear your due amount at your earliest convenience. Thank you!`
 
       // 6. Check phone
       if (!phoneToSend || !phoneToSend.trim()) {
@@ -980,7 +975,7 @@ function CustomerPageContent() {
               console.warn('Failed to fetch settings for customer SMS:', err)
             }
             
-            const smsMessage = `Dear ${resolvedCustomerName}\nReceived a payment of ${payment.amount.toLocaleString()} by ${payment.method}.\nYour due amount is ${updatedTotalDue.toLocaleString()}.\nThank you! - ${businessName}`
+            const smsMessage = `Dear ${resolvedCustomerName}\nReceived payment ${payment.amount.toLocaleString()} by ${payment.method}.\nDue Amount - ${updatedTotalDue.toLocaleString()}.\nThank you! - ${businessName}.`
             
             if (targetCustomer.phone) {
               sendSMS(targetCustomer.phone, smsMessage)

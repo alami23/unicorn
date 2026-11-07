@@ -52,45 +52,40 @@ SECTION 2: AUTOMATED TRANSACTIONAL SMS TEMPLATES
    Source: /app/customer/page.tsx
    Template:
    "Dear [Customer Name]
-   Received a payment of [Amount] by [Payment Method].
-   Your due amount is [Current Due Amount].
-   Thank you! - [Business Name]"
+   Received payment [Amount] by [Payment Method].
+   Due Amount - [Current Due Amount].
+   Thank you! - [Business Name]."
 
 6. Trigger Event: Payment Received Receipt (Invoice Module)
    Source: /app/invoice/page.tsx
    Template:
    "Dear [Customer Name]
-   Received a payment of [Amount] by [Payment Method].
-   Your due amount is [Current Due Amount].
-   Thank you! - [Business Name]"
+   Received payment [Amount] by [Payment Method].
+   Due Amount - [Current Due Amount].
+   Thank you! - [Business Name]."
 
 
 --------------------------------------------------------------------------------
 SECTION 3: PAYMENT REMINDER & INVOICE SHARING SMS TEMPLATES
 --------------------------------------------------------------------------------
 
-7. Trigger Event: Customer Due Reminder (Customer With Invoice History)
+7. Trigger Event: Customer Due Reminder (Customer Module)
    Source: /app/customer/page.tsx
    Template:
-   "Dear [Customer Name], this is a payment reminder from [Business Name].
-   - Total Purchases: [Total Purchases] BDT
-   - Paid Amount: [Paid Amount] BDT
-   - Outstanding Due: [Outstanding Due] BDT
+   "Dear [Customer Name], payment reminder from [Business Name].
+   Total Purchases: [Total Purchases].
+   Paid Amount: [Paid Amount].
+   Due Amount: [Outstanding Due].
    Please clear your due amount at your earliest convenience. Thank you!"
-
-8. Trigger Event: Customer Due Reminder (Customer With Opening Balance Only)
-   Source: /app/customer/page.tsx
-   Template:
-   "Dear [Customer Name], this is a payment reminder from [Business Name] regarding your outstanding due of [Outstanding Due] BDT.
-   Please clear it at your earliest convenience. Thank you!"
 
 9. Trigger Event: Invoice Due Reminder (Specific Unpaid Invoice)
    Source: /app/invoice/page.tsx
    Template:
-   "Dear [Customer Name], here is the payment reminder for Invoice [Invoice Number] from [Business Name].
-   - Total Bill: [Total Bill] BDT
-   - Paid Amount: [Paid Amount] BDT
-   - Due Amount: [Due Amount] BDT
+   "Dear [Customer Name]
+   payment reminder for Invoice [Invoice Number] from [Business Name].
+   Total Bill: [Total Bill]
+   Paid Amount: [Paid Amount]
+   Due Amount: [Due Amount]
    Please clear the due amount at your earliest convenience. Thank you!"
 
 10. Trigger Event: Outstanding Due Reminder (Reports Module)
