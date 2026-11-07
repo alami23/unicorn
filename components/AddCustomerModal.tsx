@@ -25,6 +25,8 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
   const balanceInputRef = useRef<HTMLInputElement>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const [activeInvoiceDue, setActiveInvoiceDue] = useState(0)
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -36,17 +38,64 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
   })
 
   React.useEffect(() => {
+    let isMounted = true
+
     if (initialData) {
+      const initialInvoiceDue = Number(initialData.invoiceDue || 0)
+      const initialOpening = initialData.initialBalance !== undefined
+        ? Math.max(0, Number(initialData.initialBalance) || 0)
+        : Math.max(0, (Number(initialData.totalDue) || 0) - initialInvoiceDue)
+
+      setActiveInvoiceDue(initialInvoiceDue)
       setFormData({
         name: initialData.name || '',
         phone: initialData.phone || '',
         email: initialData.email || '',
         address: initialData.address || '',
         type: initialData.type || 'Regular',
-        initialBalance: initialData.initialBalance || initialData.totalDue || 0,
+        initialBalance: initialOpening,
         photo: initialData.photo || null
       })
+
+      // Fetch authoritative active invoice dues from Supabase to ensure accurate opening balance separation
+      const fetchActiveInvoiceDues = async () => {
+        try {
+          const filterExpr = initialData.id
+            ? `customer_id.eq."${initialData.id}",customer_name.eq."${initialData.name}"`
+            : `customer_name.eq."${initialData.name}"`
+
+          const [furnRes, woodRes] = await Promise.all([
+            supabase.from('furniture_invoices').select('due_amount').or(filterExpr),
+            supabase.from('wood_invoices').select('due_amount').or(filterExpr)
+          ])
+
+          if (!isMounted) return
+
+          const allInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+          const computedInvoiceDue = allInvoices.reduce(
+            (sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)),
+            0
+          )
+          setActiveInvoiceDue(computedInvoiceDue)
+
+          const computedOpeningBalance = initialData.initialBalance !== undefined
+            ? Math.max(0, Number(initialData.initialBalance) || 0)
+            : Math.max(0, (Number(initialData.totalDue) || 0) - computedInvoiceDue)
+
+          setFormData(prev => ({
+            ...prev,
+            initialBalance: computedOpeningBalance
+          }))
+        } catch (err) {
+          console.error('Error fetching active invoice dues for customer:', err)
+        }
+      }
+
+      if (isOpen && (initialData.id || initialData.name)) {
+        fetchActiveInvoiceDues()
+      }
     } else {
+      setActiveInvoiceDue(0)
       setFormData({
         name: '',
         phone: '',
@@ -56,6 +105,10 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
         initialBalance: 0,
         photo: null
       })
+    }
+
+    return () => {
+      isMounted = false
     }
   }, [initialData, isOpen])
 
@@ -130,11 +183,39 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
     if (isSubmitting) return
     setIsSubmitting(true)
     try {
+      let latestInvoiceDue = activeInvoiceDue
+      let latestOrdersCount = initialData?.totalOrders || 0
+
+      if (initialData?.id || initialData?.name) {
+        const filterExpr = initialData.id
+          ? `customer_id.eq."${initialData.id}",customer_name.eq."${initialData.name}"`
+          : `customer_name.eq."${initialData.name}"`
+
+        const [furnRes, woodRes] = await Promise.all([
+          supabase.from('furniture_invoices').select('due_amount').or(filterExpr),
+          supabase.from('wood_invoices').select('due_amount').or(filterExpr)
+        ])
+
+        const allInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+        latestInvoiceDue = allInvoices.reduce(
+          (sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)),
+          0
+        )
+        latestOrdersCount = Math.max(latestOrdersCount, allInvoices.length)
+      }
+
+      const cleanOpeningBalance = Math.max(0, Number(formData.initialBalance) || 0)
+      const recalculatedTotalDue = initialData
+        ? Math.max(0, latestInvoiceDue + cleanOpeningBalance)
+        : cleanOpeningBalance
+
       const customerData = {
         id: initialData?.id || `CUS-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
         ...formData,
-        totalOrders: initialData?.totalOrders || 0,
-        totalDue: formData.initialBalance,
+        initialBalance: cleanOpeningBalance,
+        invoiceDue: latestInvoiceDue,
+        totalOrders: latestOrdersCount,
+        totalDue: recalculatedTotalDue,
         lastPurchase: initialData?.lastPurchase || null
       }
       
@@ -161,9 +242,9 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
         email: customer.email,
         address: customer.address,
         type: customer.type,
-        total_due: customer.initialBalance || 0,
-        total_orders: 0,
-        last_purchase: null,
+        total_due: Number(customer.totalDue ?? customer.initialBalance ?? 0),
+        total_orders: customer.totalOrders || 0,
+        last_purchase: customer.lastPurchase || null,
         photo: customer.photo
       }
 
@@ -367,15 +448,34 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
             </div>
 
             <div className="col-span-full space-y-2">
-              <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Initial Opening Balance (৳)</label>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Initial Opening Balance (৳)</label>
+                {initialData && (Number(formData.initialBalance) || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, initialBalance: 0 }))}
+                    className="text-[11px] font-bold text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+                  >
+                    Reset Opening Balance to 0
+                  </button>
+                )}
+              </div>
               <input 
                 ref={balanceInputRef}
                 type="number"
+                min="0"
+                step="any"
                 inputMode="decimal"
                 enterKeyHint="send"
                 value={Number.isNaN(formData.initialBalance) ? '' : formData.initialBalance}
                 onFocus={(e) => e.target.select()}
-                onChange={(e) => setFormData({...formData, initialBalance: parseFloat(e.target.value) || 0})}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setFormData(prev => ({
+                    ...prev,
+                    initialBalance: val === '' ? 0 : Math.max(0, parseFloat(val) || 0)
+                  }))
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.keyCode === 13) {
                     e.preventDefault()
@@ -385,7 +485,15 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all text-sm"
                 placeholder="0.00"
               />
-              <p className="text-[10px] text-slate-400 italic">Enter any previous due amount if applicable</p>
+              {initialData ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/70 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+                  <span>Active Invoices Due: <strong className="text-slate-700 dark:text-slate-200">৳{activeInvoiceDue.toLocaleString()}</strong></span>
+                  <span>+ Opening Balance: <strong className="text-slate-700 dark:text-slate-200">৳{Math.max(0, Number(formData.initialBalance) || 0).toLocaleString()}</strong></span>
+                  <span>= New Total Due: <strong className="text-amber-600 dark:text-amber-400">৳{Math.max(0, activeInvoiceDue + (Number(formData.initialBalance) || 0)).toLocaleString()}</strong></span>
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-400 italic">Enter any previous due amount if applicable</p>
+              )}
             </div>
           </div>
 

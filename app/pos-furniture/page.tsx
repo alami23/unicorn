@@ -197,7 +197,7 @@ function POSFurnitureContent() {
         phone: customer.phone,
         address: customer.address,
         type: customer.type,
-        total_due: 0
+        total_due: Number(customer.totalDue ?? customer.initialBalance ?? 0)
       }])
       if (error) throw error
       

@@ -34,6 +34,8 @@ interface Customer {
   type: string
   totalOrders: number
   totalDue: number
+  initialBalance?: number
+  invoiceDue?: number
   lastPurchase: string
   email?: string
   photo?: string | null
@@ -104,8 +106,8 @@ function CustomerPageContent() {
       if (error) throw error
       
       const [furnInvoices, woodInvoices] = await Promise.all([
-        supabase.from('furniture_invoices').select('customer_name'),
-        supabase.from('wood_invoices').select('customer_name')
+        supabase.from('furniture_invoices').select('id, customer_id, customer_name, due_amount'),
+        supabase.from('wood_invoices').select('id, customer_id, customer_name, due_amount')
       ])
       const invoicesData = [
         ...(furnInvoices.data || []),
@@ -113,9 +115,20 @@ function CustomerPageContent() {
       ]
 
       if (data) {
-        // Map snake_case from DB to camelCase for UI
+        // Map snake_case from DB to camelCase for UI and separate active invoice due from opening balance
         const mappedCustomers = data.map(c => {
-          const invoiceCount = invoicesData?.filter(inv => inv.customer_name === c.name).length || 0
+          const customerInvoices = invoicesData.filter(
+            inv => (inv.customer_id && inv.customer_id === c.id) || inv.customer_name === c.name
+          )
+          const invoiceCount = customerInvoices.length
+          const activeInvoiceDue = customerInvoices.reduce(
+            (sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)),
+            0
+          )
+          const dbTotalDue = Math.max(0, Number(c.total_due || 0))
+          const openingBalance = Math.max(0, dbTotalDue - activeInvoiceDue)
+          const effectiveTotalDue = activeInvoiceDue + openingBalance
+
           return {
             id: c.id,
             name: c.name,
@@ -123,7 +136,9 @@ function CustomerPageContent() {
             address: c.address,
             type: c.type,
             totalOrders: Math.max(c.total_orders || 0, invoiceCount),
-            totalDue: c.total_due,
+            totalDue: effectiveTotalDue,
+            initialBalance: openingBalance,
+            invoiceDue: activeInvoiceDue,
             lastPurchase: c.last_purchase,
             email: c.email,
             photo: c.photo
@@ -141,28 +156,111 @@ function CustomerPageContent() {
 
   const handleAddCustomer = async (customer: Customer) => {
     try {
-      const customerData = {
-        id: customer.id,
-        name: customer.name,
-        phone: customer.phone,
-        address: customer.address,
-        type: customer.type,
-        total_orders: customer.totalOrders,
-        total_due: customer.totalDue,
-        last_purchase: customer.lastPurchase,
-        email: customer.email,
-        photo: customer.photo
-      }
-
       if (editingCustomer) {
+        // 1. Fetch active invoices for this customer to calculate remaining due from active invoices
+        const filterParts = [`customer_id.eq."${customer.id}"`, `customer_name.eq."${customer.name}"`]
+        if (editingCustomer.name && editingCustomer.name !== customer.name) {
+          filterParts.push(`customer_name.eq."${editingCustomer.name}"`)
+        }
+        const filterExpr = filterParts.join(',')
+
+        const [furnRes, woodRes] = await Promise.all([
+          supabase.from('furniture_invoices').select('id, due_amount').or(filterExpr),
+          supabase.from('wood_invoices').select('id, due_amount').or(filterExpr)
+        ])
+
+        const allCustomerInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+        const activeInvoiceDue = allCustomerInvoices.reduce(
+          (sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)),
+          0
+        )
+
+        const newOpeningBalance = Math.max(0, Number(customer.initialBalance ?? 0))
+        const recalculatedTotalDue = Math.max(0, activeInvoiceDue + newOpeningBalance)
+        const recalculatedTotalOrders = Math.max(customer.totalOrders || 0, allCustomerInvoices.length)
+
+        const customerData = {
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone,
+          address: customer.address,
+          type: customer.type,
+          total_orders: recalculatedTotalOrders,
+          total_due: recalculatedTotalDue,
+          last_purchase: customer.lastPurchase,
+          email: customer.email,
+          photo: customer.photo
+        }
+
         const { error } = await supabase
           .from('customer')
           .update(customerData)
           .eq('id', customer.id)
         
         if (error) throw error
-        toast.success('Customer updated successfully')
+
+        // If customer name changed, keep active invoices synchronized
+        if (editingCustomer.name && editingCustomer.name !== customer.name) {
+          await Promise.all([
+            supabase.from('furniture_invoices').update({ customer_name: customer.name }).or(`customer_id.eq."${customer.id}",customer_name.eq."${editingCustomer.name}"`),
+            supabase.from('wood_invoices').update({ customer_name: customer.name }).or(`customer_id.eq."${customer.id}",customer_name.eq."${editingCustomer.name}"`)
+          ])
+        }
+
+        // Synchronize Opening Balance transaction in ledger if opening balance was updated or reset
+        if (newOpeningBalance === 0) {
+          await supabase
+            .from('transactions')
+            .delete()
+            .eq('customer_id', customer.id)
+            .eq('type', 'Opening Balance')
+        } else {
+          const { data: existingOpenTxn } = await supabase
+            .from('transactions')
+            .select('id')
+            .eq('customer_id', customer.id)
+            .eq('type', 'Opening Balance')
+            .maybeSingle()
+
+          if (existingOpenTxn?.id) {
+            await supabase
+              .from('transactions')
+              .update({ debit: newOpeningBalance, balance: recalculatedTotalDue })
+              .eq('id', existingOpenTxn.id)
+          }
+        }
+
+        // Optimistically update local state immediately so visible dues reflect the recalculated amount right away
+        setCustomersList(prev => prev.map(c => c.id === customer.id ? {
+          ...c,
+          name: customer.name,
+          phone: customer.phone,
+          address: customer.address,
+          type: customer.type,
+          email: customer.email,
+          photo: customer.photo,
+          totalOrders: recalculatedTotalOrders,
+          totalDue: recalculatedTotalDue,
+          initialBalance: newOpeningBalance,
+          invoiceDue: activeInvoiceDue
+        } : c))
+
+        toast.success('Customer updated and total due recalculated')
       } else {
+        const newOpeningBalance = Math.max(0, Number(customer.initialBalance ?? customer.totalDue ?? 0))
+        const customerData = {
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone,
+          address: customer.address,
+          type: customer.type,
+          total_orders: customer.totalOrders || 0,
+          total_due: newOpeningBalance,
+          last_purchase: customer.lastPurchase,
+          email: customer.email,
+          photo: customer.photo
+        }
+
         const { error } = await supabase
           .from('customer')
           .insert([customerData])
@@ -170,7 +268,7 @@ function CustomerPageContent() {
         if (error) throw error
         toast.success('Customer added successfully')
       }
-      fetchCustomers()
+      await fetchCustomers()
       setEditingCustomer(null)
     } catch (error: any) {
       console.error('Error saving customer:', error)
