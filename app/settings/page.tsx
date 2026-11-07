@@ -881,7 +881,8 @@ function SettingsPageContent() {
     }
     setIsTestingSms(true);
     try {
-      await sendSMS(testNumber, "Test message from FurniTrack Settings", {
+      const businessName = (user?.id && (settings as any).business_by_user?.[user.id]?.name) || settings.business?.name || "FurniTrack";
+      await sendSMS(testNumber, `Test message from ${businessName} Settings`, {
         apiKey: settings.integrations?.smsApiKey,
         senderId: settings.integrations?.smsSenderId,
       });

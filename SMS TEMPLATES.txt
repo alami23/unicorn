@@ -91,17 +91,26 @@ SECTION 3: PAYMENT REMINDER & INVOICE SHARING SMS TEMPLATES
 10. Trigger Event: Outstanding Due Reminder (Reports Module)
     Source: /app/reports/page.tsx
     Template:
-    "Dear [Customer Name], you have an outstanding due of BDT [Total Due] at our showroom. Please settle it soon. Thank you!"
+    "Dear [Customer Name], Reports reminder from [Business Name].
+    Total Oder:  [Total Oder].
+    Total Purchases: [Total Purchases].
+    Paid Amount: [Paid Amount].
+    Due Amount: [Outstanding Due].
+    Please clear your due amount at your earliest convenience. Thank you!"
 
 11. Trigger Event: Share / Send Online Invoice PDF Link
     Source: /components/SendInvoiceModal.tsx
     Template:
-    "Dear [Customer Name], here is your Invoice [Invoice ID]. Bill: [Total Amount] BDT, Due: [Due Amount] BDT. View and download your official invoice PDF online: [Invoice Short Link]"
+    "Dear [Customer Name],
+    Invoice ID: [Invoice ID].
+    Bill: [Total Amount] ,
+    Due: [Due Amount].
+    Invoice PDF: [Invoice Short Link]"
 
 12. Trigger Event: SMS Gateway Configuration Test
     Source: /app/settings/page.tsx
     Template:
-    "Test message from FurniTrack Settings"
+    "Test message from [Business Name] Settings"
 
 
 --------------------------------------------------------------------------------

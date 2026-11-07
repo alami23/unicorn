@@ -486,13 +486,60 @@ function ReportPageContent() {
   const handleSendReminderMessage = async (customer: any) => {
     setIsReminderSending(customer.id)
     try {
-      const smsMessage = `Dear ${customer.name}, you have an outstanding due of BDT ${Number(customer.total_due).toLocaleString()} at our showroom. Please settle it soon. Thank you!`
+      const [furnRes, woodRes, settingsRes] = await Promise.all([
+        supabase
+          .from('furniture_invoices')
+          .select('total, paid_amount, due_amount')
+          .or(`customer_name.eq."${customer.name}",customer_id.eq."${customer.id}"`),
+        supabase
+          .from('wood_invoices')
+          .select('total, paid_amount, due_amount')
+          .or(`customer_name.eq."${customer.name}",customer_id.eq."${customer.id}"`),
+        supabase
+          .from('app_settings')
+          .select('settings')
+          .eq('id', 'global')
+          .maybeSingle()
+      ])
+
+      const allInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+      const totalOrders = Math.max(Number(customer.total_orders || 0), allInvoices.length)
+      let totalDue = Number(customer.total_due || 0)
+      let totalBill = 0
+      let totalPaid = 0
+
+      if (allInvoices.length > 0) {
+        totalBill = allInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
+        totalPaid = allInvoices.reduce((sum, inv) => sum + Number(inv.paid_amount || 0), 0)
+        const invDue = allInvoices.reduce((sum, inv) => sum + Number(inv.due_amount || 0), 0)
+        if (totalDue <= 0 && invDue > 0) {
+          totalDue = invDue
+        }
+      } else {
+        totalBill = totalDue
+      }
+
+      const settings = settingsRes.data?.settings as any
+      let currentUserId = null
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('custom_user')
+          if (stored) currentUserId = JSON.parse(stored).id
+        } catch (e) {}
+      }
+      const businessName = (currentUserId && settings?.business_by_user?.[currentUserId]?.name) || settings?.business?.name || 'Store'
+
+      const formattedTotal = Math.round(totalBill).toLocaleString()
+      const formattedPaid = Math.round(totalPaid).toLocaleString()
+      const formattedDue = Math.round(totalDue).toLocaleString()
+
+      const smsMessage = `Dear ${customer.name}, Reports reminder from ${businessName}.\nTotal Oder:  ${totalOrders}.\nTotal Purchases: ${formattedTotal}.\nPaid Amount: ${formattedPaid}.\nDue Amount: ${formattedDue}.\nPlease clear your due amount at your earliest convenience. Thank you!`
       const response = await sendSMS(customer.phone, smsMessage)
       
       toast.success(`Outstanding due reminder successfully sent to ${customer.name}!`)
       setAlertConfig({
         isOpen: true,
-        message: `SMS reminder delivered to ${customer.name} at ${customer.phone} successfully. Due amount: ৳${Number(customer.total_due).toLocaleString()}`,
+        message: `SMS reminder delivered to ${customer.name} at ${customer.phone} successfully. Due amount: ${formattedDue} BDT`,
         type: 'success'
       })
     } catch (e: any) {
