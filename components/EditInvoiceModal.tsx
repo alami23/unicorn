@@ -1528,9 +1528,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
           className="bg-white dark:bg-slate-900 w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800"
         >
           {/* Modal Header */}
-          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/50">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
                 <Edit3 size={20} />
               </div>
               <div>
@@ -1546,6 +1546,60 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                   </span>
                 </div>
               </div>
+
+              {isWood && (
+                <div className="flex items-center gap-2.5 flex-wrap ml-1 sm:ml-3">
+                  {/* Display Area for Total CFT of Selected Items */}
+                  <div 
+                    className={cn(
+                      "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs",
+                      selectedCount > 0 
+                        ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/70 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/30" 
+                        : "bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
+                    )}
+                    title={`${selectedCount} of ${items.length}`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn(
+                        "w-2 h-2 rounded-full transition-colors",
+                        selectedCount > 0 ? "bg-amber-500 animate-pulse" : "bg-slate-400"
+                      )} />
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Selected CFT:
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
+                        {selectedTotalCft.toFixed(5)}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        CFT
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-700 pl-2">
+                      {selectedCount} of {items.length}
+                    </span>
+                  </div>
+
+                  {/* Display Area for Total Items CFT */}
+                  <div 
+                    className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all shadow-xs"
+                    title={`Total across all ${items.length} items`}
+                  >
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Total Items ({items.length}) CFT:
+                    </span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
+                        {totalAllCft.toFixed(5)}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        CFT
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all">
@@ -2080,60 +2134,6 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                         >
                           <ArrowUpDown size={14} className="text-amber-600 dark:text-amber-400" />
                         </button>
-
-                        {isWood && (
-                          <>
-                            {/* Display Area for Total CFT of Selected Items */}
-                            <div 
-                              className={cn(
-                                "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs",
-                                selectedCount > 0 
-                                  ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/70 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/30" 
-                                  : "bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
-                              )}
-                              title={`${selectedCount} items selected`}
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <span className={cn(
-                                  "w-2 h-2 rounded-full transition-colors",
-                                  selectedCount > 0 ? "bg-amber-500 animate-pulse" : "bg-slate-400"
-                                )} />
-                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                  Selected CFT:
-                                </span>
-                              </div>
-                              <div className="flex items-baseline gap-1">
-                                <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
-                                  {selectedTotalCft.toFixed(5)}
-                                </span>
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                                  CFT
-                                </span>
-                              </div>
-                              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-700 pl-2">
-                                {selectedCount} of {items.length} selected
-                              </span>
-                            </div>
-
-                            {/* Display Area for Total Items CFT */}
-                            <div 
-                              className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all shadow-xs"
-                              title={`Total across all ${items.length} items`}
-                            >
-                              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Total Items ({items.length}) CFT:
-                              </span>
-                              <div className="flex items-baseline gap-1">
-                                <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
-                                  {totalAllCft.toFixed(5)}
-                                </span>
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                                  CFT
-                                </span>
-                              </div>
-                            </div>
-                          </>
-                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
