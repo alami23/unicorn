@@ -1983,14 +1983,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           </div>
 
                           {/* Paid Amount (Input Box + Partial Payments Support) */}
-                          <div className="space-y-2.5 pt-1">
-                            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-4">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Paid Amount</span>
+                          <div className="space-y-2 pt-1">
+                            <div className="flex items-center justify-between gap-2 sm:gap-4">
+                              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 shrink-0">Paid Amount</span>
                                 {paid > 0 && (
                                   <span
                                     className={cn(
-                                      "px-2 py-0.5 rounded-full text-[10px] font-mono font-black border whitespace-nowrap",
+                                      "px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-mono font-black border whitespace-nowrap truncate",
                                       isPaidExceedingGrandTotal
                                         ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
                                         : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
@@ -2000,7 +2000,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+                              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                                 <input
                                   type="number"
                                   step="any"
@@ -2014,7 +2014,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                   }}
                                   placeholder="0"
                                   className={cn(
-                                    "flex-1 sm:flex-initial sm:w-40 md:w-48 bg-white dark:bg-slate-800 border rounded-xl px-3.5 py-1.5 text-right font-mono font-black outline-none transition-colors",
+                                    "w-24 sm:w-40 md:w-48 bg-white dark:bg-slate-800 border rounded-xl px-2.5 sm:px-3.5 py-1.5 text-right font-mono font-black outline-none transition-colors",
                                     isPaidExceedingGrandTotal
                                       ? "border-rose-500 text-rose-600 dark:text-rose-400 focus:border-rose-600"
                                       : "border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 focus:border-emerald-500"
@@ -2043,26 +2043,26 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
                             {/* Recorded Partial Payment Transaction Entries */}
                             {paymentEntries.length > 0 && (
-                              <div className="space-y-2 sm:space-y-1.5 pl-2 border-l-2 border-emerald-500/30">
+                              <div className="space-y-1.5 pl-1.5 sm:pl-2 border-l-2 border-emerald-500/30">
                                 {paymentEntries.map((entry, idx) => (
                                   <div
                                     key={entry.id}
-                                    className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-2 sm:py-1.5 text-xs"
+                                    className="flex flex-row flex-nowrap items-center justify-between gap-1 sm:gap-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-1.5 sm:px-3 py-1 sm:py-1.5 text-xs overflow-hidden"
                                   >
-                                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                                      <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                                    <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
+                                      <span className="font-mono font-black text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
                                         #{idx + 1}
                                       </span>
                                       <input
                                         type="date"
                                         value={entry.date}
                                         onChange={e => handleUpdatePaymentEntry(entry.id, 'date', e.target.value)}
-                                        className="flex-1 sm:flex-initial min-w-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none"
+                                        className="w-[98px] sm:w-auto min-w-0 shrink bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md sm:rounded-lg px-1 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none"
                                       />
                                       <select
                                         value={entry.method}
                                         onChange={e => handleUpdatePaymentEntry(entry.id, 'method', e.target.value)}
-                                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none"
+                                        className="w-[68px] sm:w-auto min-w-0 shrink bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md sm:rounded-lg px-1 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none truncate"
                                       >
                                         <option value="Cash">Cash</option>
                                         <option value="Card">Card</option>
@@ -2071,18 +2071,18 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                         <option value="Bank Transfer">Bank Transfer</option>
                                       </select>
                                     </div>
-                                    <div className="flex items-center justify-end gap-1.5">
+                                    <div className="flex items-center justify-end gap-1 sm:gap-1.5 shrink-0">
                                       <input
                                         type="number"
                                         step="any"
                                         value={entry.amount ?? ''}
                                         onChange={e => handleUpdatePaymentEntry(entry.id, 'amount', e.target.value)}
-                                        className="flex-1 sm:flex-initial sm:w-28 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 outline-none focus:border-emerald-500"
+                                        className="w-[68px] sm:w-28 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md sm:rounded-lg px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-right text-[11px] sm:text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       />
                                       <button
                                         type="button"
                                         onClick={() => handleRemovePaymentEntry(entry.id)}
-                                        className="p-1 text-slate-400 hover:text-rose-500 rounded-lg transition-colors shrink-0"
+                                        className="p-0.5 sm:p-1 text-slate-400 hover:text-rose-500 rounded-md sm:rounded-lg transition-colors shrink-0"
                                         title="Remove payment entry"
                                       >
                                         <Trash2 size={13} />
