@@ -105,14 +105,16 @@ function CustomerPageContent() {
 
       if (error) throw error
       
-      const [furnInvoices, woodInvoices] = await Promise.all([
+      const [furnInvoices, woodInvoices, openTxnsRes] = await Promise.all([
         supabase.from('furniture_invoices').select('id, customer_id, customer_name, due_amount'),
-        supabase.from('wood_invoices').select('id, customer_id, customer_name, due_amount')
+        supabase.from('wood_invoices').select('id, customer_id, customer_name, due_amount'),
+        supabase.from('transactions').select('customer_id, type, ref, debit, credit')
       ])
       const invoicesData = [
         ...(furnInvoices.data || []),
         ...(woodInvoices.data || [])
       ]
+      const txnsData = openTxnsRes.data || []
 
       if (data) {
         // Map snake_case from DB to camelCase for UI and separate active invoice due from opening balance
@@ -130,9 +132,26 @@ function CustomerPageContent() {
             (sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)),
             0
           )
+
+          const customerTxns = txnsData.filter(
+            t => Boolean(t.customer_id && String(t.customer_id) === String(c.id))
+          )
+          const openingDebit = customerTxns
+            .filter(t => String(t.type || '').trim().toLowerCase() === 'opening balance')
+            .reduce((sum, t) => sum + Math.max(0, Number(t.debit || 0)), 0)
+          const openingCredit = customerTxns
+            .filter(
+              t =>
+                String(t.type || '').trim().toLowerCase() === 'payment' &&
+                String(t.ref || '').trim().toLowerCase() === 'opening balance'
+            )
+            .reduce((sum, t) => sum + Math.max(0, Number(t.credit || 0)), 0)
+          const ledgerOpeningBalance = Math.max(0, openingDebit - openingCredit)
+
           const dbTotalDue = Math.max(0, Number(c.total_due || 0))
-          const openingBalance = Math.max(0, dbTotalDue - activeInvoiceDue)
-          const effectiveTotalDue = activeInvoiceDue + openingBalance
+          const dbOpeningBalance = Math.max(0, dbTotalDue - activeInvoiceDue)
+          const openingBalance = Math.max(dbOpeningBalance, ledgerOpeningBalance)
+          const effectiveTotalDue = Math.max(0, activeInvoiceDue + openingBalance, dbTotalDue)
 
           return {
             id: c.id,
@@ -354,35 +373,82 @@ function CustomerPageContent() {
         .eq('id', cus.id)
         .maybeSingle()
 
-      // 2. Fetch customer's invoices to calculate exact purchases, paid amount, and due
-      const [furnRes, woodRes] = await Promise.all([
+      const resolvedCustomerName = (freshCus?.name || cus.name || '').trim()
+      const filterParts = [`customer_id.eq."${cus.id}"`]
+      if (resolvedCustomerName) {
+        filterParts.push(`customer_name.eq."${resolvedCustomerName}"`)
+      }
+      if (cus.name && cus.name.trim() && cus.name.trim() !== resolvedCustomerName) {
+        filterParts.push(`customer_name.eq."${cus.name.trim()}"`)
+      }
+      const filterExpr = filterParts.join(',')
+
+      // 2. Fetch customer's active invoices and opening balance transactions
+      const [furnRes, woodRes, openTxnsRes] = await Promise.all([
         supabase
           .from('furniture_invoices')
-          .select('total, paid_amount, due_amount')
-          .or(`customer_name.eq."${cus.name}",customer_id.eq."${cus.id}"`),
+          .select('id, customer_id, customer_name, total, paid_amount, due_amount')
+          .or(filterExpr),
         supabase
           .from('wood_invoices')
-          .select('total, paid_amount, due_amount')
-          .or(`customer_name.eq."${cus.name}",customer_id.eq."${cus.id}"`)
+          .select('id, customer_id, customer_name, total, paid_amount, due_amount')
+          .or(filterExpr),
+        supabase
+          .from('transactions')
+          .select('type, ref, debit, credit')
+          .eq('customer_id', cus.id)
       ])
 
-      const allInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
+      const targetNameLower = resolvedCustomerName.toLowerCase()
+      const allInvoices = [...(furnRes.data || []), ...(woodRes.data || [])].filter(inv => {
+        const invNameLower = (inv.customer_name || '').trim().toLowerCase()
+        if (invNameLower && targetNameLower) {
+          return invNameLower === targetNameLower
+        }
+        return Boolean(cus.id && String(inv.customer_id) === String(cus.id))
+      })
+
+      const invTotal = allInvoices.reduce((sum, inv) => sum + Math.max(0, Number(inv.total || 0)), 0)
+      const invPaid = allInvoices.reduce((sum, inv) => sum + Math.max(0, Number(inv.paid_amount || 0)), 0)
+      const activeInvoiceDue = allInvoices.reduce((sum, inv) => sum + Math.max(0, Number(inv.due_amount || 0)), 0)
+
+      // 3. Calculate comprehensive total outstanding balance (active invoice dues + opening/additional balances)
+      const dbTotalDue = freshCus?.total_due !== undefined
+        ? Math.max(0, Number(freshCus.total_due || 0))
+        : Math.max(0, Number(cus.totalDue || 0))
+      const uiTotalDue = Math.max(0, Number(cus.totalDue || 0))
+      const uiOpeningBalance = Math.max(0, Number(cus.initialBalance || 0))
+
+      const txns = openTxnsRes.data || []
+      const openingDebit = txns
+        .filter(t => String(t.type || '').trim().toLowerCase() === 'opening balance')
+        .reduce((sum, t) => sum + Math.max(0, Number(t.debit || 0)), 0)
+      const openingCredit = txns
+        .filter(
+          t =>
+            String(t.type || '').trim().toLowerCase() === 'payment' &&
+            String(t.ref || '').trim().toLowerCase() === 'opening balance'
+        )
+        .reduce((sum, t) => sum + Math.max(0, Number(t.credit || 0)), 0)
+      const ledgerOpeningDue = Math.max(0, openingDebit - openingCredit)
+
+      const dbAdditionalDue = Math.max(0, dbTotalDue - activeInvoiceDue)
+      const uiAdditionalDue = Math.max(0, uiTotalDue - activeInvoiceDue, uiOpeningBalance)
+      const additionalOutstandingDue = freshCus
+        ? Math.max(dbAdditionalDue, uiOpeningBalance, ledgerOpeningDue)
+        : Math.max(uiAdditionalDue, ledgerOpeningDue)
+
+      const totalDue = Math.max(0, activeInvoiceDue + additionalOutstandingDue, dbTotalDue, uiTotalDue)
+
       let totalBill = 0
       let totalPaid = 0
-      let totalDue = freshCus?.total_due !== undefined ? Number(freshCus.total_due) : Number(cus.totalDue || 0)
 
       if (allInvoices.length > 0) {
-        const invTotal = allInvoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0)
-        const invPaid = allInvoices.reduce((sum, inv) => sum + Number(inv.paid_amount || 0), 0)
-        const invDue = allInvoices.reduce((sum, inv) => sum + Number(inv.due_amount || 0), 0)
         totalBill = invTotal
         totalPaid = invPaid
-        if (invDue > 0) {
-          totalDue = invDue
-        }
       } else {
-        totalDue = Number(freshCus?.total_due ?? cus.totalDue ?? 0)
         totalBill = totalDue
+        totalPaid = 0
       }
 
       if (totalDue <= 0) {
