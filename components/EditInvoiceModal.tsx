@@ -1520,121 +1520,131 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[120] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[120] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-3 md:p-4">
         <motion.div 
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-white dark:bg-slate-900 w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800"
+          className="bg-white dark:bg-slate-900 w-full max-w-[1440px] h-[96vh] md:h-[93vh] rounded-2xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800"
         >
-          {/* Modal Header */}
-          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/50">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                <Edit3 size={20} />
+          {/* Modal Header: Stacked on mobile (<768px), single row on tablet/desktop (>=768px) */}
+          <div className="px-3.5 py-3 md:px-6 md:py-3.5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap md:flex-nowrap items-center justify-between gap-2.5 md:gap-4 bg-slate-50/50 dark:bg-slate-900/50 md:overflow-x-auto scrollbar-none shrink-0">
+            {/* Title & Type Badge */}
+            <div className="order-1 flex items-center gap-2.5 md:gap-3 shrink-0">
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl md:rounded-2xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Edit3 size={18} className="md:w-5 md:h-5" />
               </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  Edit Invoice <span className="text-amber-600 dark:text-amber-400 font-mono">{getDisplayInvoiceId(invoiceId || invoice?.id, isWood)}</span>
+              <div className="shrink-0">
+                <h2 className="text-base md:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 whitespace-nowrap">
+                  Edit Invoice
                 </h2>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className={cn(
-                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase whitespace-nowrap",
                     isWood ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                   )}>
                     {isWood ? 'Wood Stock' : 'Furniture'}
                   </span>
                 </div>
               </div>
+            </div>
 
-              {isWood && (
-                <div className="flex items-center gap-2.5 flex-wrap ml-1 sm:ml-3">
-                  {/* Display Area for Total CFT of Selected Items */}
-                  <div 
-                    className={cn(
-                      "flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs",
-                      selectedCount > 0 
-                        ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/70 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/30" 
-                        : "bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
-                    )}
-                    title={`${selectedCount} of ${items.length}`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className={cn(
-                        "w-2 h-2 rounded-full transition-colors",
-                        selectedCount > 0 ? "bg-amber-500 animate-pulse" : "bg-slate-400"
-                      )} />
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Selected CFT:
-                      </span>
-                    </div>
+            {/* CFT Counters: Full-width stacked row on mobile (<768px), inline right-aligned on tablet/desktop (>=768px) */}
+            {isWood && (
+              <div className="order-3 md:order-2 w-full md:w-auto md:ml-auto grid grid-cols-1 sm:grid-cols-2 md:flex items-center gap-2 md:gap-2.5 pt-2 md:pt-0 border-t border-slate-200/60 dark:border-slate-800/60 md:border-t-0 shrink-0">
+                {/* Display Area for Total CFT of Selected Items */}
+                <div 
+                  className={cn(
+                    "h-9 md:h-10 flex items-center justify-between md:justify-start gap-2 md:gap-2.5 px-3 md:px-3.5 rounded-xl border text-xs font-bold transition-all shadow-xs whitespace-nowrap",
+                    selectedCount > 0 
+                      ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/70 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/30" 
+                      : "bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
+                  )}
+                  title={`${selectedCount} of ${items.length}`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn(
+                      "w-2 h-2 rounded-full transition-colors shrink-0",
+                      selectedCount > 0 ? "bg-amber-500 animate-pulse" : "bg-slate-400"
+                    )} />
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      CFT:
+                    </span>
                     <div className="flex items-baseline gap-1">
-                      <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
+                      <span className="font-mono font-black text-xs md:text-sm text-amber-600 dark:text-amber-400">
                         {selectedTotalCft.toFixed(5)}
                       </span>
                       <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
                         CFT
                       </span>
                     </div>
-                    <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-700 pl-2">
-                      {selectedCount} of {items.length}
-                    </span>
                   </div>
+                  <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-700 pl-2">
+                    {selectedCount} of {items.length}
+                  </span>
+                </div>
 
-                  {/* Display Area for Total Items CFT */}
-                  <div 
-                    className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all shadow-xs"
-                    title={`Total across all ${items.length} items`}
-                  >
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Total Items ({items.length}) CFT:
+                {/* Display Area for Total Items CFT */}
+                <div 
+                  className="h-9 md:h-10 flex items-center justify-between md:justify-start gap-2 px-3 md:px-3.5 rounded-xl border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all shadow-xs whitespace-nowrap"
+                  title={`Total across all ${items.length} items`}
+                >
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    T CFT:
+                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-mono font-black text-xs md:text-sm text-slate-700 dark:text-slate-200">
+                      {items.length} pcs
                     </span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
-                        {totalAllCft.toFixed(5)}
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                        CFT
-                      </span>
-                    </div>
+                    <span className="text-slate-400 dark:text-slate-500 font-bold">-</span>
+                    <span className="font-mono font-black text-xs md:text-sm text-amber-600 dark:text-amber-400">
+                      {totalAllCft.toFixed(5)}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                      CFT
+                    </span>
                   </div>
                 </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all">
-                Cancel
-              </button>
+              </div>
+            )}
+
+            {/* Save Changes & Close Button */}
+            <div className={cn("order-2 md:order-3 flex items-center gap-2 shrink-0", !isWood && "md:ml-auto")}>
               <button 
                 onClick={handleSaveChanges} 
                 disabled={isSubmitting || isPaidExceedingGrandTotal}
                 title={isPaidExceedingGrandTotal ? 'Total Paid cannot exceed Grand Total' : 'Save Changes'}
-                className="flex items-center gap-2 px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-9 md:h-10 flex items-center gap-1.5 md:gap-2 px-3.5 md:px-5 bg-amber-600 hover:bg-amber-700 text-white text-xs md:text-sm font-bold rounded-xl shadow-lg shadow-amber-600/20 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0 transition-all"
               >
-                {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                Save Changes
+                {isSubmitting ? <Loader2 size={16} className="animate-spin md:w-[18px] md:h-[18px]" /> : <Save size={16} className="md:w-[18px] md:h-[18px]" />}
+                <span>Save Changes</span>
               </button>
-              <button onClick={onClose} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 rounded-xl transition-all ml-1">
-                <X size={24} />
+              <button 
+                onClick={onClose} 
+                className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 rounded-xl transition-all shrink-0"
+                title="Close"
+                aria-label="Close"
+              >
+                <X size={20} className="md:w-[22px] md:h-[22px]" />
               </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 scrollbar-thin">
             {isLoadingItems ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400">
                 <Loader2 size={48} className="animate-spin text-amber-500 mb-4" />
                 <p className="font-bold">Loading invoice data...</p>
               </div>
             ) : (
-              <div className="space-y-8">
+              <div className="space-y-6 md:space-y-8">
                 {/* Full-width Form Area (Metadata & Items Table) */}
-                <div className="space-y-6">
+                <div className="space-y-5 md:space-y-6">
                   {/* Top Section: Left Side (Customer Details + Invoice Metadata) | Right Side (Totals Breakdown) */}
-                  <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  <div className="bg-slate-50/80 dark:bg-slate-800/40 rounded-2xl md:rounded-3xl p-3.5 sm:p-4 md:p-5 border border-slate-200/80 dark:border-slate-800">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6 items-start">
                       {/* Left Column: Customer Name, Phone Number, Address vertically, then Invoice ID, Invoice Date, Created By/Assigned Staff below */}
-                      <div className="lg:col-span-6 space-y-5">
+                      <div className="lg:col-span-6 space-y-4 md:space-y-5">
                         {/* Customer Information (Arranged Vertically) */}
                         <div className="space-y-3">
                           {/* 1. Customer Name Dropdown */}
@@ -1816,10 +1826,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                         {isWood && (
                           <form
                             onSubmit={handleAddManualWoodItem}
-                            className="bg-white/70 dark:bg-slate-900/40 rounded-2xl p-4 border border-slate-200/70 dark:border-slate-700/60"
+                            className="bg-white/70 dark:bg-slate-900/40 rounded-2xl p-3 sm:p-4 border border-slate-200/70 dark:border-slate-700/60"
                           >
-                            <div className="flex items-end gap-2.5">
-                              <div className="flex-1 space-y-1">
+                            <div className="grid grid-cols-3 sm:flex items-end gap-2 sm:gap-2.5">
+                              <div className="sm:flex-1 min-w-0 space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 block">Width</label>
                                 <input
                                   ref={manualWidthInputRef}
@@ -1836,10 +1846,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                       manualLengthInputRef.current?.focus()
                                     }
                                   }}
-                                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-full px-2.5 sm:px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                               </div>
-                              <div className="flex-1 space-y-1">
+                              <div className="sm:flex-1 min-w-0 space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 block">Length</label>
                                 <input
                                   ref={manualLengthInputRef}
@@ -1856,10 +1866,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                       handleAddManualWoodItem()
                                     }
                                   }}
-                                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-full px-2.5 sm:px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                               </div>
-                              <div className="flex-1 space-y-1">
+                              <div className="sm:flex-1 min-w-0 space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 block">Price</label>
                                 <input
                                   type="number"
@@ -1874,15 +1884,16 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                       handleAddManualWoodItem()
                                     }
                                   }}
-                                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-full px-2.5 sm:px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                               </div>
                               <button
                                 type="submit"
-                                className="p-2.5 h-[42px] w-[42px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-colors shadow-sm flex items-center justify-center shrink-0"
+                                className="col-span-3 sm:col-span-1 p-2.5 h-[40px] sm:h-[42px] w-full sm:w-[42px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 shrink-0 font-bold text-xs"
                                 title="Add to List"
                               >
                                 <Plus size={18} />
+                                <span className="sm:hidden">Add Wood Item</span>
                               </button>
                             </div>
                           </form>
@@ -1890,14 +1901,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                       </div>
 
                       {/* Right Column: Totals Breakdown (Total CFT, Subtotal, Discount, Delivery Charge, Grand Total, Paid Amount, Total Due) */}
-                      <div className="lg:col-span-6 lg:border-l lg:border-slate-200/80 lg:dark:border-slate-700/60 lg:pl-6">
+                      <div className="lg:col-span-6 border-t border-slate-200/80 dark:border-slate-700/60 pt-4 lg:border-t-0 lg:pt-0 lg:border-l lg:pl-6">
                         <div className="space-y-3.5 py-1">
                           {/* Total CFT (Wood) / Total Items (Furniture) */}
                           <div className="flex items-center justify-between py-1">
                             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                               {isWood ? 'Total CFT' : 'Total Items'}
                             </span>
-                            <span className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
+                            <span className="text-lg md:text-xl font-black font-mono text-amber-600 dark:text-amber-400">
                               {isWood ? `${totalAllCft.toFixed(5)} CFT` : `${totalFurnitureItemsQty} PCS`}
                             </span>
                           </div>
@@ -1905,14 +1916,14 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           {/* Subtotal */}
                           <div className="flex items-center justify-between py-1">
                             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Subtotal</span>
-                            <span className="text-xl font-black font-mono text-slate-900 dark:text-slate-100">৳{Math.round(itemsSubtotal).toLocaleString()}</span>
+                            <span className="text-lg md:text-xl font-black font-mono text-slate-900 dark:text-slate-100">৳{Math.round(itemsSubtotal).toLocaleString()}</span>
                           </div>
 
                           <div className="h-px bg-slate-200 dark:bg-slate-800" />
 
                           {/* Discount */}
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2.5">
+                          <div className="flex items-center justify-between gap-2 sm:gap-4">
+                            <div className="flex items-center gap-2 shrink-0">
                               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Discount</span>
                               <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700">
                                 <button
@@ -1941,18 +1952,18 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                               type="number" 
                               value={discount ?? ''} 
                               onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
-                              className="w-40 sm:w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-1.5 text-right font-mono font-black text-amber-600 dark:text-amber-400 outline-none focus:border-amber-500"
+                              className="w-32 sm:w-40 md:w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 md:px-3.5 py-1.5 text-right font-mono font-black text-amber-600 dark:text-amber-400 outline-none focus:border-amber-500"
                             />
                           </div>
 
                           {/* Delivery Charge */}
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Delivery Charge</span>
+                          <div className="flex items-center justify-between gap-2 sm:gap-4">
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 shrink-0">Delivery Charge</span>
                             <input 
                               type="number" 
                               value={deliveryCharge ?? ''} 
                               onChange={e => setDeliveryCharge(parseFloat(e.target.value) || 0)}
-                              className="w-40 sm:w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-1.5 text-right font-mono font-black text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
+                              className="w-32 sm:w-40 md:w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 md:px-3.5 py-1.5 text-right font-mono font-black text-slate-900 dark:text-slate-100 outline-none focus:border-amber-500"
                             />
                           </div>
 
@@ -1968,18 +1979,18 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             className="flex items-center justify-between py-1 px-2 -mx-2 rounded-xl cursor-pointer hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors select-none"
                           >
                             <span className="text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Grand Total</span>
-                            <span className="text-2xl font-black font-mono text-slate-900 dark:text-slate-100">৳{Math.round(grandTotal).toLocaleString()}</span>
+                            <span className="text-xl md:text-2xl font-black font-mono text-slate-900 dark:text-slate-100">৳{Math.round(grandTotal).toLocaleString()}</span>
                           </div>
 
                           {/* Paid Amount (Input Box + Partial Payments Support) */}
                           <div className="space-y-2.5 pt-1">
-                            <div className="flex items-center justify-between gap-4">
+                            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-4">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Paid Amount</span>
                                 {paid > 0 && (
                                   <span
                                     className={cn(
-                                      "px-2 py-0.5 rounded-full text-[10px] font-mono font-black border",
+                                      "px-2 py-0.5 rounded-full text-[10px] font-mono font-black border whitespace-nowrap",
                                       isPaidExceedingGrandTotal
                                         ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
                                         : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
@@ -1989,7 +2000,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
                                 <input
                                   type="number"
                                   step="any"
@@ -2003,7 +2014,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                   }}
                                   placeholder="0"
                                   className={cn(
-                                    "w-40 sm:w-48 bg-white dark:bg-slate-800 border rounded-xl px-3.5 py-1.5 text-right font-mono font-black outline-none transition-colors",
+                                    "flex-1 sm:flex-initial sm:w-40 md:w-48 bg-white dark:bg-slate-800 border rounded-xl px-3.5 py-1.5 text-right font-mono font-black outline-none transition-colors",
                                     isPaidExceedingGrandTotal
                                       ? "border-rose-500 text-rose-600 dark:text-rose-400 focus:border-rose-600"
                                       : "border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 focus:border-emerald-500"
@@ -2032,21 +2043,21 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
                             {/* Recorded Partial Payment Transaction Entries */}
                             {paymentEntries.length > 0 && (
-                              <div className="space-y-1.5 pl-2 border-l-2 border-emerald-500/30">
+                              <div className="space-y-2 sm:space-y-1.5 pl-2 border-l-2 border-emerald-500/30">
                                 {paymentEntries.map((entry, idx) => (
                                   <div
                                     key={entry.id}
-                                    className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-1.5 text-xs"
+                                    className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/60 rounded-xl px-3 py-2 sm:py-1.5 text-xs"
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                      <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
                                         #{idx + 1}
                                       </span>
                                       <input
                                         type="date"
                                         value={entry.date}
                                         onChange={e => handleUpdatePaymentEntry(entry.id, 'date', e.target.value)}
-                                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none"
+                                        className="flex-1 sm:flex-initial min-w-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none"
                                       />
                                       <select
                                         value={entry.method}
@@ -2060,18 +2071,18 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                         <option value="Bank Transfer">Bank Transfer</option>
                                       </select>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center justify-end gap-1.5">
                                       <input
                                         type="number"
                                         step="any"
                                         value={entry.amount ?? ''}
                                         onChange={e => handleUpdatePaymentEntry(entry.id, 'amount', e.target.value)}
-                                        className="w-28 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 outline-none focus:border-emerald-500"
+                                        className="flex-1 sm:flex-initial sm:w-28 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 outline-none focus:border-emerald-500"
                                       />
                                       <button
                                         type="button"
                                         onClick={() => handleRemovePaymentEntry(entry.id)}
-                                        className="p-1 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                                        className="p-1 text-slate-400 hover:text-rose-500 rounded-lg transition-colors shrink-0"
                                         title="Remove payment entry"
                                       >
                                         <Trash2 size={13} />
@@ -2094,8 +2105,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                           </div>
 
                           {/* Total Due (Current Invoice Due + Previous Outstanding Balance) */}
-                          <div className="flex items-center justify-between pt-2.5 border-t border-slate-200 dark:border-slate-800">
-                            <div className="space-y-0.5">
+                          <div className="flex items-center justify-between pt-2.5 border-t border-slate-200 dark:border-slate-800 gap-2">
+                            <div className="space-y-0.5 min-w-0">
                               <span className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-500 block">
                                 Total Due
                               </span>
@@ -2103,7 +2114,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                 Current Due: ৳{Math.round(currentDue).toLocaleString()} + Previous Due: ৳{Math.round(oldDue).toLocaleString()}
                               </span>
                             </div>
-                            <span className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
+                            <span className="text-lg md:text-xl font-black font-mono text-amber-600 dark:text-amber-400 shrink-0">
                               ৳{Math.round(totalDue).toLocaleString()}
                             </span>
                           </div>
@@ -2113,9 +2124,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                   </div>
 
                   {/* Items Table Section */}
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-                      <div className="flex items-center gap-3 flex-wrap">
+                  <div className="space-y-3 md:space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 md:gap-3 px-1">
+                      <div className="flex items-center gap-2.5 md:gap-3 flex-wrap">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                           <Tag size={16} className="text-amber-500" /> Invoice Items
                         </h3>
@@ -2138,14 +2149,236 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={handleAddItem}
-                          className="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md"
+                          className="flex items-center gap-1.5 md:gap-2 px-3.5 md:px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold rounded-xl hover:scale-105 active:scale-95 transition-all shadow-md"
                         >
                           <Plus size={14} /> Add Item Row
                         </button>
                       </div>
                     </div>
 
-                    <div className="border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+                    {/* Mobile Stacked Item Cards (max-width: 767px / md:hidden) */}
+                    <div className="md:hidden space-y-3">
+                      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={items.length > 0 && items.every(it => it.marked)}
+                            onChange={e => {
+                              const isChecked = e.target.checked
+                              setItems(prev => prev.map(it => ({ ...it, marked: isChecked })))
+                            }}
+                            className="rounded border-slate-300 dark:border-slate-700 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer accent-amber-600"
+                          />
+                          <span>Select All Items ({selectedCount}/{items.length})</span>
+                        </label>
+                        <span className="font-mono text-[11px] text-amber-600 dark:text-amber-400">
+                          {isWood ? `${totalAllCft.toFixed(3)} CFT` : `${totalFurnitureItemsQty} PCS`}
+                        </span>
+                      </div>
+
+                      {displayedItems.map(({ item, originalIndex: idx }, displayIdx) => {
+                        const itemTagColor = getTagColor(item.tag)
+                        return (
+                          <div
+                            key={item.id || idx}
+                            className={cn(
+                              "rounded-2xl border p-3.5 space-y-3 transition-all shadow-xs",
+                              item.marked
+                                ? "bg-amber-50/60 dark:bg-amber-900/15 border-amber-300 dark:border-amber-700/60"
+                                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                            )}
+                          >
+                            {/* Card Top Bar: Checkbox + #No + Total + Delete */}
+                            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                              <div className="flex items-center gap-2.5">
+                                <input
+                                  type="checkbox"
+                                  checked={!!item.marked}
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    handleItemRowSelection(displayIdx, idx, e, true)
+                                  }}
+                                  onChange={() => {}}
+                                  className="rounded border-slate-300 dark:border-slate-700 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer accent-amber-600"
+                                />
+                                <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-mono font-bold text-xs text-slate-600 dark:text-slate-300">
+                                  #{idx + 1}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2.5">
+                                <span className="font-mono font-black text-sm text-amber-600 dark:text-amber-400">
+                                  ৳{Math.round(item.total).toLocaleString()}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItem(idx)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                  title="Delete Item"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {isWood ? (
+                              <div className="space-y-2.5">
+                                {/* Row 1: Car, Tree, Tag */}
+                                <div className="grid grid-cols-12 gap-2">
+                                  <div className="col-span-3 space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">Car</label>
+                                    <input
+                                      type="text"
+                                      value={['solo', 'manual'].includes(item.carNo?.trim().toLowerCase() || '') ? 'M' : (item.carNo ?? '')}
+                                      onChange={e => {
+                                        let val = e.target.value
+                                        if (['solo', 'manual'].includes(val.trim().toLowerCase())) val = 'M'
+                                        handleItemChange(idx, 'carNo', val)
+                                      }}
+                                      placeholder="Car #"
+                                      className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                  <div className="col-span-4 space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">Tree</label>
+                                    <input
+                                      type="text"
+                                      value={item.treeNo || item.name || ''}
+                                      onChange={e => {
+                                        handleItemChange(idx, 'treeNo', e.target.value)
+                                        handleItemChange(idx, 'name', e.target.value)
+                                      }}
+                                      placeholder="Tree #"
+                                      className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-2 text-center font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                  <div className="col-span-5 space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">Tag</label>
+                                    <div className="relative flex items-center">
+                                      <span
+                                        className="absolute left-2 w-2 h-2 rounded-full shrink-0 pointer-events-none z-10 bg-slate-300 dark:bg-slate-600"
+                                        style={itemTagColor ? { backgroundColor: itemTagColor } : undefined}
+                                      />
+                                      <select
+                                        value={item.tag ?? ''}
+                                        onChange={e => handleItemChange(idx, 'tag', e.target.value)}
+                                        className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 pl-5 pr-5 font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500 appearance-none truncate"
+                                      >
+                                        <option value="">No Tag</option>
+                                        {savedTags.map(st => (
+                                          <option key={st.id || st.name} value={st.name}>
+                                            {st.name} {st.sell_price > 0 ? `(৳${st.sell_price})` : ''}
+                                          </option>
+                                        ))}
+                                        {item.tag && !savedTags.some(st => st.name.toLowerCase() === item.tag?.toLowerCase()) && (
+                                          <option value={item.tag}>{item.tag}</option>
+                                        )}
+                                      </select>
+                                      <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Row 2: W, L, CFT, Price */}
+                                <div className="grid grid-cols-4 gap-2">
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">W</label>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={item.width ?? ''}
+                                      onChange={e => handleItemChange(idx, 'width', parseFloat(e.target.value) || 0)}
+                                      placeholder="W"
+                                      className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">L</label>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={item.length ?? ''}
+                                      onChange={e => handleItemChange(idx, 'length', parseFloat(e.target.value) || 0)}
+                                      placeholder="L"
+                                      className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">CFT</label>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={item.cft ?? ''}
+                                      onChange={e => handleItemChange(idx, 'cft', parseFloat(e.target.value) || 0)}
+                                      placeholder="CFT"
+                                      className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">Price</label>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={item.price ?? ''}
+                                      onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                      placeholder="0"
+                                      className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-2.5">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold uppercase text-slate-400 block">Item Name</label>
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={e => handleItemChange(idx, 'name', e.target.value)}
+                                    placeholder="Enter item name..."
+                                    className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-2.5 font-bold text-xs text-slate-800 dark:text-slate-200 outline-none focus:ring-1 focus:ring-amber-500"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-12 gap-2">
+                                  <div className="col-span-6 space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">Description</label>
+                                    <input
+                                      type="text"
+                                      value={item.description ?? ''}
+                                      onChange={e => handleItemChange(idx, 'description', e.target.value)}
+                                      placeholder="Description..."
+                                      className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-2 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                  <div className="col-span-3 space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">Qty</label>
+                                    <input
+                                      type="number"
+                                      value={item.quantity ?? ''}
+                                      onChange={e => handleItemChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                                      placeholder="Qty"
+                                      className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                  <div className="col-span-3 space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400 block">Price</label>
+                                    <input
+                                      type="number"
+                                      value={item.price ?? ''}
+                                      onChange={e => handleItemChange(idx, 'price', parseFloat(e.target.value) || 0)}
+                                      placeholder="0"
+                                      className="w-full bg-slate-100/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 rounded-lg py-1.5 px-1.5 text-center font-mono font-bold text-xs outline-none focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Tablet & Desktop Table (min-width: 768px / hidden md:block) */}
+                    <div className="hidden md:block border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
                       <table className="w-full text-sm table-fixed border-collapse">
                         <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs">
                           <tr>
