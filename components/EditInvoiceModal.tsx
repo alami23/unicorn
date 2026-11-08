@@ -1549,58 +1549,58 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
               </div>
             </div>
 
-            {/* CFT Counters: Full-width stacked row on mobile (<768px), inline right-aligned on tablet/desktop (>=768px) */}
+            {/* CFT Counters: Horizontal single row on mobile (<768px), inline right-aligned on tablet/desktop (>=768px) */}
             {isWood && (
-              <div className="order-3 md:order-2 w-full md:w-auto md:ml-auto grid grid-cols-1 sm:grid-cols-2 md:flex items-center gap-2 md:gap-2.5 pt-2 md:pt-0 border-t border-slate-200/60 dark:border-slate-800/60 md:border-t-0 shrink-0">
+              <div className="order-3 md:order-2 w-full md:w-auto md:ml-auto grid grid-cols-2 md:flex items-center gap-1.5 sm:gap-2 md:gap-2.5 pt-2 md:pt-0 border-t border-slate-200/60 dark:border-slate-800/60 md:border-t-0 shrink-0">
                 {/* Display Area for Total CFT of Selected Items */}
                 <div 
                   className={cn(
-                    "h-9 md:h-10 flex items-center justify-between md:justify-start gap-2 md:gap-2.5 px-3 md:px-3.5 rounded-xl border text-xs font-bold transition-all shadow-xs whitespace-nowrap",
+                    "h-8 sm:h-9 md:h-10 min-w-0 flex items-center justify-between md:justify-start gap-1 sm:gap-2 md:gap-2.5 px-2 sm:px-3 md:px-3.5 rounded-xl border text-[10px] sm:text-xs font-bold transition-all shadow-xs whitespace-nowrap overflow-hidden",
                     selectedCount > 0 
                       ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/70 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/30" 
                       : "bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-500 dark:text-slate-400"
                   )}
                   title={`${selectedCount} of ${items.length}`}
                 >
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                     <span className={cn(
-                      "w-2 h-2 rounded-full transition-colors shrink-0",
+                      "w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-colors shrink-0",
                       selectedCount > 0 ? "bg-amber-500 animate-pulse" : "bg-slate-400"
                     )} />
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <span className="text-[10px] md:text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 shrink-0">
                       CFT:
                     </span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="font-mono font-black text-xs md:text-sm text-amber-600 dark:text-amber-400">
+                    <div className="flex items-baseline gap-0.5 sm:gap-1 min-w-0">
+                      <span className="font-mono font-black text-[11px] sm:text-xs md:text-sm text-amber-600 dark:text-amber-400 truncate">
                         {selectedTotalCft.toFixed(5)}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
                         CFT
                       </span>
                     </div>
                   </div>
-                  <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-700 pl-2">
+                  <span className="text-[9px] sm:text-[10px] font-medium text-slate-400 dark:text-slate-500 border-l border-slate-200 dark:border-slate-700 pl-1.5 sm:pl-2 shrink-0">
                     {selectedCount} of {items.length}
                   </span>
                 </div>
 
                 {/* Display Area for Total Items CFT */}
                 <div 
-                  className="h-9 md:h-10 flex items-center justify-between md:justify-start gap-2 px-3 md:px-3.5 rounded-xl border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-bold transition-all shadow-xs whitespace-nowrap"
+                  className="h-8 sm:h-9 md:h-10 min-w-0 flex items-center justify-between md:justify-start gap-1 sm:gap-2 px-2 sm:px-3 md:px-3.5 rounded-xl border bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-[10px] sm:text-xs font-bold transition-all shadow-xs whitespace-nowrap overflow-hidden"
                   title={`Total across all ${items.length} items`}
                 >
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <span className="text-[10px] md:text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 shrink-0">
                     T CFT:
                   </span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-mono font-black text-xs md:text-sm text-slate-700 dark:text-slate-200">
+                  <div className="flex items-baseline gap-0.5 sm:gap-1 min-w-0">
+                    <span className="font-mono font-black text-[11px] sm:text-xs md:text-sm text-slate-700 dark:text-slate-200 shrink-0">
                       {items.length} pcs
                     </span>
-                    <span className="text-slate-400 dark:text-slate-500 font-bold">-</span>
-                    <span className="font-mono font-black text-xs md:text-sm text-amber-600 dark:text-amber-400">
+                    <span className="text-slate-400 dark:text-slate-500 font-bold shrink-0">-</span>
+                    <span className="font-mono font-black text-[11px] sm:text-xs md:text-sm text-amber-600 dark:text-amber-400 truncate">
                       {totalAllCft.toFixed(5)}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
                       CFT
                     </span>
                   </div>
@@ -1828,8 +1828,8 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                             onSubmit={handleAddManualWoodItem}
                             className="bg-white/70 dark:bg-slate-900/40 rounded-2xl p-3 sm:p-4 border border-slate-200/70 dark:border-slate-700/60"
                           >
-                            <div className="grid grid-cols-3 sm:flex items-end gap-2 sm:gap-2.5">
-                              <div className="sm:flex-1 min-w-0 space-y-1">
+                            <div className="flex items-end gap-1.5 sm:gap-2.5">
+                              <div className="flex-1 min-w-0 space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 block">Width</label>
                                 <input
                                   ref={manualWidthInputRef}
@@ -1846,10 +1846,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                       manualLengthInputRef.current?.focus()
                                     }
                                   }}
-                                  className="w-full px-2.5 sm:px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-full h-[40px] sm:h-[42px] px-2.5 sm:px-3 py-2 sm:py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                               </div>
-                              <div className="sm:flex-1 min-w-0 space-y-1">
+                              <div className="flex-1 min-w-0 space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 block">Length</label>
                                 <input
                                   ref={manualLengthInputRef}
@@ -1866,10 +1866,10 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                       handleAddManualWoodItem()
                                     }
                                   }}
-                                  className="w-full px-2.5 sm:px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-full h-[40px] sm:h-[42px] px-2.5 sm:px-3 py-2 sm:py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                               </div>
-                              <div className="sm:flex-1 min-w-0 space-y-1">
+                              <div className="flex-1 min-w-0 space-y-1">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 block">Price</label>
                                 <input
                                   type="number"
@@ -1884,16 +1884,16 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
                                       handleAddManualWoodItem()
                                     }
                                   }}
-                                  className="w-full px-2.5 sm:px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-full h-[40px] sm:h-[42px] px-2.5 sm:px-3 py-2 sm:py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                               </div>
                               <button
                                 type="submit"
-                                className="col-span-3 sm:col-span-1 p-2.5 h-[40px] sm:h-[42px] w-full sm:w-[42px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-colors shadow-sm flex items-center justify-center gap-1.5 shrink-0 font-bold text-xs"
-                                title="Add to List"
+                                className="h-[40px] sm:h-[42px] w-[40px] sm:w-[42px] bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-colors shadow-sm flex items-center justify-center shrink-0 font-bold text-xs"
+                                title="Add Wood Item"
+                                aria-label="Add Wood Item"
                               >
                                 <Plus size={18} />
-                                <span className="sm:hidden">Add Wood Item</span>
                               </button>
                             </div>
                           </form>
