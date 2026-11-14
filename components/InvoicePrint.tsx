@@ -71,15 +71,6 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
         ? { ...syncFallbackBiz, ...settings.business }
         : syncFallbackBiz);
 
-  const normalizedSize = size?.toLowerCase().trim()
-  const isPOS = normalizedSize === 'pos'
-  const isPOS2 = normalizedSize === 'pos 2' || normalizedSize === 'pos2'
-  const isAnyPOS = isPOS || isPOS2
-  const isA5 = normalizedSize === 'a5'
-  const isChalan = normalizedSize === 'chalan'
-  const isA4 = normalizedSize === 'a4' || isChalan 
-  const isStandardPage = isA4 || isA5 
-
   const isWood = invoice.type?.toLowerCase() === 'wood' || 
                  invoice.type?.toLowerCase() === 'solo_wood' || 
                  invoice.originalType?.toLowerCase() === 'solo_wood' || 
@@ -87,6 +78,15 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
                  invoice.originalType?.toLowerCase() === 'wood' || 
                  invoice.original_type?.toLowerCase() === 'wood' ||
                  Boolean(invoice.id?.includes?.('-W-'))
+
+  const normalizedSize = size?.toLowerCase().trim()
+  const isPOS = normalizedSize === 'pos' || (!isWood && (normalizedSize === 'pos 2' || normalizedSize === 'pos2'))
+  const isPOS2 = isWood && (normalizedSize === 'pos 2' || normalizedSize === 'pos2')
+  const isAnyPOS = isPOS || isPOS2
+  const isA5 = normalizedSize === 'a5'
+  const isChalan = normalizedSize === 'chalan'
+  const isA4 = normalizedSize === 'a4' || isChalan 
+  const isStandardPage = isA4 || isA5 
 
   const showPaymentData = !isChalan ? true : (isWood ? Boolean(settings?.finance?.showPaymentOnChalan) : false)
 

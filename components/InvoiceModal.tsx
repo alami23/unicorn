@@ -25,6 +25,17 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
   const [unscaledHeight, setUnscaledHeight] = useState(1123)
   const printableInvoiceRef = useRef<HTMLDivElement>(null)
 
+  const activeInvoice = localInvoice || invoice
+  const isWoodInvoice = Boolean(
+    activeInvoice?.originalType?.toLowerCase() === 'wood' ||
+    activeInvoice?.originalType?.toLowerCase() === 'solo_wood' ||
+    activeInvoice?.original_type?.toLowerCase() === 'wood' ||
+    activeInvoice?.original_type?.toLowerCase() === 'solo_wood' ||
+    activeInvoice?.type?.toLowerCase() === 'wood' ||
+    activeInvoice?.type?.toLowerCase() === 'solo_wood' ||
+    activeInvoice?.id?.includes?.('-W-')
+  )
+
   useEffect(() => {
     if (invoice) {
       setLocalInvoice(invoice)
@@ -33,6 +44,12 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
       }
     }
   }, [invoice])
+
+  useEffect(() => {
+    if (!isWoodInvoice && selectedSize === 'POS 2') {
+      setSelectedSize('POS')
+    }
+  }, [isWoodInvoice, selectedSize])
 
   useEffect(() => {
     if (!isOpen) return
@@ -453,15 +470,17 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                 >
                   <Smartphone size={16} className="sm:w-[18px]" /> POS
                 </button>
-                <button 
-                  onClick={() => setSelectedSize('POS 2')}
-                  className={cn(
-                    "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-[12px] sm:text-sm font-bold transition-all",
-                    selectedSize === 'POS 2' ? "bg-amber-600 text-white shadow-lg shadow-amber-600/20" : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  )}
-                >
-                  <Smartphone size={16} className="sm:w-[18px]" /> POS 2
-                </button>
+                {isWoodInvoice && (
+                  <button 
+                    onClick={() => setSelectedSize('POS 2')}
+                    className={cn(
+                      "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-[12px] sm:text-sm font-bold transition-all",
+                      selectedSize === 'POS 2' ? "bg-amber-600 text-white shadow-lg shadow-amber-600/20" : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    <Smartphone size={16} className="sm:w-[18px]" /> POS 2
+                  </button>
+                )}
                 <button 
                   onClick={() => setSelectedSize('Chalan')}
                   className={cn(
@@ -516,10 +535,11 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
 
             {/* Preview Area */}
             {(() => {
+              const effectiveSize = (!isWoodInvoice && selectedSize === 'POS 2') ? 'POS' : selectedSize
               let originalWidth = 794
-              if (selectedSize === 'A5') {
+              if (effectiveSize === 'A5') {
                 originalWidth = 559
-              } else if (selectedSize === 'POS' || selectedSize === 'POS 2') {
+              } else if (effectiveSize === 'POS' || effectiveSize === 'POS 2') {
                 originalWidth = 302
               }
 
@@ -550,7 +570,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                         className="h-fit"
                       >
                         <div ref={printableInvoiceRef} id="printable-invoice" className="h-fit">
-                          <InvoicePrint invoice={localInvoice || invoice} size={selectedSize} />
+                          <InvoicePrint invoice={localInvoice || invoice} size={effectiveSize} />
                         </div>
                       </div>
                     </div>
