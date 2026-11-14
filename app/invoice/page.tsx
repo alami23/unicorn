@@ -1345,6 +1345,7 @@ function InvoicePageContent() {
                         )}
                         <button onClick={() => handleOpenInvoice(inv)} disabled={isFetchingItems} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-50 transition-colors" title="View"><Eye size={16} /></button>
                       <button onClick={() => handleOpenInvoice(inv)} disabled={isFetchingItems} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-50 transition-colors" title="Print"><Printer size={16} /></button>
+                      <button onClick={() => handleEditInvoice(inv)} disabled={isFetchingItems} className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 disabled:opacity-50 transition-colors" title="Edit"><Edit size={16} /></button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
@@ -1352,12 +1353,6 @@ function InvoicePageContent() {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem 
-                            onClick={() => handleEditInvoice(inv)}
-                            className="gap-3 cursor-pointer"
-                          >
-                            <Edit size={16} className="text-amber-600" /> Edit
-                          </DropdownMenuItem>
                           {inv.type === 'Furniture' && (
                             <DropdownMenuItem
                               onClick={() => handleToggleDeliveryStatus(inv)}
