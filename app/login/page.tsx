@@ -22,9 +22,14 @@ import {
   Eye,
   EyeOff,
   Sun,
-  Moon
+  Moon,
+  Download,
+  Smartphone
 } from 'lucide-react';
 import SPreview from '@/components/SPreview';
+
+const APK_BUCKET = 'apk';
+const DEFAULT_APK_FILE = 'app-release.apk';
 
 type PageMode = 'login' | 'forgot_identify' | 'forgot_otp' | 'forgot_reset';
 type ViewMode = 'admin' | 'preview';
@@ -32,6 +37,10 @@ type ViewMode = 'admin' | 'preview';
 export default function LoginPage() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [apkUrl, setApkUrl] = useState<string>(() => {
+    const { data } = supabase.storage.from(APK_BUCKET).getPublicUrl(DEFAULT_APK_FILE);
+    return data?.publicUrl || '';
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -49,8 +58,40 @@ export default function LoginPage() {
         params.delete('view');
         const q = params.toString();
         window.location.replace(q ? `/s?${q}` : '/s');
+        return;
       }
     }
+
+    // Dynamically resolve the latest APK file from Supabase Storage 'apk' bucket
+    const resolveStoredApk = async () => {
+      try {
+        const { data: files, error: listError } = await supabase.storage
+          .from(APK_BUCKET)
+          .list('', {
+            limit: 20,
+            sortBy: { column: 'updated_at', order: 'desc' },
+          });
+
+        if (!listError && files && files.length > 0) {
+          const apkFile =
+            files.find((f) => f.name === DEFAULT_APK_FILE) ||
+            files.find((f) => f.name.toLowerCase().endsWith('.apk')) ||
+            files.find((f) => f.name !== '.emptyFolderPlaceholder');
+
+          if (apkFile?.name) {
+            const { data } = supabase.storage.from(APK_BUCKET).getPublicUrl(apkFile.name);
+            if (data?.publicUrl) {
+              setApkUrl(data.publicUrl);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        // Fallback to default public URL already initialized
+      }
+    };
+
+    resolveStoredApk();
   }, []);
 
   const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'light';
@@ -330,6 +371,19 @@ export default function LoginPage() {
         >
           Preview
         </Link>
+        {apkUrl && (
+          <a
+            href={apkUrl}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border bg-emerald-600/95 hover:bg-emerald-700 text-white border-emerald-500/40"
+            title="Download Android APK from Supabase Storage"
+          >
+            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Download APK</span>
+          </a>
+        )}
       </div>
 
       {/* Light Mode / Dark Mode Switcher */}
@@ -453,7 +507,7 @@ export default function LoginPage() {
                     Create one
                   </Link>
                 </p>
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
                   <p className="text-xs text-slate-400 dark:text-slate-500">
                     Customer verifying an invoice?{' '}
                     <button
@@ -464,6 +518,19 @@ export default function LoginPage() {
                       Open Invoice Preview
                     </button>
                   </p>
+                  {apkUrl && (
+                    <a
+                      href={apkUrl}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-700 transition-all active:scale-[0.98]"
+                    >
+                      <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>Download APK</span>
+                      <Download className="w-3.5 h-3.5 opacity-70" />
+                    </a>
+                  )}
                 </div>
               </div>
             </motion.div>

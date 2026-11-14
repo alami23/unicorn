@@ -426,8 +426,24 @@ CREATE POLICY "Allow public full access to sms_history" ON public.sms_history FO
 
 -- 23. Storage Buckets
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('logos', 'logos', true)
-ON CONFLICT (id) DO NOTHING;
+VALUES 
+  ('logos', 'logos', true),
+  ('apk', 'apk', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Storage RLS Policies for APK Hosting ('apk' bucket)
+DROP POLICY IF EXISTS "Allow public download of APK files" ON storage.objects;
+CREATE POLICY "Allow public download of APK files"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'apk');
+
+DROP POLICY IF EXISTS "Allow upload and update of APK files" ON storage.objects;
+CREATE POLICY "Allow upload and update of APK files"
+ON storage.objects FOR ALL
+TO public
+USING (bucket_id = 'apk')
+WITH CHECK (bucket_id = 'apk');
 
 ALTER TABLE public.furniture_category ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public full access to furniture_category" ON public.furniture_category;

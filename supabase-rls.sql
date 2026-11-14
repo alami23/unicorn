@@ -502,3 +502,22 @@ ALTER TABLE public.furniture_invoices ADD COLUMN IF NOT EXISTS created_by TEXT;
 ALTER TABLE public.furniture_invoices ADD COLUMN IF NOT EXISTS created_by_name TEXT;
 ALTER TABLE public.wood_invoices ADD COLUMN IF NOT EXISTS created_by TEXT;
 ALTER TABLE public.wood_invoices ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+
+-- 9. Supabase Storage Configuration for APK Hosting ('apk' bucket)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('apk', 'apk', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Allow public download of APK files" ON storage.objects;
+CREATE POLICY "Allow public download of APK files"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'apk');
+
+DROP POLICY IF EXISTS "Allow upload and update of APK files" ON storage.objects;
+CREATE POLICY "Allow upload and update of APK files"
+ON storage.objects FOR ALL
+TO public
+USING (bucket_id = 'apk')
+WITH CHECK (bucket_id = 'apk');
+
