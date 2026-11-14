@@ -9,12 +9,13 @@ import { getSynchronousBusiness, getSynchronousSettings, setSynchronousSettings 
 
 interface InvoicePrintProps {
   invoice: any
-  size: 'A4' | 'A5' | 'POS' | 'Chalan'
+  size: 'A4' | 'A5' | 'POS' | 'POS 2' | 'Chalan'
 }
 
 export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
   // Synchronous initialization ensures zero render delay on frame 0
   const [settings, setSettings] = useState<any>(() => getSynchronousSettings())
+  const [savedTags, setSavedTags] = useState<Array<{ name: string; sell_price: number }>>([])
 
   let currentUserId: string | null = null;
   if (typeof window !== 'undefined') {
@@ -28,23 +29,34 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
 
   useEffect(() => {
     let isMounted = true
-    const fetchSettings = async () => {
+    const fetchSettingsAndTags = async () => {
       try {
-        const { data } = await supabase
-          .from('app_settings')
-          .select('settings')
-          .eq('id', 'global')
-          .maybeSingle()
+        const [settingsRes, tagsRes] = await Promise.all([
+          supabase
+            .from('app_settings')
+            .select('settings')
+            .eq('id', 'global')
+            .maybeSingle(),
+          supabase
+            .from('wood_category_tag')
+            .select('name, sell_price')
+        ])
         
-        if (isMounted && data && data.settings) {
-          setSettings(data.settings)
-          setSynchronousSettings(data.settings, currentUserId || undefined)
+        if (isMounted && settingsRes.data && settingsRes.data.settings) {
+          setSettings(settingsRes.data.settings)
+          setSynchronousSettings(settingsRes.data.settings, currentUserId || undefined)
+        }
+        if (isMounted && tagsRes.data) {
+          setSavedTags(tagsRes.data.map((t: any) => ({
+            name: String(t.name || '').trim(),
+            sell_price: Number(t.sell_price || 0)
+          })))
         }
       } catch (e) {
         console.error('Failed to fetch settings from Supabase', e)
       }
     }
-    fetchSettings()
+    fetchSettingsAndTags()
     return () => { isMounted = false }
   }, [currentUserId])
 
@@ -59,10 +71,13 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
         ? { ...syncFallbackBiz, ...settings.business }
         : syncFallbackBiz);
 
-  const isPOS = size?.toLowerCase() === 'pos'
-  const isA5 = size?.toLowerCase() === 'a5'
-  const isChalan = size?.toLowerCase() === 'chalan'
-  const isA4 = size?.toLowerCase() === 'a4' || isChalan 
+  const normalizedSize = size?.toLowerCase().trim()
+  const isPOS = normalizedSize === 'pos'
+  const isPOS2 = normalizedSize === 'pos 2' || normalizedSize === 'pos2'
+  const isAnyPOS = isPOS || isPOS2
+  const isA5 = normalizedSize === 'a5'
+  const isChalan = normalizedSize === 'chalan'
+  const isA4 = normalizedSize === 'a4' || isChalan 
   const isStandardPage = isA4 || isA5 
 
   const isWood = invoice.type?.toLowerCase() === 'wood' || 
@@ -82,6 +97,21 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
     return str
   }
 
+  const resolveItemTag = (item: any) => {
+    const direct = formatTagDisplay(item?.tag)
+    if (direct !== '-') return direct
+    if (isWood && savedTags.length > 0) {
+      const priceVal = Number(item?.sellPrice ?? item?.price ?? 0)
+      if (priceVal > 0) {
+        const matched = savedTags.find(
+          t => Number(t.sell_price) > 0 && Math.abs(Number(t.sell_price) - priceVal) < 0.01
+        )
+        if (matched?.name) return formatTagDisplay(matched.name)
+      }
+    }
+    return '-'
+  }
+
   let items = Array.isArray(invoice.items) ? invoice.items.map((item: any) => {
     const rawCft = (item.cft !== undefined && item.cft !== null) ? Number(item.cft) : Number(item.quantity);
     return {
@@ -92,7 +122,7 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
       cft: isNaN(rawCft) ? 0 : rawCft,
       width: item.width !== undefined && item.width !== null ? Number(item.width) : 0,
       length: item.length !== undefined && item.length !== null ? Number(item.length) : 0,
-      tag: formatTagDisplay(item.tag),
+      tag: resolveItemTag(item),
     }
   }) : []
 
@@ -116,6 +146,33 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
     : (invoice.discount || 0))
   const totalOrderAmount = Math.round(itemsSubtotal - discountAmount + (invoice.deliveryCharge || 0))
 
+  // Group items by tag for POS 2 format
+  const tagGroups = (() => {
+    const groupsMap = new Map<string, { tag: string; items: any[]; totalQty: number; totalCft: number; totalAmount: number }>()
+    items.forEach((item: any) => {
+      const displayTag = formatTagDisplay(item.tag)
+      const tagKey = displayTag === '-' ? '-' : displayTag.toUpperCase()
+      if (!groupsMap.has(tagKey)) {
+        groupsMap.set(tagKey, {
+          tag: tagKey,
+          items: [],
+          totalQty: 0,
+          totalCft: 0,
+          totalAmount: 0
+        })
+      }
+      const group = groupsMap.get(tagKey)!
+      group.items.push(item)
+      group.totalQty += isWood ? 1 : (Number(item.quantity) || 1)
+      group.totalCft += Number(item.cft) || 0
+      group.totalAmount += Number(item.total) || 0
+    })
+    const allGroups = Array.from(groupsMap.values())
+    const namedGroups = allGroups.filter(g => g.tag !== '-')
+    const untaggedGroups = allGroups.filter(g => g.tag === '-')
+    return [...namedGroups, ...untaggedGroups]
+  })()
+
 
   // Helper to format date
   const formatDate = (dateStr: string) => {
@@ -132,7 +189,7 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
     return method.charAt(0).toUpperCase() + method.slice(1).toLowerCase()
   }
 
-  if (isPOS) {
+  if (isAnyPOS) {
     return (
       <div className="w-[80mm] bg-white text-black font-sans p-[12px] flex flex-col shadow-sm print:shadow-none mx-auto" style={{ fontSize: '10px' }}>
         {/* Business Header */}
@@ -170,42 +227,72 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
         {/* Items Table */}
         <table className="w-full mb-[12px] border-collapse text-black">
           <thead>
-            <tr className="border-y-[1.5px] border-black text-[10px] uppercase font-black leading-[1]">
-              <th className="py-[6px] text-center w-[24px]">NO</th>
-              {isWood && <th className="py-[6px] text-center w-[24px]">CAR</th>}
-              <th className="py-[6px] text-left pl-[4px]">{isWood ? '( TREE - W - L ) = SIZE' : 'Description'}</th>
-              {!isWood && <th className="py-[6px] text-center w-[32px]">QTY</th>}
-              {isWood ? <th className="py-[6px] text-center w-[28px]">TAG</th> : <th className="py-[6px] text-right w-[48px]">PRICE</th>}
-              <th className="py-[6px] text-right w-[56px]">TOTAL</th>
-            </tr>
+            {isPOS2 ? (
+              <tr className="border-y-[1.5px] border-black text-[10px] uppercase font-black leading-[1]">
+                <th className="py-[6px] text-center w-[24px]">NO</th>
+                <th className="py-[6px] text-left pl-[4px]">TAG</th>
+                <th className="py-[6px] text-center w-[48px]">PCS</th>
+                <th className="py-[6px] text-center w-[64px]">CFT</th>
+                <th className="py-[6px] text-right w-[64px]">TOTAL</th>
+              </tr>
+            ) : (
+              <tr className="border-y-[1.5px] border-black text-[10px] uppercase font-black leading-[1]">
+                <th className="py-[6px] text-center w-[24px]">NO</th>
+                {isWood && <th className="py-[6px] text-center w-[24px]">CAR</th>}
+                <th className="py-[6px] text-left pl-[4px]">{isWood ? '( TREE - W - L ) = SIZE' : 'Description'}</th>
+                {!isWood && <th className="py-[6px] text-center w-[32px]">QTY</th>}
+                {isWood ? <th className="py-[6px] text-center w-[28px]">TAG</th> : <th className="py-[6px] text-right w-[48px]">PRICE</th>}
+                <th className="py-[6px] text-right w-[56px]">TOTAL</th>
+              </tr>
+            )}
           </thead>
           <tbody>
-            {items.map((item: any, idx: number) => (
-              <tr key={`pos-item-${idx}`} className="text-[10px] border-b-[1px] border-slate-200 last:border-b-0 text-black leading-[1.2]">
-                <td className="py-[8px] text-center font-bold align-top">{idx + 1}</td>
-                {isWood && <td className="py-[8px] text-center font-bold align-top">{item.treeNo?.startsWith('M-') ? 'M' : (item.carNo || '-')}</td>}
-                <td className="py-[8px] pr-[4px] pl-[4px] align-top">
-                  <span className="font-bold">
-                    {isWood 
-                      ? `( ${item.treeNo || '-'} - ${item.width || 0}" - ${item.length || 0}' ) = ${item.cft?.toFixed(4) || 0}` 
-                      : item.name}
-                  </span>
-                </td>
-                {!isWood && (
-                  <td className="py-[8px] text-center text-black font-bold text-[10px] align-top">
-                    {item.quantity || 1} {item.unit || 'PCS'}
+            {isPOS2 ? (
+              tagGroups.map((group, idx) => (
+                <tr key={`pos2-group-${group.tag}-${idx}`} className="text-[10px] border-b-[1px] border-slate-200 last:border-b-0 text-black leading-[1.2]">
+                  <td className="py-[8px] text-center font-bold align-top">{idx + 1}</td>
+                  <td className="py-[8px] pr-[4px] pl-[4px] font-bold text-black uppercase align-top">
+                    {group.tag}
                   </td>
-                )}
-                {isWood ? (
-                  <td className="py-[8px] text-center font-bold text-black uppercase align-top">{formatTagDisplay(item.tag)}</td>
-                ) : (
-                  <td className="py-[8px] text-right font-bold text-black uppercase align-top">৳{Number(item.price || 0).toLocaleString()}</td>
-                )}
-                <td className="py-[8px] text-right font-black text-black align-top">
-                  ৳{Number(item.total || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })}
-                </td>
-              </tr>
-            ))}
+                  <td className="py-[8px] text-center font-bold text-black uppercase align-top">
+                    {group.totalQty} PCS
+                  </td>
+                  <td className="py-[8px] text-center font-bold text-black align-top">
+                    {group.totalCft.toFixed(4)}
+                  </td>
+                  <td className="py-[8px] text-right font-black text-black align-top">
+                    ৳{Number(group.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              items.map((item: any, idx: number) => (
+                <tr key={`pos-item-${idx}`} className="text-[10px] border-b-[1px] border-slate-200 last:border-b-0 text-black leading-[1.2]">
+                  <td className="py-[8px] text-center font-bold align-top">{idx + 1}</td>
+                  {isWood && <td className="py-[8px] text-center font-bold align-top">{item.treeNo?.startsWith('M-') ? 'M' : (item.carNo || '-')}</td>}
+                  <td className="py-[8px] pr-[4px] pl-[4px] align-top">
+                    <span className="font-bold">
+                      {isWood 
+                        ? `( ${item.treeNo || '-'} - ${item.width || 0}" - ${item.length || 0}' ) = ${item.cft?.toFixed(4) || 0}` 
+                        : item.name}
+                    </span>
+                  </td>
+                  {!isWood && (
+                    <td className="py-[8px] text-center text-black font-bold text-[10px] align-top">
+                      {item.quantity || 1} {item.unit || 'PCS'}
+                    </td>
+                  )}
+                  {isWood ? (
+                    <td className="py-[8px] text-center font-bold text-black uppercase align-top">{formatTagDisplay(item.tag)}</td>
+                  ) : (
+                    <td className="py-[8px] text-right font-bold text-black uppercase align-top">৳{Number(item.price || 0).toLocaleString()}</td>
+                  )}
+                  <td className="py-[8px] text-right font-black text-black align-top">
+                    ৳{Number(item.total || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
 

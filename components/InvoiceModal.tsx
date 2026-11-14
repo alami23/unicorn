@@ -18,7 +18,7 @@ interface InvoiceModalProps {
 }
 
 export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalProps) {
-  const [selectedSize, setSelectedSize] = useState<'A4' | 'A5' | 'POS' | 'Chalan'>('A4')
+  const [selectedSize, setSelectedSize] = useState<'A4' | 'A5' | 'POS' | 'POS 2' | 'Chalan'>('A4')
   const [zoom, setZoom] = useState(0.8)
   const containerRef = useRef<HTMLDivElement>(null)
   const [localInvoice, setLocalInvoice] = useState<any>(() => invoice || null)
@@ -159,7 +159,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     let targetWidth = 794 // Default A4/Chalan
     if (selectedSize === 'A5') {
       targetWidth = 559 // 148mm
-    } else if (selectedSize === 'POS') {
+    } else if (selectedSize === 'POS' || selectedSize === 'POS 2') {
       targetWidth = 302 // 80mm
     }
 
@@ -189,13 +189,15 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     const content = document.getElementById('printable-invoice');
     if (!content) return;
 
+    const isPosFormat = selectedSize === 'POS' || selectedSize === 'POS 2';
+
     // Create an off-screen iframe with desktop viewport size so mobile browsers render standard desktop layouts
     const iframe = document.createElement('iframe');
     iframe.id = 'print-iframe';
     iframe.style.position = 'absolute';
     iframe.style.left = '-9999px';
     iframe.style.top = '-9999px';
-    iframe.style.width = selectedSize === 'POS' ? '302px' : '1024px';
+    iframe.style.width = isPosFormat ? '302px' : '1024px';
     iframe.style.height = '768px';
     iframe.style.border = '0';
     document.body.appendChild(iframe);
@@ -237,14 +239,14 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
             ${styles}
             @media print {
               @page {
-                size: ${selectedSize === 'POS' ? `80mm ${dynamicHeight}px` : (selectedSize === 'A5' ? 'A5' : 'A4')};
+                size: ${isPosFormat ? `80mm ${dynamicHeight}px` : (selectedSize === 'A5' ? 'A5' : 'A4')};
                 margin: 0;
               }
               body { 
                 margin: 0 !important; 
                 padding: 0 !important;
                 background: white !important;
-                width: ${selectedSize === 'POS' ? '80mm' : 'auto'} !important;
+                width: ${isPosFormat ? '80mm' : 'auto'} !important;
               }
               * {
                 -webkit-print-color-adjust: exact !important;
@@ -255,10 +257,10 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                 box-shadow: none !important; 
                 margin: 0 !important; 
                 border: none !important;
-                width: ${selectedSize === 'POS' ? '80mm' : '100%'} !important;
+                width: ${isPosFormat ? '80mm' : '100%'} !important;
                 max-width: none !important;
                 transform: none !important;
-                padding: ${selectedSize === 'POS' ? '0' : 'inherited'} !important;
+                padding: ${isPosFormat ? '0' : 'inherited'} !important;
               }
               tr, .break-inside-avoid {
                 page-break-inside: avoid !important;
@@ -452,6 +454,15 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                   <Smartphone size={16} className="sm:w-[18px]" /> POS
                 </button>
                 <button 
+                  onClick={() => setSelectedSize('POS 2')}
+                  className={cn(
+                    "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-[12px] sm:text-sm font-bold transition-all",
+                    selectedSize === 'POS 2' ? "bg-amber-600 text-white shadow-lg shadow-amber-600/20" : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  )}
+                >
+                  <Smartphone size={16} className="sm:w-[18px]" /> POS 2
+                </button>
+                <button 
                   onClick={() => setSelectedSize('Chalan')}
                   className={cn(
                     "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-[12px] sm:text-sm font-bold transition-all",
@@ -508,7 +519,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
               let originalWidth = 794
               if (selectedSize === 'A5') {
                 originalWidth = 559
-              } else if (selectedSize === 'POS') {
+              } else if (selectedSize === 'POS' || selectedSize === 'POS 2') {
                 originalWidth = 302
               }
 
