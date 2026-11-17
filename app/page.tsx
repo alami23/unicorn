@@ -1,47 +1,24 @@
 'use client'
 
-import React, { Suspense, useMemo } from 'react'
+import React, { Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import DashboardLayout from '@/components/DashboardLayout'
-import { BarcodeScannerModal } from '@/components/BarcodeScannerModal'
-import AddCustomerModal from '@/components/AddCustomerModal'
-import UpcomingDeliveriesWidget from '@/components/UpcomingDeliveriesWidget'
-import InventoryStockWidget from '@/components/InventoryStockWidget'
 import { motion } from 'motion/react'
 import { 
-  TrendingUp, 
-  TrendingDown, 
   DollarSign, 
   ShoppingBag, 
   Users, 
   AlertCircle,
-  ArrowUpRight,
   ChevronRight,
-  Trees,
-  BarChart3,
   Receipt,
   CreditCard,
   Search,
   FileText,
   X,
   ExternalLink,
-  Filter,
   Scan,
-  Camera,
-  QrCode,
   UserPlus
 } from 'lucide-react'
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  Cell,
-  PieChart,
-  Pie
-} from 'recharts'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
@@ -49,6 +26,14 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { getDisplayInvoiceId } from '@/lib/invoice'
 import { toast } from 'sonner'
+
+const BarcodeScannerModal = dynamic(
+  () => import('@/components/BarcodeScannerModal').then((mod) => mod.BarcodeScannerModal),
+  { ssr: false }
+)
+const AddCustomerModal = dynamic(() => import('@/components/AddCustomerModal'), { ssr: false })
+const UpcomingDeliveriesWidget = dynamic(() => import('@/components/UpcomingDeliveriesWidget'), { ssr: false })
+const InventoryStockWidget = dynamic(() => import('@/components/InventoryStockWidget'), { ssr: false })
 
 const stats = [
   { label: 'Total Sales', value: '৳0', change: '+0%', trend: 'up', icon: DollarSign, color: 'bg-[#fe9a13]' },

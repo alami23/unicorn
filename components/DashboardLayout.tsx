@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
@@ -39,7 +40,8 @@ import {
   ShieldAlert
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import OnboardingModal from '@/components/OnboardingModal'
+
+const OnboardingModal = dynamic(() => import('@/components/OnboardingModal'), { ssr: false })
 
 const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, href: '/', permission: 'Dashboard' }, 

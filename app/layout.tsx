@@ -55,7 +55,7 @@ export default function RootLayout({
           <AuthProvider>
             {children}
             <Toaster
-              position="top-right"
+              position="top-center"
               richColors
               expand={true}
               visibleToasts={6}

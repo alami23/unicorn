@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { preloadInvoicesBackground } from '@/lib/invoiceCache';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -26,7 +27,8 @@ import {
   Download,
   Smartphone
 } from 'lucide-react';
-import SPreview from '@/components/SPreview';
+
+const SPreview = dynamic(() => import('@/components/SPreview'), { ssr: false });
 
 const APK_BUCKET = 'apk';
 const DEFAULT_APK_FILE = 'app-release.apk';
