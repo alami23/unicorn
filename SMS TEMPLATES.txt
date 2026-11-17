@@ -76,7 +76,7 @@ SECTION 3: PAYMENT REMINDER & INVOICE SHARING SMS TEMPLATES
    Total Purchases: [Total Purchases].
    Paid Amount: [Paid Amount].
    Due Amount: [Outstanding Due].
-   Please clear your due amount at your earliest convenience. Thank you!"
+   Please clear your due amount. Thank you!"
 
 9. Trigger Event: Invoice Due Reminder (Specific Unpaid Invoice)
    Source: /app/invoice/page.tsx
@@ -86,7 +86,7 @@ SECTION 3: PAYMENT REMINDER & INVOICE SHARING SMS TEMPLATES
    Total Bill: [Total Bill]
    Paid Amount: [Paid Amount]
    Due Amount: [Due Amount]
-   Please clear the due amount at your earliest convenience. Thank you!"
+   Please clear your due amount. Thank you!"
 
 10. Trigger Event: Outstanding Due Reminder (Reports Module)
     Source: /app/reports/page.tsx
@@ -96,7 +96,7 @@ SECTION 3: PAYMENT REMINDER & INVOICE SHARING SMS TEMPLATES
     Total Purchases: [Total Purchases].
     Paid Amount: [Paid Amount].
     Due Amount: [Outstanding Due].
-    Please clear your due amount at your earliest convenience. Thank you!"
+    Please clear your due amount. Thank you!"
 
 11. Trigger Event: Share / Send Online Invoice PDF Link
     Source: /components/SendInvoiceModal.tsx

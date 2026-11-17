@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense, useMemo } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
 import { Search, Plus, UserCog, Phone, Calendar, MoreVertical, Shield, Briefcase, Eye, Edit2, Trash2, X, ChevronDown, Check, DollarSign, Wallet, Users, Settings, Loader2 } from 'lucide-react'
-import { cn, safeParse, parseDateSafe } from '@/lib/utils'
+import { cn, safeParse, parseDateSafe, sanitizePhoneInput, isValidPhoneNumber } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { addNotification } from '@/lib/notifications'
 import { toast } from 'sonner'
@@ -203,7 +203,13 @@ function StaffPageContent() {
 
   const handleAddStaff = async () => {
     if (isSubmitting) return;
-    if (!newStaff.name || !newStaff.phone || newStaff.salary <= 0 || !newStaff.role) return;
+    const sanitizedPhone = sanitizePhoneInput(newStaff.phone);
+    if (!newStaff.name || !isValidPhoneNumber(sanitizedPhone) || newStaff.salary <= 0 || !newStaff.role) {
+      if (newStaff.phone && !isValidPhoneNumber(sanitizedPhone)) {
+        toast.error('Please enter a valid phone number (digits and optional leading + only, no spaces or special characters).');
+      }
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -212,7 +218,7 @@ function StaffPageContent() {
         id,
         name: newStaff.name,
         role: newStaff.role,
-        phone: newStaff.phone,
+        phone: sanitizedPhone,
         join_date: newStaff.joinDate,
         salary: newStaff.salary,
         status: newStaff.status
@@ -241,18 +247,23 @@ function StaffPageContent() {
   };
 
   const handleEditStaff = (member: StaffMember) => {
-    setEditingStaff(member);
+    setEditingStaff({ ...member, phone: sanitizePhoneInput(member.phone || '') });
     setIsEditModalOpen(true);
   };
 
   const handleUpdateStaff = async () => {
     if (isSubmitting || !editingStaff) return;
+    const sanitizedPhone = sanitizePhoneInput(editingStaff.phone);
+    if (!isValidPhoneNumber(sanitizedPhone)) {
+      toast.error('Please enter a valid phone number (digits and optional leading + only, no spaces or special characters).');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('staff').update({
         name: editingStaff.name,
         role: editingStaff.role,
-        phone: editingStaff.phone,
+        phone: sanitizedPhone,
         join_date: editingStaff.joinDate,
         salary: editingStaff.salary,
         status: editingStaff.status
@@ -657,13 +668,18 @@ function StaffPageContent() {
                       <div className="relative">
                         <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input 
-                          type="text"
-                          placeholder="+880 1711-XXXXXX"
+                          type="tel"
+                          inputMode="tel"
+                          pattern="^\+?\d+$"
+                          title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
+                          placeholder="+8801711XXXXXX"
                           value={isAddModalOpen ? newStaff.phone : editingStaff?.phone || ''}
-                          onChange={(e) => isAddModalOpen 
-                            ? setNewStaff({ ...newStaff, phone: e.target.value })
-                            : setEditingStaff({ ...editingStaff!, phone: e.target.value })
-                          }
+                          onChange={(e) => {
+                            const sanitized = sanitizePhoneInput(e.target.value);
+                            isAddModalOpen 
+                              ? setNewStaff({ ...newStaff, phone: sanitized })
+                              : setEditingStaff({ ...editingStaff!, phone: sanitized })
+                          }}
                           className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium"
                         />
                       </div>

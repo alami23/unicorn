@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
 import { Search, Printer, Download, User, Calendar, ArrowUpRight, ArrowDownLeft, ChevronLeft, X, ChevronDown, Check } from 'lucide-react'
-import { cn, safeParse } from '@/lib/utils'
+import { cn, safeParse, sortByNameAsc } from '@/lib/utils'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -83,10 +83,11 @@ function CustomerStatementContent() {
       const { data: allCustomers, error: cusError } = await supabase
         .from('customer')
         .select('*')
+        .order('name', { ascending: true })
       
       if (cusError) throw cusError
       if (allCustomers) {
-        setCustomers(allCustomers.map(c => ({
+        setCustomers(sortByNameAsc(allCustomers.map(c => ({
           id: c.id,
           name: c.name,
           phone: c.phone,
@@ -96,7 +97,7 @@ function CustomerStatementContent() {
           totalDue: c.total_due,
           totalOrders: c.total_orders,
           lastPurchase: c.last_purchase
-        })))
+        }))))
       }
 
       if (targetId) {
@@ -137,6 +138,40 @@ function CustomerStatementContent() {
               .select('id, invoice_number, customer_id, customer_name')
               .or(invFilter)
           ])
+
+          type InvoiceRefMeta = {
+            invoiceId: string
+            displayId: string
+            invoiceType: 'Wood' | 'Furniture'
+          }
+          const invoiceLookup = new Map<string, InvoiceRefMeta>()
+          const registerInvoiceMeta = (inv: any, invoiceType: 'Wood' | 'Furniture') => {
+            if (!inv?.id) return
+            const isWood = invoiceType === 'Wood'
+            const displayId = getDisplayInvoiceId(inv.invoice_number || inv.id, isWood)
+            const meta: InvoiceRefMeta = {
+              invoiceId: String(inv.id),
+              displayId,
+              invoiceType
+            }
+            const keys = [
+              String(inv.id).trim(),
+              inv.invoice_number ? String(inv.invoice_number).trim() : '',
+              displayId,
+              displayId.replace(/^#+/, ''),
+              getDisplayInvoiceId(inv.id, isWood),
+              getDisplayInvoiceId(inv.id, isWood).replace(/^#+/, '')
+            ]
+            keys.forEach((k) => {
+              const norm = k.trim().toUpperCase()
+              if (norm && !invoiceLookup.has(norm)) {
+                invoiceLookup.set(norm, meta)
+              }
+            })
+          }
+
+          ;(furnRes.data || []).forEach((inv: any) => registerInvoiceMeta(inv, 'Furniture'))
+          ;(woodRes.data || []).forEach((inv: any) => registerInvoiceMeta(inv, 'Wood'))
 
           const candidateInvoices = [...(furnRes.data || []), ...(woodRes.data || [])]
           const ownedInvoiceRefs = new Set<string>()
@@ -204,15 +239,116 @@ function CustomerStatementContent() {
               return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
             })
 
-          setCustomerTransactions(filteredTxns.map(t => ({
-            id: t.id,
-            date: t.date,
-            type: t.type,
-            ref: t.ref,
-            debit: Number(t.debit || 0),
-            credit: Number(t.credit || 0),
-            balance: Number(t.balance || 0)
-          })))
+          const isNonInvoiceRef = (rawRef: string) => {
+            const lower = rawRef.trim().toLowerCase()
+            if (!lower || ['opening balance', 'opening', 'initial', 'n/a', '-', 'none'].includes(lower)) {
+              return true
+            }
+            if (/^(pay|ret|exp)-/i.test(lower)) return true
+            return false
+          }
+
+          const findInvoiceMeta = (rawRef: string): InvoiceRefMeta | null => {
+            const trimmed = rawRef.trim()
+            if (!trimmed) return null
+            const disp = getDisplayInvoiceId(trimmed)
+            const lookupKeys = [
+              trimmed.toUpperCase(),
+              trimmed.replace(/^#+/, '').toUpperCase(),
+              disp.toUpperCase(),
+              disp.replace(/^#+/, '').toUpperCase()
+            ]
+            for (const key of lookupKeys) {
+              const foundMeta = invoiceLookup.get(key)
+              if (foundMeta) return foundMeta
+            }
+            return null
+          }
+
+          // Resolve any invoice refs not returned by the customer filter (e.g., historical name changes)
+          const unresolvedCandidates = new Set<string>()
+          filteredTxns.forEach((t: any) => {
+            const rawRef = String(t.ref || '').trim()
+            if (isNonInvoiceRef(rawRef)) return
+            const looksLikeInvoice =
+              String(t.type || '').toLowerCase() === 'invoice' ||
+              /inv/i.test(rawRef)
+            if (looksLikeInvoice && !findInvoiceMeta(rawRef)) {
+              const disp = getDisplayInvoiceId(rawRef)
+              unresolvedCandidates.add(rawRef)
+              unresolvedCandidates.add(rawRef.replace(/^#+/, ''))
+              if (disp) {
+                unresolvedCandidates.add(disp)
+                unresolvedCandidates.add(disp.replace(/^#+/, ''))
+              }
+            }
+          })
+
+          if (unresolvedCandidates.size > 0) {
+            const candidateList = Array.from(unresolvedCandidates).filter(Boolean)
+            const [extraFById, extraFByNum, extraWById, extraWByNum] = await Promise.all([
+              supabase.from('furniture_invoices').select('id, invoice_number').in('id', candidateList),
+              supabase.from('furniture_invoices').select('id, invoice_number').in('invoice_number', candidateList),
+              supabase.from('wood_invoices').select('id, invoice_number').in('id', candidateList),
+              supabase.from('wood_invoices').select('id, invoice_number').in('invoice_number', candidateList),
+            ])
+            ;(extraFById.data || []).forEach((inv: any) => registerInvoiceMeta(inv, 'Furniture'))
+            ;(extraFByNum.data || []).forEach((inv: any) => registerInvoiceMeta(inv, 'Furniture'))
+            ;(extraWById.data || []).forEach((inv: any) => registerInvoiceMeta(inv, 'Wood'))
+            ;(extraWByNum.data || []).forEach((inv: any) => registerInvoiceMeta(inv, 'Wood'))
+          }
+
+          setCustomerTransactions(filteredTxns.map(t => {
+            const rawRef = String(t.ref || '').trim()
+            const nonInvoice = isNonInvoiceRef(rawRef)
+            const matchedMeta = nonInvoice ? null : findInvoiceMeta(rawRef)
+
+            const looksLikeInvoiceRef =
+              !nonInvoice &&
+              (Boolean(matchedMeta) ||
+                String(t.type || '').toLowerCase() === 'invoice' ||
+                /inv/i.test(rawRef))
+
+            let resolvedType: 'Wood' | 'Furniture' | null = matchedMeta?.invoiceType || null
+            if (!resolvedType && looksLikeInvoiceRef) {
+              if (/(?:^|#|_|-)W-|WOOD/i.test(rawRef)) {
+                resolvedType = 'Wood'
+              } else if (/(?:^|#|_|-)F-|FURN/i.test(rawRef)) {
+                resolvedType = 'Furniture'
+              }
+            }
+
+            const displayRef = rawRef.toLowerCase() === 'opening balance'
+              ? 'Opening Balance'
+              : (matchedMeta?.displayId ||
+                getDisplayInvoiceId(
+                  rawRef,
+                  resolvedType === 'Wood' ? true : resolvedType === 'Furniture' ? false : undefined
+                ))
+
+            let invoiceHref: string | null = null
+            if (looksLikeInvoiceRef && displayRef && displayRef !== '-') {
+              const qp = new URLSearchParams()
+              if (resolvedType) qp.set('type', resolvedType)
+              qp.set('search', displayRef)
+              if (matchedMeta?.invoiceId) qp.set('invoiceId', matchedMeta.invoiceId)
+              qp.set('open', 'true')
+              invoiceHref = `/invoice?${qp.toString()}`
+            }
+
+            return {
+              id: t.id,
+              date: t.date,
+              type: t.type,
+              ref: t.ref,
+              displayRef,
+              invoiceType: resolvedType,
+              invoiceHref,
+              debit: Number(t.debit || 0),
+              credit: Number(t.credit || 0),
+              balance: Number(t.balance || 0)
+            }
+          }))
         }
       } else {
         setCustomer(null)
@@ -228,9 +364,9 @@ function CustomerStatementContent() {
     fetchData()
   }, [fetchData])
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.phone.includes(searchTerm)
+  const filteredCustomers = sortByNameAsc(customers).filter(c => 
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.phone || '').includes(searchTerm)
   )
 
   const handlePrint = () => {
@@ -484,7 +620,20 @@ function CustomerStatementContent() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-amber-600 dark:text-amber-400 font-medium">{String(txn.ref).toLowerCase() === 'opening balance' ? 'Opening Balance' : getDisplayInvoiceId(txn.ref)}</td>
+                        <td className="px-6 py-4 text-sm text-amber-600 dark:text-amber-400 font-medium">
+                          {txn.invoiceHref ? (
+                            <Link
+                              href={txn.invoiceHref}
+                              title={`Open ${txn.invoiceType ? `${txn.invoiceType} ` : ''}Invoice ${txn.displayRef}`}
+                              className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline decoration-amber-500/40 underline-offset-4 hover:decoration-amber-600 transition-colors print:no-underline print:text-slate-900"
+                            >
+                              <span>{txn.displayRef}</span>
+                              <ArrowUpRight size={13} className="opacity-70 shrink-0 print:hidden" />
+                            </Link>
+                          ) : (
+                            <span className="print:text-slate-900">{txn.displayRef}</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-sm text-right font-medium text-slate-900 dark:text-slate-100">{txn.debit > 0 ? `৳${(txn.debit || 0).toLocaleString()}` : '-'}</td>
                         <td className="px-6 py-4 text-sm text-right font-medium text-emerald-600 dark:text-emerald-400">{txn.credit > 0 ? `৳${(txn.credit || 0).toLocaleString()}` : '-'}</td>
                         <td className="px-6 py-4 text-sm text-right font-medium text-rose-500 dark:text-rose-400">{(txn.debit - txn.credit) > 0 ? `৳${(txn.debit - txn.credit).toLocaleString()}` : '-'}</td>
@@ -512,7 +661,17 @@ function CustomerStatementContent() {
                       )}>{txn.type}</span>
                     </div>
                     <div>
-                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{String(txn.ref).toLowerCase() === 'opening balance' ? 'Opening Balance' : getDisplayInvoiceId(txn.ref)}</span>
+                      {txn.invoiceHref ? (
+                        <Link
+                          href={txn.invoiceHref}
+                          className="inline-flex items-center gap-1 text-sm font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline decoration-amber-500/40 underline-offset-4 transition-colors"
+                        >
+                          <span>{txn.displayRef}</span>
+                          <ArrowUpRight size={13} className="opacity-75 shrink-0" />
+                        </Link>
+                      ) : (
+                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{txn.displayRef}</span>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="text-slate-500">Bill: {txn.debit > 0 ? `৳${(txn.debit || 0).toLocaleString()}` : '-'}</div>

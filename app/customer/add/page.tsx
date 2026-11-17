@@ -4,8 +4,9 @@ import React, { useState, useRef, Suspense } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
 import { User, Phone, MapPin, Mail, Save, ArrowLeft, Camera, Plus, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { safeParse } from '@/lib/utils'
+import { safeParse, sanitizePhoneInput, isValidPhoneNumber } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -37,6 +38,11 @@ function AddCustomerContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isSubmitting) return
+    const sanitizedPhone = sanitizePhoneInput(formData.phone)
+    if (!isValidPhoneNumber(sanitizedPhone)) {
+      toast.error('Please enter a valid phone number (digits and optional leading + only, no spaces or special characters).')
+      return
+    }
     setIsSubmitting(true)
     const customerId = `CUS-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`
     
@@ -44,7 +50,7 @@ function AddCustomerContent() {
       const dbData = {
         id: customerId,
         name: formData.name,
-        phone: formData.phone,
+        phone: sanitizedPhone,
         email: formData.email,
         address: formData.address,
         type: formData.type,
@@ -157,10 +163,13 @@ function AddCustomerContent() {
                   <input 
                     required
                     type="tel"
+                    inputMode="tel"
+                    pattern="^\+?\d+$"
+                    title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    onChange={(e) => setFormData({...formData, phone: sanitizePhoneInput(e.target.value)})}
                     className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 dark:text-slate-100 transition-all text-sm"
-                    placeholder="e.g. 017XXXXXXXX"
+                    placeholder="e.g. 017XXXXXXXX or +88017XXXXXXXX"
                   />
                 </div>
 

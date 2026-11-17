@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/AuthProvider';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { cn } from '@/lib/utils';
+import { cn, sanitizePhoneInput, isValidPhoneNumber } from '@/lib/utils';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserPlus, Lock, User, AlertCircle, Phone, Mail, Fingerprint, Key, Eye, EyeOff, Sun, Moon } from 'lucide-react';
@@ -50,8 +50,15 @@ export default function SignupPage() {
       return;
     }
 
-    const cleanPhone = phone.replace(/^0+/, '');
-    const fullPhoneNumber = `${countryCode}${cleanPhone}`;
+    const sanitizedPhone = sanitizePhoneInput(phone);
+    if (!isValidPhoneNumber(sanitizedPhone)) {
+      setError('Please enter a valid phone number (digits and optional leading + only, no spaces or special characters).');
+      return;
+    }
+
+    const fullPhoneNumber = sanitizedPhone.startsWith('+')
+      ? sanitizedPhone
+      : `${countryCode}${sanitizedPhone.replace(/^0+/, '')}`;
 
     setLoading(true);
     setError(null);
@@ -469,10 +476,13 @@ export default function SignupPage() {
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                       <input
                         type="tel"
+                        inputMode="tel"
+                        pattern="^\+?\d+$"
+                        title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-r-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dark:text-white"
-                        placeholder="1700-000000"
+                        placeholder="1700000000"
                         required
                       />
                     </div>

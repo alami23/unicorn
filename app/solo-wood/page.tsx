@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense, useRef } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
 import { Search, Plus, Minus, Trash2, Printer, ShoppingCart, Filter, Pencil, Check, X, Upload, UserPlus, RotateCcw, ChevronDown, Lock } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
-import { cn, safeParse } from '@/lib/utils'
+import { cn, safeParse, sortByNameAsc } from '@/lib/utils'
 import AddCustomerModal from '@/components/AddCustomerModal'
 import InvoiceModal from '@/components/InvoiceModal'
 import AlertPopup from '@/components/AlertPopup'
@@ -200,9 +200,9 @@ function SoloWoodContent() {
 
   useEffect(() => {
     const loadCustomers = async () => {
-      const { data, error } = await supabase.from('customer').select('*').order('name')
+      const { data, error } = await supabase.from('customer').select('*').order('name', { ascending: true })
       if (data) {
-        setCustomers(data.map(c => ({
+        setCustomers(sortByNameAsc(data.map(c => ({
           id: c.id,
           name: c.name,
           phone: c.phone,
@@ -210,7 +210,7 @@ function SoloWoodContent() {
           type: c.type,
           photo: c.photo,
           totalDue: Number(c.total_due)
-        })))
+        }))))
       }
     }
     loadCustomers()
@@ -277,7 +277,7 @@ function SoloWoodContent() {
       const { error } = await supabase.from('customer').insert([dbData])
       if (error) throw error
       
-      setCustomers([...customers, customer])
+      setCustomers(sortByNameAsc([...customers, customer]))
       setSelectedCustomer(customer.name)
       toast.success('Customer added')
     } catch (error: any) {
@@ -723,8 +723,8 @@ function SoloWoodContent() {
                         >
                           Walk-in Customer
                         </div>
-                        {customers
-                          .filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || c.phone.includes(customerSearchTerm))
+                        {sortByNameAsc(customers)
+                          .filter(c => (c.name || '').toLowerCase().includes(customerSearchTerm.toLowerCase()) || (c.phone || '').includes(customerSearchTerm))
                           .map(c => (
                           <div 
                             key={c.id}

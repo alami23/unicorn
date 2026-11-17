@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react'
 import { X, Camera, User, Phone, MapPin, Mail, Save, Plus, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
-import { safeParse } from '@/lib/utils'
+import { safeParse, sanitizePhoneInput, isValidPhoneNumber } from '@/lib/utils'
 import Image from 'next/image'
 
 import { supabase } from '@/lib/supabase'
@@ -49,7 +49,7 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
       setActiveInvoiceDue(initialInvoiceDue)
       setFormData({
         name: initialData.name || '',
-        phone: initialData.phone || '',
+        phone: sanitizePhoneInput(initialData.phone || ''),
         email: initialData.email || '',
         address: initialData.address || '',
         type: initialData.type || 'Regular',
@@ -186,6 +186,14 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isSubmitting) return
+
+    const sanitizedPhone = sanitizePhoneInput(formData.phone)
+    if (!isValidPhoneNumber(sanitizedPhone)) {
+      toast.error('Please enter a valid phone number (digits and optional leading + only, no spaces or special characters).')
+      phoneInputRef.current?.focus()
+      return
+    }
+
     setIsSubmitting(true)
     try {
       let latestInvoiceDue = activeInvoiceDue
@@ -226,6 +234,7 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
       const customerData = {
         id: initialData?.id || `CUS-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
         ...formData,
+        phone: sanitizedPhone,
         initialBalance: cleanOpeningBalance,
         invoiceDue: latestInvoiceDue,
         totalOrders: latestOrdersCount,
@@ -386,10 +395,12 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
                 required
                 type="tel"
                 inputMode="tel"
+                pattern="^\+?\d+$"
+                title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                 enterKeyHint="next"
                 value={formData.phone}
                 onFocus={(e) => e.target.select()}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                onChange={(e) => setFormData({...formData, phone: sanitizePhoneInput(e.target.value)})}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.keyCode === 13) {
                     e.preventDefault()
@@ -397,7 +408,7 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
                   }
                 }}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all text-sm"
-                placeholder="e.g. 017XXXXXXXX"
+                placeholder="e.g. 017XXXXXXXX or +88017XXXXXXXX"
               />
             </div>
 

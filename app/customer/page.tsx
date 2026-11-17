@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
 import { Search, Plus, UserPlus, Phone, MapPin, MoreVertical, Mail, MessageSquare, FileText, DollarSign, BellRing, RotateCw } from 'lucide-react'
-import { cn, safeParse } from '@/lib/utils'
+import { cn, safeParse, sortByNameAsc } from '@/lib/utils'
 import { sendSMS } from '@/lib/sms'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -101,7 +101,7 @@ function CustomerPageContent() {
       const { data, error } = await supabase
         .from('customer')
         .select('*')
-        .order('name')
+        .order('name', { ascending: true })
 
       if (error) throw error
       
@@ -168,7 +168,7 @@ function CustomerPageContent() {
             photo: c.photo
           }
         })
-        setCustomersList(mappedCustomers)
+        setCustomersList(sortByNameAsc(mappedCustomers))
       }
     } catch (error: any) {
       console.error('Error fetching customers:', error)
@@ -264,7 +264,7 @@ function CustomerPageContent() {
         }
 
         // Optimistically update local state immediately so visible dues reflect the recalculated amount right away
-        setCustomersList(prev => prev.map(c => c.id === customer.id ? {
+        setCustomersList(prev => sortByNameAsc(prev.map(c => c.id === customer.id ? {
           ...c,
           name: customer.name,
           phone: customer.phone,
@@ -276,7 +276,7 @@ function CustomerPageContent() {
           totalDue: recalculatedTotalDue,
           initialBalance: newOpeningBalance,
           invoiceDue: activeInvoiceDue
-        } : c))
+        } : c)))
 
         toast.success('Customer updated and total due recalculated')
       } else {
@@ -485,7 +485,7 @@ function CustomerPageContent() {
       const formattedTotal = Math.round(totalBill).toLocaleString()
       const formattedPaid = Math.round(totalPaid).toLocaleString()
 
-      const reminderMsg = `Dear ${cus.name}, payment reminder from ${businessName}.\nTotal Purchases: ${formattedTotal}.\nPaid Amount: ${formattedPaid}.\nDue Amount: ${formattedDue}.\nPlease clear your due amount at your earliest convenience. Thank you!`
+      const reminderMsg = `Dear ${cus.name}, payment reminder from ${businessName}.\nTotal Purchases: ${formattedTotal}.\nPaid Amount: ${formattedPaid}.\nDue Amount: ${formattedDue}.\nPlease clear your due amount. Thank you!`
 
       // 6. Check phone
       if (!phoneToSend || !phoneToSend.trim()) {
@@ -523,10 +523,10 @@ function CustomerPageContent() {
 
   const [filterType, setFilterType] = useState('All')
 
-  const filteredCustomers = customersList.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          c.phone.includes(searchQuery) ||
-                          c.id.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredCustomers = sortByNameAsc(customersList).filter(c => {
+    const matchesSearch = (c.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (c.phone || '').includes(searchQuery) ||
+                          (c.id || '').toLowerCase().includes(searchQuery.toLowerCase())
     const matchesType = filterType === 'All' || c.type === filterType
     return matchesSearch && matchesType
   })

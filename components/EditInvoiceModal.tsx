@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import { addNotification } from '@/lib/notifications'
 import { getDisplayInvoiceId, normalizeInvoiceIdFormat, isValidInvoiceIdFormat } from '@/lib/invoice'
 import { fetchOrgUsers, recordInvoiceCreator } from '@/lib/invoiceCache'
-import { cn, parseDateSafe } from '@/lib/utils'
+import { cn, parseDateSafe, sortByNameAsc } from '@/lib/utils'
 
 interface EditInvoiceModalProps {
   isOpen: boolean
@@ -181,7 +181,7 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
         fetchOrgUsers().then(uList => setUsers(uList))
         
         const { data: custData } = await supabase.from('customer').select('*').order('name', { ascending: true })
-        if (custData) setCustomers(custData)
+        if (custData) setCustomers(sortByNameAsc(custData))
         
         const inventoryTable = isWood ? 'wood_inventory' : 'furniture_inventory'
         const { data: prodData } = await supabase.from(inventoryTable).select('*')
@@ -660,9 +660,9 @@ export default function EditInvoiceModal({ isOpen, onClose, invoice, onSave }: E
 
   const filteredCustomers = useMemo(() => {
     const term = customerSearchTerm.toLowerCase()
-    return customers.filter(c => 
-      c.name.toLowerCase().includes(term) || 
-      c.phone.toLowerCase().includes(term)
+    return sortByNameAsc(customers).filter(c => 
+      (c.name || '').toLowerCase().includes(term) || 
+      (c.phone || '').toLowerCase().includes(term)
     )
   }, [customers, customerSearchTerm])
 

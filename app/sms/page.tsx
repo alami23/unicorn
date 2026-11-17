@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
 import { Send, MessageSquare, Users, History, Search, Clock, CheckCircle2, AlertCircle, Filter, X, ChevronDown, Wallet } from 'lucide-react'
-import { cn, safeParse } from '@/lib/utils'
+import { cn, safeParse, sortByNameAsc, sanitizePhoneInput, isValidPhoneNumber } from '@/lib/utils'
 import { sendSMS } from '@/lib/sms'
 import { supabase } from '@/lib/supabase'
 import AlertPopup from '@/components/AlertPopup'
@@ -102,8 +102,8 @@ function SMSPageContent() {
 
   const fetchCustomers = async () => {
     try {
-      const { data, error } = await supabase.from('customer').select('*').order('name');
-      if (data) setCustomers(data);
+      const { data, error } = await supabase.from('customer').select('*').order('name', { ascending: true });
+      if (data) setCustomers(sortByNameAsc(data));
     } catch (error) {
       console.error('Error fetching customers:', error);
     }
@@ -119,14 +119,19 @@ function SMSPageContent() {
   }, [])
 
   const handleSend = async () => {
-    if (!message.trim() || !recipientPhone.trim()) {
+    const sanitizedPhone = sanitizePhoneInput(recipientPhone)
+    if (!message.trim() || !sanitizedPhone) {
       showAlert('Please enter both recipient phone and message', 'warning')
+      return
+    }
+    if (!isValidPhoneNumber(sanitizedPhone)) {
+      showAlert('Phone number must contain only digits and an optional leading + (no spaces or special characters).', 'warning')
       return
     }
     
     setIsSending(true)
     try {
-      await sendSMS(recipientPhone, message)
+      await sendSMS(sanitizedPhone, message)
       
       setMessage('')
       setRecipientPhone('')
@@ -148,9 +153,9 @@ function SMSPageContent() {
     return matchesSearch && matchesStatus
   })
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(historyCustomerSearch.toLowerCase()) ||
-    c.phone.includes(historyCustomerSearch)
+  const filteredCustomers = sortByNameAsc(customers).filter(c => 
+    (c.name || '').toLowerCase().includes(historyCustomerSearch.toLowerCase()) ||
+    (c.phone || '').includes(historyCustomerSearch)
   )
 
   return (
@@ -186,10 +191,13 @@ function SMSPageContent() {
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                       <input 
-                        type="text" 
+                        type="tel"
+                        inputMode="tel"
+                        pattern="^\+?\d+$"
+                        title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                         placeholder="Enter phone number (e.g. 88017...)" 
                         value={recipientPhone}
-                        onChange={(e) => setRecipientPhone(e.target.value)}
+                        onChange={(e) => setRecipientPhone(sanitizePhoneInput(e.target.value))}
                         className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-sm dark:text-slate-100"
                       />
                     </div>

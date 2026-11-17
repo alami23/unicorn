@@ -23,6 +23,7 @@ import NextImage from 'next/image';
 import { useAuth } from '@/components/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { addNotification } from '@/lib/notifications';
+import { sanitizePhoneInput, isValidPhoneNumber } from '@/lib/utils';
 
 interface OnboardingModalProps {
   isOpen?: boolean;
@@ -82,11 +83,11 @@ export default function OnboardingModal({ isOpen: externalIsOpen, onClose, force
         if (userBusiness.logoY !== undefined) setLogoY(userBusiness.logoY);
         if (userBusiness.logoZoom !== undefined) setLogoZoom(userBusiness.logoZoom);
 
-        if (userBusiness.phone) setPhone(userBusiness.phone);
-        else if (user?.phone) setPhone(user.phone);
+        if (userBusiness.phone) setPhone(sanitizePhoneInput(userBusiness.phone));
+        else if (user?.phone) setPhone(sanitizePhoneInput(user.phone));
 
-        if (userBusiness.secondaryPhone) setSecondaryPhone(userBusiness.secondaryPhone);
-        if (userBusiness.whatsapp) setWhatsapp(userBusiness.whatsapp);
+        if (userBusiness.secondaryPhone) setSecondaryPhone(sanitizePhoneInput(userBusiness.secondaryPhone));
+        if (userBusiness.whatsapp) setWhatsapp(sanitizePhoneInput(userBusiness.whatsapp));
 
         if (userBusiness.email) setEmail(userBusiness.email);
         else if (user?.email) setEmail(user.email);
@@ -237,15 +238,27 @@ export default function OnboardingModal({ isOpen: externalIsOpen, onClose, force
         onboarding_completed_by_user: {}
       };
 
+      const cleanPhone = sanitizePhoneInput(phone);
+      const cleanSecondaryPhone = sanitizePhoneInput(secondaryPhone);
+      const cleanWhatsapp = sanitizePhoneInput(whatsapp);
+
+      if ((cleanPhone && !isValidPhoneNumber(cleanPhone)) ||
+          (cleanSecondaryPhone && !isValidPhoneNumber(cleanSecondaryPhone)) ||
+          (cleanWhatsapp && !isValidPhoneNumber(cleanWhatsapp))) {
+        setAlertMsg({ type: 'error', text: 'Phone numbers must contain only digits and an optional leading + (no spaces or special characters).' });
+        setIsSaving(false);
+        return;
+      }
+
       const updatedBusiness = {
         name: businessName.trim(),
         logo: logo,
         logoX: logoX,
         logoY: logoY,
         logoZoom: logoZoom,
-        phone: phone.trim(),
-        secondaryPhone: secondaryPhone.trim(),
-        whatsapp: whatsapp.trim(),
+        phone: cleanPhone,
+        secondaryPhone: cleanSecondaryPhone,
+        whatsapp: cleanWhatsapp,
         email: email.trim(),
         address: address.trim()
       };
@@ -544,10 +557,13 @@ export default function OnboardingModal({ isOpen: externalIsOpen, onClose, force
                   Primary Phone
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
+                  pattern="^\+?\d+$"
+                  title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+880 1700-000000"
+                  onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
+                  placeholder="+8801700000000"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm text-slate-900 dark:text-slate-100 transition-all font-medium"
                 />
               </div>
@@ -558,9 +574,12 @@ export default function OnboardingModal({ isOpen: externalIsOpen, onClose, force
                   Secondary Phone
                 </label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
+                  pattern="^\+?\d+$"
+                  title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                   value={secondaryPhone}
-                  onChange={(e) => setSecondaryPhone(e.target.value)}
+                  onChange={(e) => setSecondaryPhone(sanitizePhoneInput(e.target.value))}
                   placeholder="Optional phone number"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm text-slate-900 dark:text-slate-100 transition-all font-medium"
                 />
@@ -575,7 +594,7 @@ export default function OnboardingModal({ isOpen: externalIsOpen, onClose, force
                   {phone && (
                     <button
                       type="button"
-                      onClick={() => setWhatsapp(phone)}
+                      onClick={() => setWhatsapp(sanitizePhoneInput(phone))}
                       className="text-[10px] text-amber-600 hover:underline font-semibold"
                     >
                       Same as phone
@@ -583,9 +602,12 @@ export default function OnboardingModal({ isOpen: externalIsOpen, onClose, force
                   )}
                 </div>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
+                  pattern="^\+?\d+$"
+                  title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                   value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
+                  onChange={(e) => setWhatsapp(sanitizePhoneInput(e.target.value))}
                   placeholder="WhatsApp number"
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm text-slate-900 dark:text-slate-100 transition-all font-medium"
                 />

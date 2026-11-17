@@ -211,7 +211,7 @@ export const formatInvoice = (
 
   return {
     id: inv.id,
-    displayId: getDisplayInvoiceId(inv.id),
+    displayId: getDisplayInvoiceId(inv.invoice_number || inv.id, inv.type === 'Wood' || inv.type === 'solo_wood'),
     customer: inv.customer_name,
     customerId: inv.customer_id || null,
     customer_id: inv.customer_id || null,
@@ -282,7 +282,13 @@ export const buildInvoiceQuery = (tableName: string, params: InvoiceQueryParams)
   }
 
   if (params.searchTerm) {
-    q = q.or(`id.ilike.%${params.searchTerm}%,customer_name.ilike.%${params.searchTerm}%`)
+    const rawSearch = params.searchTerm.trim().replace(/[,()]/g, '')
+    const cleanInvSearch = rawSearch.replace(/^#+/, '')
+    if (cleanInvSearch) {
+      q = q.or(`id.ilike.%${cleanInvSearch}%,invoice_number.ilike.%${cleanInvSearch}%,customer_name.ilike.%${rawSearch}%`)
+    } else if (rawSearch) {
+      q = q.or(`id.ilike.%${rawSearch}%,customer_name.ilike.%${rawSearch}%`)
+    }
   }
 
   if (params.status && params.status !== 'All') {

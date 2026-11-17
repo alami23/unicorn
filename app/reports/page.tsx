@@ -43,7 +43,7 @@ import {
   Pie,
   Cell
 } from 'recharts'
-import { cn, parseDateSafe } from '@/lib/utils'
+import { cn, parseDateSafe, sortByNameAsc } from '@/lib/utils'
 import AlertPopup from '@/components/AlertPopup'
 import { supabase } from '@/lib/supabase'
 import { sendSMS } from '@/lib/sms'
@@ -138,7 +138,7 @@ function ReportPageContent() {
         { data: furnProdData, error: furnProdErr },
         { data: woodProdData, error: woodProdErr }
       ] = await Promise.all([
-        supabase.from('customer').select('*'),
+        supabase.from('customer').select('*').order('name', { ascending: true }),
         supabase.from('furniture_inventory').select('*'),
         supabase.from('wood_inventory').select('*')
       ])
@@ -147,7 +147,7 @@ function ReportPageContent() {
       if (furnProdErr) throw furnProdErr
       if (woodProdErr) throw woodProdErr
 
-      setCustomers(custData || [])
+      setCustomers(sortByNameAsc(custData || []))
       setFurnitureProducts(furnProdData || [])
       setWoodProducts((woodProdData || []).map(w => ({ ...w, stock: w.is_sold ? 0 : 1 })))
 
@@ -533,7 +533,7 @@ function ReportPageContent() {
       const formattedPaid = Math.round(totalPaid).toLocaleString()
       const formattedDue = Math.round(totalDue).toLocaleString()
 
-      const smsMessage = `Dear ${customer.name}, Reports reminder from ${businessName}.\nTotal Oder:  ${totalOrders}.\nTotal Purchases: ${formattedTotal}.\nPaid Amount: ${formattedPaid}.\nDue Amount: ${formattedDue}.\nPlease clear your due amount at your earliest convenience. Thank you!`
+      const smsMessage = `Dear ${customer.name}, Reports reminder from ${businessName}.\nTotal Oder:  ${totalOrders}.\nTotal Purchases: ${formattedTotal}.\nPaid Amount: ${formattedPaid}.\nDue Amount: ${formattedDue}.\nPlease clear your due amount. Thank you!`
       const response = await sendSMS(customer.phone, smsMessage)
       
       toast.success(`Outstanding due reminder successfully sent to ${customer.name}!`)

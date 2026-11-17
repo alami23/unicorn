@@ -5,6 +5,7 @@ import { X, Camera, Building2, Phone, MapPin, Mail, Loader2, Trash2 } from 'luci
 import { motion, AnimatePresence } from 'motion/react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
+import { sanitizePhoneInput, isValidPhoneNumber } from '@/lib/utils'
 import { toast } from 'sonner'
 
 export interface Vendor {
@@ -42,7 +43,7 @@ export default function SaveVendorModal({ isOpen, onClose, onSave, initialData }
     if (initialData) {
       setFormData({
         name: initialData.name || '',
-        phone: initialData.phone || '',
+        phone: sanitizePhoneInput(initialData.phone || ''),
         email: initialData.email || '',
         address: initialData.address || '',
         photo: initialData.photo || null
@@ -125,13 +126,19 @@ export default function SaveVendorModal({ isOpen, onClose, onSave, initialData }
       return
     }
 
+    const sanitizedPhone = sanitizePhoneInput(formData.phone)
+    if (sanitizedPhone && !isValidPhoneNumber(sanitizedPhone)) {
+      toast.error('Please enter a valid phone number (digits and optional leading + only, no spaces or special characters)')
+      return
+    }
+
     setIsSubmitting(true)
     const vendorId = initialData?.id || `VEND-${Math.floor(1000 + Math.random() * 9000)}`
     
     const vendorRecord: Vendor = {
       id: vendorId,
       name: trimmedName,
-      phone: formData.phone.trim(),
+      phone: sanitizedPhone,
       email: formData.email.trim(),
       address: formData.address.trim(),
       photo: formData.photo,
@@ -330,9 +337,12 @@ export default function SaveVendorModal({ isOpen, onClose, onSave, initialData }
                       <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                       <input
                         type="tel"
-                        placeholder="e.g. +880 1712 345678"
+                        inputMode="tel"
+                        pattern="^\+?\d+$"
+                        title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
+                        placeholder="e.g. +8801712345678"
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, phone: sanitizePhoneInput(e.target.value) })}
                         className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 text-sm font-medium text-slate-900 dark:text-white transition-all"
                       />
                     </div>

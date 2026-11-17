@@ -47,7 +47,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense } from 'react'
 import { useInvoices } from '@/hooks/useInvoiceCache'
-import { invalidateInvoiceCache, FormattedInvoice, compareInvoiceIdsDesc } from '@/lib/invoiceCache'
+import { invalidateInvoiceCache, formatInvoice, FormattedInvoice, compareInvoiceIdsDesc } from '@/lib/invoiceCache'
 import { preloadImage, getSynchronousBusiness } from '@/lib/settingsCache'
 
 import {
@@ -66,6 +66,8 @@ function InvoicePageContent() {
   const typeFilterFromUrl = searchParams?.get('type')
   const customerFilter = searchParams?.get('customer')
   const searchParamQuery = searchParams?.get('search') || searchParams?.get('invoice') || searchParams?.get('q')
+  const invoiceIdParam = searchParams?.get('invoiceId')
+  const shouldOpenParam = searchParams?.get('open') === 'true'
 
   // Active tab state: 'All' | 'Furniture' | 'Wood'
   const [activeTab, setActiveTab] = useState<'All' | 'Furniture' | 'Wood'>(() => {
@@ -85,8 +87,9 @@ function InvoicePageContent() {
     }
   }, [typeFilterFromUrl])
 
-  const [searchTerm, setSearchTerm] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const initialUrlSearch = customerFilter || searchParamQuery || ''
+  const [searchTerm, setSearchTerm] = useState(initialUrlSearch)
+  const [debouncedSearch, setDebouncedSearch] = useState(initialUrlSearch)
 
   // Debounce search input so typing does not stutter, while tab switches remain 0ms instant
   useEffect(() => {
@@ -101,12 +104,12 @@ function InvoicePageContent() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
-  // Sync search from URL
+  // Sync search immediately from URL (no 300ms race against SWR auto-open)
   useEffect(() => {
-    if (customerFilter) {
-      setSearchTerm(customerFilter)
-    } else if (searchParamQuery) {
-      setSearchTerm(searchParamQuery)
+    const urlSearch = customerFilter || searchParamQuery || ''
+    if (urlSearch) {
+      setSearchTerm(urlSearch)
+      setDebouncedSearch(urlSearch)
     }
   }, [customerFilter, searchParamQuery])
 
@@ -431,16 +434,122 @@ function InvoicePageContent() {
     }
   }
 
-  // Automatically open invoice view if routed with open=true
-  const hasAutoOpenedRef = React.useRef(false)
+  // Automatically open the exact target invoice if routed with open=true
+  const openedTargetRef = React.useRef<string | null>(null)
   useEffect(() => {
-    if (hasAutoOpenedRef.current) return
-    const shouldOpen = searchParams?.get('open') === 'true'
-    if (shouldOpen && invoices && invoices.length > 0) {
-      hasAutoOpenedRef.current = true
-      handleOpenInvoice(invoices[0])
+    if (!shouldOpenParam) return
+
+    const targetKey = `${typeFilterFromUrl || ''}|${invoiceIdParam || ''}|${searchParamQuery || ''}`
+    if (openedTargetRef.current === targetKey) return
+
+    const norm = (val: string | null | undefined) =>
+      String(val || '').trim().replace(/^#+/, '').toUpperCase()
+
+    const expectedType =
+      typeFilterFromUrl === 'Wood'
+        ? 'Wood'
+        : typeFilterFromUrl === 'Furniture'
+          ? 'Furniture'
+          : null
+
+    const matchesTarget = (inv: any) => {
+      if (expectedType) {
+        const invIsWood =
+          inv.type?.toLowerCase() === 'wood' ||
+          inv.originalType?.toLowerCase() === 'wood' ||
+          inv.originalType?.toLowerCase() === 'solo_wood' ||
+          String(inv.id || '').includes('-W-')
+        if (expectedType === 'Wood' && !invIsWood) return false
+        if (expectedType === 'Furniture' && invIsWood) return false
+      }
+      if (invoiceIdParam) {
+        if (inv.id === invoiceIdParam || norm(inv.id) === norm(invoiceIdParam)) {
+          return true
+        }
+      }
+      if (searchParamQuery) {
+        const targetNorm = norm(searchParamQuery)
+        const idNorm = norm(inv.id)
+        const dispNorm = norm(inv.displayId)
+        const formattedDispNorm = norm(getDisplayInvoiceId(inv.id, expectedType === 'Wood'))
+        if (
+          idNorm === targetNorm ||
+          dispNorm === targetNorm ||
+          formattedDispNorm === targetNorm ||
+          idNorm.endsWith(`_${targetNorm}`)
+        ) {
+          return true
+        }
+      }
+      return false
     }
-  }, [invoices, searchParams])
+
+    // 1. Check loaded invoices for an exact match first
+    if (invoices && invoices.length > 0) {
+      const exactMatch =
+        invoiceIdParam || searchParamQuery
+          ? invoices.find(matchesTarget)
+          : invoices[0]
+
+      if (exactMatch) {
+        openedTargetRef.current = targetKey
+        handleOpenInvoice(exactMatch)
+        return
+      }
+    }
+
+    // 2. If specific invoice wasn't in the current SWR slice, look it up directly in Supabase
+    if (!invoiceIdParam && !searchParamQuery) return
+    if (isLoading) return
+
+    let cancelled = false
+    const lookupDirect = async () => {
+      const tablesToSearch =
+        expectedType === 'Wood'
+          ? ['wood_invoices']
+          : expectedType === 'Furniture'
+            ? ['furniture_invoices']
+            : ['furniture_invoices', 'wood_invoices']
+
+      const cleanSearch = (searchParamQuery || '').trim().replace(/^#+/, '').replace(/[,()]/g, '')
+      const cleanId = (invoiceIdParam || '').trim().replace(/[,()]/g, '')
+
+      for (const table of tablesToSearch) {
+        let query = supabase.from(table).select('*, customer(photo)')
+        if (cleanId) {
+          const idNoHash = cleanId.replace(/^#+/, '')
+          query = query.or(`id.eq."${cleanId}",id.ilike.%${idNoHash}%,invoice_number.ilike.%${idNoHash}%`)
+        } else if (cleanSearch) {
+          query = query.or(`id.ilike.%${cleanSearch}%,invoice_number.ilike.%${cleanSearch}%`)
+        }
+        const { data } = await query.limit(5)
+        if (cancelled) return
+        if (data && data.length > 0) {
+          const picked =
+            data.find((row: any) => {
+              if (cleanId && (row.id === cleanId || norm(row.id) === norm(cleanId))) return true
+              if (cleanSearch) {
+                return (
+                  norm(row.id) === norm(cleanSearch) ||
+                  norm(row.invoice_number) === norm(cleanSearch) ||
+                  norm(getDisplayInvoiceId(row.invoice_number || row.id, table === 'wood_invoices')) === norm(cleanSearch)
+                )
+              }
+              return false
+            }) || data[0]
+
+          openedTargetRef.current = targetKey
+          handleOpenInvoice(formatInvoice(picked))
+          return
+        }
+      }
+    }
+
+    lookupDirect()
+    return () => {
+      cancelled = true
+    }
+  }, [invoices, isLoading, shouldOpenParam, typeFilterFromUrl, invoiceIdParam, searchParamQuery])
 
   const handleOpenPayment = async (invoice: any) => {
     if (invoice.status === 'Paid' || Number(invoice.due || 0) <= 0) {
@@ -745,7 +854,7 @@ function InvoicePageContent() {
       const formattedPaid = Math.round(amountPaid).toLocaleString()
       const formattedDue = Math.round(amountDue).toLocaleString()
 
-      const reminderMsg = `Dear ${customerName}\npayment reminder for Invoice ${invoiceNumber} from ${businessName}.\nTotal Bill: ${formattedTotal}\nPaid Amount: ${formattedPaid}\nDue Amount: ${formattedDue}\nPlease clear the due amount at your earliest convenience. Thank you!`
+      const reminderMsg = `Dear ${customerName}\npayment reminder for Invoice ${invoiceNumber} from ${businessName}.\nTotal Bill: ${formattedTotal}\nPaid Amount: ${formattedPaid}\nDue Amount: ${formattedDue}\nPlease clear your due amount. Thank you!`
 
       // 6. If phone number is missing, open modal so user can input phone number
       if (!phoneToSend || !phoneToSend.trim()) {

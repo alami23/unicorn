@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "motion/react";
-import { cn } from "@/lib/utils";
+import { cn, sanitizePhoneInput, isValidPhoneNumber } from "@/lib/utils";
 import { sendSMS } from "@/lib/sms";
 import AlertPopup from "@/components/AlertPopup";
 import { useTheme } from "next-themes";
@@ -516,8 +516,12 @@ function SettingsPageContent() {
     if (!user || !user.id) return;
     setIsSavingProfile(true);
     try {
-      // Preserve the phone format as entered (e.g. 017...) as requested by user
-      const normalizedPhone = formatProfilePhoneDisplay(editProfilePhone.trim());
+      // Enforce strict phone formatting (digits and single leading '+' only)
+      const sanitizedEditPhone = sanitizePhoneInput(editProfilePhone);
+      if (sanitizedEditPhone && !isValidPhoneNumber(sanitizedEditPhone)) {
+        throw new Error("Phone number must contain only digits and an optional leading '+' (no spaces or special characters).");
+      }
+      const normalizedPhone = formatProfilePhoneDisplay(sanitizedEditPhone);
 
       const { error } = await supabase
         .from("custom_users")
@@ -871,10 +875,11 @@ function SettingsPageContent() {
   ];
 
   const handleTestSms = async () => {
-    if (!testNumber) {
+    const sanitizedTestPhone = sanitizePhoneInput(testNumber);
+    if (!sanitizedTestPhone || !isValidPhoneNumber(sanitizedTestPhone)) {
       setAlertConfig({
         isOpen: true,
-        message: "Please enter a test phone number",
+        message: "Please enter a valid phone number (digits and optional leading + only, no spaces or special characters)",
         type: "warning",
       });
       return;
@@ -882,7 +887,7 @@ function SettingsPageContent() {
     setIsTestingSms(true);
     try {
       const businessName = (user?.id && (settings as any).business_by_user?.[user.id]?.name) || settings.business?.name || "FurniTrack";
-      await sendSMS(testNumber, `Test message from ${businessName} Settings`, {
+      await sendSMS(sanitizedTestPhone, `Test message from ${businessName} Settings`, {
         apiKey: settings.integrations?.smsApiKey,
         senderId: settings.integrations?.smsSenderId,
       });
@@ -1501,7 +1506,7 @@ function SettingsPageContent() {
                             onClick={() => {
                               setEditProfileName(user.name || "");
                               setEditProfileUsername(user.username || "");
-                              setEditProfilePhone(formatProfilePhoneDisplay(user.phone) || "");
+                              setEditProfilePhone(sanitizePhoneInput(formatProfilePhoneDisplay(user.phone) || ""));
                               setEditProfileEmail(user.email || "");
                               setIsEditingProfile(true);
                             }}
@@ -1545,9 +1550,12 @@ function SettingsPageContent() {
                                 Phone
                               </label>
                               <input
-                                type="text"
+                                type="tel"
+                                inputMode="tel"
+                                pattern="^\+?\d+$"
+                                title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                                 value={editProfilePhone}
-                                onChange={(e) => setEditProfilePhone(e.target.value)}
+                                onChange={(e) => setEditProfilePhone(sanitizePhoneInput(e.target.value))}
                                 className="w-full mt-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium"
                               />
                             </div>
@@ -1951,14 +1959,17 @@ function SettingsPageContent() {
                               Phone
                             </label>
                             <input
-                              type="text"
+                              type="tel"
+                              inputMode="tel"
+                              pattern="^\+?\d+$"
+                              title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                               disabled={!isSuperAdmin}
                               value={settings.business?.phone || ""}
                               onChange={(e) =>
                                 updateSetting(
                                   "business",
                                   "phone",
-                                  e.target.value,
+                                  sanitizePhoneInput(e.target.value),
                                 )
                               }
                               className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
@@ -1969,14 +1980,17 @@ function SettingsPageContent() {
                               Secondary Phone
                             </label>
                             <input
-                              type="text"
+                              type="tel"
+                              inputMode="tel"
+                              pattern="^\+?\d+$"
+                              title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                               disabled={!isSuperAdmin}
                               value={settings.business?.secondaryPhone || ""}
                               onChange={(e) =>
                                 updateSetting(
                                   "business",
                                   "secondaryPhone",
-                                  e.target.value,
+                                  sanitizePhoneInput(e.target.value),
                                 )
                               }
                               className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
@@ -1987,14 +2001,17 @@ function SettingsPageContent() {
                               WhatsApp
                             </label>
                             <input
-                              type="text"
+                              type="tel"
+                              inputMode="tel"
+                              pattern="^\+?\d+$"
+                              title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                               disabled={!isSuperAdmin}
                               value={settings.business?.whatsapp || ""}
                               onChange={(e) =>
                                 updateSetting(
                                   "business",
                                   "whatsapp",
-                                  e.target.value,
+                                  sanitizePhoneInput(e.target.value),
                                 )
                               }
                               className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
@@ -2918,10 +2935,13 @@ function SettingsPageContent() {
                         </h4>
                         <div className="flex flex-col sm:flex-row gap-3">
                           <input
-                            type="text"
+                            type="tel"
+                            inputMode="tel"
+                            pattern="^\+?\d+$"
+                            title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                             disabled={!isAdminOrSuperAdmin}
                             value={testNumber}
-                            onChange={(e) => setTestNumber(e.target.value)}
+                            onChange={(e) => setTestNumber(sanitizePhoneInput(e.target.value))}
                             placeholder="Enter phone number (e.g. 88017...)"
                             className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                           />
@@ -3413,9 +3433,12 @@ function SettingsPageContent() {
                   </label>
                   <input
                     type="tel"
+                    inputMode="tel"
+                    pattern="^\+?\d+$"
+                    title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                     value={editingUser.phone || ""}
                     onChange={(e) =>
-                      setEditingUser({ ...editingUser, phone: e.target.value })
+                      setEditingUser({ ...editingUser, phone: sanitizePhoneInput(e.target.value) })
                     }
                     placeholder="e.g. 017..."
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-900 dark:text-slate-100"
@@ -3556,9 +3579,12 @@ function SettingsPageContent() {
                     Phone Number
                   </label>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="tel"
+                    pattern="^\+?\d+$"
+                    title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                     value={clearDataPhone}
-                    onChange={(e) => setClearDataPhone(e.target.value)}
+                    onChange={(e) => setClearDataPhone(sanitizePhoneInput(e.target.value))}
                     className="w-full mt-1 px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
                     placeholder="Enter admin phone number"
                   />

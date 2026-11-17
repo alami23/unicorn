@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
 import { Search, Plus, Minus, Trash2, Printer, ShoppingCart, Filter, Pencil, Check, X, Upload, UserPlus, RotateCcw, ChevronDown, Lock } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
-import { cn, safeParse } from '@/lib/utils'
+import { cn, safeParse, sortByNameAsc } from '@/lib/utils'
 import AddCustomerModal from '@/components/AddCustomerModal'
 import InvoiceModal from '@/components/InvoiceModal'
 import AlertPopup from '@/components/AlertPopup'
@@ -236,8 +236,8 @@ function POSWoodContent() {
   }, [])
 
   const loadCustomers = async () => {
-    const { data, error } = await supabase.from('customer').select('*')
-    if (data) setCustomers(data)
+    const { data, error } = await supabase.from('customer').select('*').order('name', { ascending: true })
+    if (data) setCustomers(sortByNameAsc(data))
   }
 
   const loadSettings = async () => {
@@ -1123,8 +1123,8 @@ function POSWoodContent() {
                         >
                           Walk-in Customer
                         </div>
-                        {customers
-                          .filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || c.phone.includes(customerSearchTerm))
+                        {sortByNameAsc(customers)
+                          .filter(c => (c.name || '').toLowerCase().includes(customerSearchTerm.toLowerCase()) || (c.phone || '').includes(customerSearchTerm))
                           .map(c => (
                           <div 
                             key={c.id}

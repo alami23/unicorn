@@ -19,7 +19,7 @@ import {
   Link as LinkIcon
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, sanitizePhoneInput, isValidPhoneNumber } from '@/lib/utils'
 import { shortenInvoiceUrl } from '@/lib/shortener'
 
 interface SendInvoiceModalProps {
@@ -46,7 +46,7 @@ export default function SendInvoiceModal({
   const [shortening, setShortening] = useState(!initialShortUrl)
   const [copied, setCopied] = useState(false)
   const [sendingSms, setSendingSms] = useState(false)
-  const [recipientPhone, setRecipientPhone] = useState(invoice?.customerPhone || '')
+  const [recipientPhone, setRecipientPhone] = useState(() => sanitizePhoneInput(invoice?.customerPhone || ''))
 
   const customerName = invoice?.customer || 'Valued Customer'
   const invNumber = invoice?.displayId || invoice?.invoice_number || invoice?.id || 'Invoice'
@@ -136,8 +136,9 @@ export default function SendInvoiceModal({
   // Send via SMS
   const handleSendViaSms = async () => {
     if (sendingSms) return;
-    if (!recipientPhone.trim()) {
-      toast.error('Please enter a valid recipient phone number.')
+    const sanitizedPhone = sanitizePhoneInput(recipientPhone)
+    if (!isValidPhoneNumber(sanitizedPhone)) {
+      toast.error('Please enter a valid phone number (digits and optional leading + only, no spaces or special characters).')
       return
     }
 
@@ -148,7 +149,7 @@ export default function SendInvoiceModal({
 
     setSendingSms(true)
     try {
-      const success = await onSendSms(recipientPhone.trim(), smsMessage)
+      const success = await onSendSms(sanitizedPhone, smsMessage)
       if (success) {
         onClose()
       }
@@ -334,9 +335,12 @@ export default function SendInvoiceModal({
                   <Smartphone className="w-4 h-4" />
                 </div>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
+                  pattern="^\+?\d+$"
+                  title="Only digits and an optional leading '+' are allowed (no spaces or special characters)"
                   value={recipientPhone}
-                  onChange={(e) => setRecipientPhone(e.target.value)}
+                  onChange={(e) => setRecipientPhone(sanitizePhoneInput(e.target.value))}
                   placeholder="01XXXXXXXXX"
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 />

@@ -5,7 +5,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import Image from 'next/image'
 import { Search, Plus, Minus, Trash2, Printer, ShoppingCart, Armchair, LayoutGrid, List, Check, UserPlus, RotateCcw, ChevronDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
-import { cn, safeParse } from '@/lib/utils'
+import { cn, safeParse, sortByNameAsc } from '@/lib/utils'
 import AddCustomerModal from '@/components/AddCustomerModal'
 import InvoiceModal from '@/components/InvoiceModal'
 import AlertPopup from '@/components/AlertPopup'
@@ -133,8 +133,8 @@ function POSFurnitureContent() {
   }, [])
 
   const loadCustomers = React.useCallback(async () => {
-    const { data, error } = await supabase.from('customer').select('*')
-    if (data) setCustomers(data)
+    const { data, error } = await supabase.from('customer').select('*').order('name', { ascending: true })
+    if (data) setCustomers(sortByNameAsc(data))
   }, [])
 
   const loadSettings = React.useCallback(async () => {
@@ -903,8 +903,8 @@ function POSFurnitureContent() {
                         >
                           Walk-in Customer
                         </div>
-                        {customers
-                          .filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || c.phone.includes(customerSearchTerm))
+                        {sortByNameAsc(customers)
+                          .filter(c => (c.name || '').toLowerCase().includes(customerSearchTerm.toLowerCase()) || (c.phone || '').includes(customerSearchTerm))
                           .map(c => (
                           <div 
                             key={c.id}
