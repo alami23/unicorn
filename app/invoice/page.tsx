@@ -854,7 +854,7 @@ function InvoicePageContent() {
       const formattedPaid = Math.round(amountPaid).toLocaleString()
       const formattedDue = Math.round(amountDue).toLocaleString()
 
-      const reminderMsg = `Dear ${customerName}\npayment reminder for Invoice ${invoiceNumber} from ${businessName}.\nTotal Bill: ${formattedTotal}\nPaid Amount: ${formattedPaid}\nDue Amount: ${formattedDue}\nPlease clear your due amount. Thank you!`
+      const reminderMsg = `Dear ${customerName}\npayment reminder for Invoice ${invoiceNumber} from ${businessName}.\nTotal Bill: ${formattedTotal}\nPaid: ${formattedPaid}\nDue: ${formattedDue}\nPlease clear your due amount. Thank you!`
 
       // 6. If phone number is missing, open modal so user can input phone number
       if (!phoneToSend || !phoneToSend.trim()) {

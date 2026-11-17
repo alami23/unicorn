@@ -485,7 +485,7 @@ function CustomerPageContent() {
       const formattedTotal = Math.round(totalBill).toLocaleString()
       const formattedPaid = Math.round(totalPaid).toLocaleString()
 
-      const reminderMsg = `Dear ${cus.name}, payment reminder from ${businessName}.\nTotal Purchases: ${formattedTotal}.\nPaid Amount: ${formattedPaid}.\nDue Amount: ${formattedDue}.\nPlease clear your due amount. Thank you!`
+      const reminderMsg = `Dear ${cus.name}, payment reminder from ${businessName}.\nTotal Purchases: ${formattedTotal}.\nPaid: ${formattedPaid}.\nDue: ${formattedDue}.\nPlease clear your due amount. Thank you!`
 
       // 6. Check phone
       if (!phoneToSend || !phoneToSend.trim()) {

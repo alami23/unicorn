@@ -74,8 +74,8 @@ SECTION 3: PAYMENT REMINDER & INVOICE SHARING SMS TEMPLATES
    Template:
    "Dear [Customer Name], payment reminder from [Business Name].
    Total Purchases: [Total Purchases].
-   Paid Amount: [Paid Amount].
-   Due Amount: [Outstanding Due].
+   Paid: [Paid Amount].
+   Due: [Outstanding Due].
    Please clear your due amount. Thank you!"
 
 9. Trigger Event: Invoice Due Reminder (Specific Unpaid Invoice)
@@ -84,8 +84,8 @@ SECTION 3: PAYMENT REMINDER & INVOICE SHARING SMS TEMPLATES
    "Dear [Customer Name]
    payment reminder for Invoice [Invoice Number] from [Business Name].
    Total Bill: [Total Bill]
-   Paid Amount: [Paid Amount]
-   Due Amount: [Due Amount]
+   Paid: [Paid Amount]
+   Due: [Due Amount]
    Please clear your due amount. Thank you!"
 
 10. Trigger Event: Outstanding Due Reminder (Reports Module)
@@ -94,8 +94,8 @@ SECTION 3: PAYMENT REMINDER & INVOICE SHARING SMS TEMPLATES
     "Dear [Customer Name], Reports reminder from [Business Name].
     Total Oder:  [Total Oder].
     Total Purchases: [Total Purchases].
-    Paid Amount: [Paid Amount].
-    Due Amount: [Outstanding Due].
+    Paid: [Paid Amount].
+    Due: [Outstanding Due].
     Please clear your due amount. Thank you!"
 
 11. Trigger Event: Share / Send Online Invoice PDF Link

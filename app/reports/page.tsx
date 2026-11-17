@@ -533,7 +533,7 @@ function ReportPageContent() {
       const formattedPaid = Math.round(totalPaid).toLocaleString()
       const formattedDue = Math.round(totalDue).toLocaleString()
 
-      const smsMessage = `Dear ${customer.name}, Reports reminder from ${businessName}.\nTotal Oder:  ${totalOrders}.\nTotal Purchases: ${formattedTotal}.\nPaid Amount: ${formattedPaid}.\nDue Amount: ${formattedDue}.\nPlease clear your due amount. Thank you!`
+      const smsMessage = `Dear ${customer.name}, Reports reminder from ${businessName}.\nTotal Oder:  ${totalOrders}.\nTotal Purchases: ${formattedTotal}.\nPaid: ${formattedPaid}.\nDue: ${formattedDue}.\nPlease clear your due amount. Thank you!`
       const response = await sendSMS(customer.phone, smsMessage)
       
       toast.success(`Outstanding due reminder successfully sent to ${customer.name}!`)
