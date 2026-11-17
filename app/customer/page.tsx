@@ -1207,14 +1207,14 @@ function CustomerPageContent() {
                 <button 
                   onClick={() => setIsDeleteModalOpen(false)}
                   disabled={isDeleting}
-                  className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-r border-slate-100 dark:border-slate-800"
+                  className="px-6 py-4 text-sm font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-r border-slate-100 dark:border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={() => customerToDelete && handleDeleteCustomer(customerToDelete)}
                   disabled={isDeleting}
-                  className="px-6 py-4 text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors flex items-center justify-center gap-2"
+                  className="px-6 py-4 text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed pointer-events-auto disabled:pointer-events-none"
                 >
                   {isDeleting ? (
                     <div className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />

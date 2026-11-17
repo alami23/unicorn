@@ -481,8 +481,9 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
                 step="any"
                 inputMode="decimal"
                 enterKeyHint="send"
-                value={Number.isNaN(formData.initialBalance) ? '' : formData.initialBalance}
+                value={Number.isNaN(formData.initialBalance) || formData.initialBalance === 0 ? '' : formData.initialBalance}
                 onFocus={(e) => e.target.select()}
+                onWheel={(e) => e.currentTarget.blur()}
                 onChange={(e) => {
                   const val = e.target.value
                   setFormData(prev => ({
@@ -496,7 +497,7 @@ export default function AddCustomerModal({ isOpen, onClose, onAdd, initialData }
                     handleSubmit(e as any)
                   }
                 }}
-                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all text-sm"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 placeholder="0.00"
               />
               {initialData ? (

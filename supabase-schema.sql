@@ -682,9 +682,36 @@ CREATE POLICY "Restrict delete custom_users to super admin" ON public.custom_use
   role = 'Super Admin' OR public.current_user_role() = 'Super Admin' OR org_id::text = public.current_org_id()
 );
 
--- Migration commands for invoice creator columns
+-- Migration commands for invoice creator and notes columns
 ALTER TABLE public.furniture_invoices ADD COLUMN IF NOT EXISTS created_by TEXT;
 ALTER TABLE public.furniture_invoices ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+ALTER TABLE public.furniture_invoices ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE public.wood_invoices ADD COLUMN IF NOT EXISTS created_by TEXT;
 ALTER TABLE public.wood_invoices ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+ALTER TABLE public.wood_invoices ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- Tenant isolation for vendors and categories
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS org_id UUID;
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS org_id UUID;
+DROP POLICY IF EXISTS "Allow public full access to vendors" ON public.vendors;
+DROP POLICY IF EXISTS "Allow public full access to categories" ON public.categories;
+DROP POLICY IF EXISTS "Tenant isolation for vendors" ON public.vendors;
+DROP POLICY IF EXISTS "Tenant isolation for categories" ON public.categories;
+CREATE POLICY "Tenant isolation for vendors" ON public.vendors FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
+CREATE POLICY "Tenant isolation for categories" ON public.categories FOR ALL TO public USING (org_id::text = public.current_org_id()) WITH CHECK (org_id::text = public.current_org_id());
+
+-- Storage RLS Policies for 'logos' bucket
+DROP POLICY IF EXISTS "Allow public read of logos" ON storage.objects;
+CREATE POLICY "Allow public read of logos"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'logos');
+
+DROP POLICY IF EXISTS "Allow upload and update of logos" ON storage.objects;
+CREATE POLICY "Allow upload and update of logos"
+ON storage.objects FOR ALL
+TO public
+USING (bucket_id = 'logos')
+WITH CHECK (bucket_id = 'logos');
+
 

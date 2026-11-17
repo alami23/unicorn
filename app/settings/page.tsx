@@ -2641,15 +2641,17 @@ function SettingsPageContent() {
                           <input
                             type="number"
                             disabled={!isAdminOrSuperAdmin}
-                            value={settings.system?.lowStockThreshold}
+                            value={settings.system?.lowStockThreshold || ''}
+                            placeholder="0"
+                            onWheel={(e) => e.currentTarget.blur()}
                             onChange={(e) =>
                               updateSetting(
                                 "system",
                                 "lowStockThreshold",
-                                parseInt(e.target.value),
+                                e.target.value === '' ? 0 : (parseInt(e.target.value) || 0),
                               )
                             }
-                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </div>
                       </div>
@@ -2664,6 +2666,7 @@ function SettingsPageContent() {
                             type="number"
                             disabled={!isAdminOrSuperAdmin}
                             value={settings.system?.defaultWoodPrice ?? ''}
+                            onWheel={(e) => e.currentTarget.blur()}
                             onChange={(e) =>
                               updateSetting(
                                 "system",
@@ -2672,7 +2675,7 @@ function SettingsPageContent() {
                               )
                             }
                             placeholder="Set your own price"
-                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </div>
                       </div>
