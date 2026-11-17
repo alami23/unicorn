@@ -54,7 +54,13 @@ export default function RootLayout({
         >
           <AuthProvider>
             {children}
-            <Toaster position="bottom-right" richColors expand={true} visibleToasts={6} />
+            <Toaster
+              position="top-right"
+              richColors
+              expand={true}
+              visibleToasts={6}
+              swipeDirections={['top', 'right', 'left']}
+            />
           </AuthProvider>
         </ThemeProvider>
       </body>

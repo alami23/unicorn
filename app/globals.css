@@ -92,3 +92,34 @@ input[type="number"] {
   appearance: textfield;
 }
 
+/* Top notification toasts: slide in/out from right or left edge & support smooth swipe-to-dismiss */
+[data-sonner-toast][data-y-position='top'][data-x-position='right']:not([data-mounted='true']) {
+  transform: translateX(calc(100% + 24px)) !important;
+  opacity: 0;
+}
+
+[data-sonner-toast][data-y-position='top'][data-x-position='left']:not([data-mounted='true']) {
+  transform: translateX(calc(-100% - 24px)) !important;
+  opacity: 0;
+}
+
+[data-sonner-toast][data-y-position='top'][data-x-position='right'][data-removed='true'][data-swipe-out='false'] {
+  transform: var(--y) translateX(calc(100% + 24px)) !important;
+  opacity: 0;
+}
+
+[data-sonner-toast][data-y-position='top'][data-x-position='left'][data-removed='true'][data-swipe-out='false'] {
+  transform: var(--y) translateX(calc(-100% - 24px)) !important;
+  opacity: 0;
+}
+
+[data-sonner-toast] {
+  cursor: grab;
+  touch-action: none;
+}
+
+[data-sonner-toast][data-swiping='true'] {
+  cursor: grabbing;
+}
+
+
