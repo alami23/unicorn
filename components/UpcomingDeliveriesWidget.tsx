@@ -299,12 +299,11 @@ export default function UpcomingDeliveriesWidget({
         prev.filter((item) => item.id !== delivery.id && item.invoiceId !== delivery.invoiceId && item.displayInvoiceId !== delivery.displayInvoiceId)
       )
 
-      // 3. Top-screen success toast notification with invoice ID and 3.5s auto-dismiss
+      // 3. Success toast notification with invoice ID and 3.5s auto-dismiss
       const targetInvoiceId = delivery.displayInvoiceId || delivery.invoiceId
       toast.success(`Invoice #${targetInvoiceId} marked as Delivered`, {
         description: delivery.customerName ? `Customer: ${delivery.customerName}` : 'Delivery status successfully updated',
         duration: 3500,
-        position: 'top-center',
       })
 
       if (typeof window !== 'undefined') {

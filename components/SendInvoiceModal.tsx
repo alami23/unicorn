@@ -150,7 +150,6 @@ export default function SendInvoiceModal({
     try {
       const success = await onSendSms(recipientPhone.trim(), smsMessage)
       if (success) {
-        toast.success(`Invoice link successfully sent to ${recipientPhone}`)
         onClose()
       }
     } catch (e: any) {

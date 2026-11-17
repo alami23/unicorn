@@ -219,12 +219,10 @@ function InvoicePageContent() {
       toast.success(`Invoice #${displayId} marked as Delivered`, {
         description: inv.customer ? `Customer: ${inv.customer}` : 'Delivery status successfully updated',
         duration: 3500,
-        position: 'top-center'
       })
     } else {
       toast.success(`Invoice #${displayId} delivery status reverted to Pending`, {
         duration: 3500,
-        position: 'top-center'
       })
     }
 
@@ -773,7 +771,6 @@ function InvoicePageContent() {
       }))
 
       toast.dismiss(toastId)
-      toast.success(`Due reminder SMS sent successfully to ${customerName} (${phoneToSend})!`)
     } catch (e: any) {
       console.error('Error sending due reminder SMS:', e)
       toast.dismiss(toastId)

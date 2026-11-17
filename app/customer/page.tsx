@@ -512,7 +512,6 @@ function CustomerPageContent() {
       }))
 
       toast.dismiss(toastId)
-      toast.success(`Due reminder SMS sent successfully to ${cus.name} (${phoneToSend})!`)
     } catch (e: any) {
       console.error('Error sending customer due reminder SMS:', e)
       toast.dismiss(toastId)

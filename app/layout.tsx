@@ -54,7 +54,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             {children}
-            <Toaster position="top-center" richColors expand={true} visibleToasts={6} />
+            <Toaster position="bottom-right" richColors expand={true} visibleToasts={6} />
           </AuthProvider>
         </ThemeProvider>
       </body>

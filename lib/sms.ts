@@ -85,7 +85,7 @@ export async function sendSMS(
     }
 
     saveToHistory('Delivered');
-    toast.success(`SMS sent successfully to ${id}`);
+    toast.success('SMS Sent');
     return data;
   } catch (error: any) {
     console.error('sendSMS Error:', error);
