@@ -1351,14 +1351,6 @@ function InvoicePageContent() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{getDisplayInvoiceId(inv.id)}</span>
                             <span className={cn(
-                              "px-2 py-0.5 rounded-full text-[10px] font-bold text-black",
-                              inv.status === 'Paid' ? "bg-emerald-100 dark:bg-emerald-900/30" :
-                              inv.status === 'Partial' ? "bg-amber-100 dark:bg-amber-900/30" :
-                              "bg-rose-100 dark:bg-rose-900/30"
-                            )}>
-                              {inv.status}
-                            </span>
-                            <span className={cn(
                               "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase text-black",
                               inv.type === 'Furniture' ? "bg-purple-100 dark:bg-purple-900/30" : "bg-amber-100 dark:bg-amber-900/30"
                             )}>
@@ -1377,12 +1369,21 @@ function InvoicePageContent() {
                         </div>
                       </div>
 
-                      {/* Corner element for Created By & Delivery Status in mobile and tablet views */}
+                      {/* Corner element for Created By, Status Badge & Delivery Status in mobile and tablet views */}
                       <div className="shrink-0 flex flex-col items-end gap-1.5">
                         <div className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 text-slate-600 dark:text-slate-300" title={`Created by: ${inv.createdBy || 'Unassigned'}`}>
                           <User size={11} className="text-slate-400 shrink-0" />
                           <span className="font-medium truncate max-w-[85px] sm:max-w-[120px]">{inv.createdBy || 'Unassigned'}</span>
                         </div>
+
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-bold text-black",
+                          inv.status === 'Paid' ? "bg-emerald-100 dark:bg-emerald-900/30" :
+                          inv.status === 'Partial' ? "bg-amber-100 dark:bg-amber-900/30" :
+                          "bg-rose-100 dark:bg-rose-900/30"
+                        )}>
+                          {inv.status}
+                        </span>
 
                         {inv.type === 'Furniture' && (
                           inv.deliveryStatus === 'Delivered' ? (
