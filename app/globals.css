@@ -8,6 +8,14 @@ html {
   font-size: 14px;
 }
 
+/* Isolated scroll and pinch-to-zoom specifically for invoice preview containers */
+.invoice-preview-container {
+  touch-action: auto;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 @media print {
   * {
     -webkit-print-color-adjust: exact !important;

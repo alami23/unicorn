@@ -31,6 +31,7 @@ import InvoicePrint from './InvoicePrint'
 import { getDisplayInvoiceId, generateInvoicePreviewUrl } from '@/lib/invoice'
 import { shortenInvoiceUrl, decodeInvoiceToken } from '@/lib/shortener'
 import { toast } from 'sonner'
+import { usePinchZoom } from '@/hooks/usePinchZoom'
 
 interface SPreviewProps {
   onBackToLogin?: () => void
@@ -72,6 +73,15 @@ function SPreviewContent({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const isManuallyZoomedRef = useRef(false)
+
+  const { isPinching } = usePinchZoom(containerRef, zoom, setZoom, {
+    minZoom: 0.25,
+    maxZoom: 2.5,
+    enabled: Boolean(!initialChecking && verifiedInvoice),
+    onManualZoom: () => {
+      isManuallyZoomedRef.current = true
+    },
+  })
 
   // Measure unscaled document height to prevent any truncation
   useEffect(() => {
@@ -528,7 +538,7 @@ function SPreviewContent({
                   type="button"
                   onClick={() => {
                     isManuallyZoomedRef.current = true
-                    setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))
+                    setZoom(z => Math.max(0.25, Number((z - 0.1).toFixed(2))))
                   }}
                   className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                   title="Zoom Out"
@@ -542,7 +552,7 @@ function SPreviewContent({
                   type="button"
                   onClick={() => {
                     isManuallyZoomedRef.current = true
-                    setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))
+                    setZoom(z => Math.min(2.5, Number((z + 0.1).toFixed(2))))
                   }}
                   className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                   title="Zoom In"
@@ -635,7 +645,7 @@ function SPreviewContent({
                 type="button"
                 onClick={() => {
                   isManuallyZoomedRef.current = true
-                  setZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(2))))
+                  setZoom(z => Math.max(0.25, Number((z - 0.1).toFixed(2))))
                 }}
                 className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                 title="Zoom Out"
@@ -649,7 +659,7 @@ function SPreviewContent({
                 type="button"
                 onClick={() => {
                   isManuallyZoomedRef.current = true
-                  setZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(2))))
+                  setZoom(z => Math.min(2.5, Number((z + 0.1).toFixed(2))))
                 }}
                 className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 cursor-pointer transition-colors active:scale-95"
                 title="Zoom In"
@@ -737,9 +747,9 @@ function SPreviewContent({
                 {/* PDF Document Viewport Area - Centered Full-Width & Full-Height Canvas */}
                 <div
                   ref={containerRef}
-                  className="flex-1 w-full bg-slate-950 py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-6 flex justify-center items-center overflow-auto min-h-[calc(100vh-125px)]"
+                  className="invoice-preview-container flex-1 w-full bg-slate-950 py-4 sm:py-6 lg:py-8 px-2 sm:px-4 lg:px-6 overflow-auto touch-auto overscroll-contain min-h-[calc(100vh-125px)]"
                 >
-                  <div className="flex flex-col items-center justify-center my-auto mx-auto transition-all duration-200">
+                  <div className="min-w-full w-max min-h-full flex flex-col items-center justify-center my-auto mx-auto">
                     <div
                       style={{
                         width: `${originalWidth * zoom}px`,
@@ -747,7 +757,10 @@ function SPreviewContent({
                         overflow: 'hidden',
                         position: 'relative'
                       }}
-                      className="transition-all duration-150 shadow-[0_10px_35px_-5px_rgba(0,0,0,0.5),0_20px_45px_-10px_rgba(0,0,0,0.7)] rounded-sm bg-white border border-slate-700/60 ring-1 ring-white/10 mx-auto my-auto"
+                      className={cn(
+                        "shadow-[0_10px_35px_-5px_rgba(0,0,0,0.5),0_20px_45px_-10px_rgba(0,0,0,0.7)] rounded-sm bg-white border border-slate-700/60 ring-1 ring-white/10 mx-auto my-auto",
+                        !isPinching && "transition-all duration-150"
+                      )}
                     >
                       <div
                         style={{

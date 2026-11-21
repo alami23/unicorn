@@ -10,6 +10,7 @@ import { getDisplayInvoiceId, generateInvoicePreviewUrl } from '@/lib/invoice'
 import { shortenInvoiceUrl } from '@/lib/shortener'
 import { toast } from 'sonner'
 import { preloadImage } from '@/lib/settingsCache'
+import { usePinchZoom } from '@/hooks/usePinchZoom'
 
 interface InvoiceModalProps {
   isOpen: boolean
@@ -24,6 +25,12 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
   const [localInvoice, setLocalInvoice] = useState<any>(() => invoice || null)
   const [unscaledHeight, setUnscaledHeight] = useState(1123)
   const printableInvoiceRef = useRef<HTMLDivElement>(null)
+
+  const { isPinching } = usePinchZoom(containerRef, zoom, setZoom, {
+    minZoom: 0.2,
+    maxZoom: 2.5,
+    enabled: isOpen,
+  })
 
   const activeInvoice = localInvoice || invoice
   const isWoodInvoice = Boolean(
@@ -495,7 +502,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full sm:w-auto justify-center sm:justify-end">
                 <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
                   <button 
-                    onClick={() => setZoom(prev => Math.max(0.1, prev - 0.1))}
+                    onClick={() => setZoom(prev => Math.max(0.2, Number((prev - 0.1).toFixed(2))))}
                     className="px-2 sm:px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
                   >
                     -
@@ -504,7 +511,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                     {Math.round(zoom * 100)}%
                   </span>
                   <button 
-                    onClick={() => setZoom(prev => Math.min(2, prev + 0.1))}
+                    onClick={() => setZoom(prev => Math.min(2.5, Number((prev + 0.1).toFixed(2))))}
                     className="px-2 sm:px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
                   >
                     +
@@ -546,9 +553,9 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
               return (
                 <div 
                   ref={containerRef} 
-                  className="flex-1 overflow-auto p-4 sm:p-8 bg-slate-100 dark:bg-slate-950 scrollbar-thin overscroll-contain touch-auto"
+                  className="invoice-preview-container flex-1 overflow-auto p-4 sm:p-8 bg-slate-100 dark:bg-slate-950 scrollbar-thin overscroll-contain touch-auto"
                 >
-                  <div className="min-w-max min-h-max flex items-start justify-center p-2">
+                  <div className="min-w-full w-max min-h-max flex items-start justify-center p-2">
                     <div 
                       style={{ 
                         width: `${originalWidth * zoom}px`, 
@@ -556,7 +563,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                         overflow: 'hidden',
                         position: 'relative'
                       }} 
-                      className="shadow-2xl rounded-lg bg-white"
+                      className={cn("shadow-2xl rounded-lg bg-white", !isPinching && "transition-[width,height] duration-100")}
                     >
                       <div 
                         style={{ 
