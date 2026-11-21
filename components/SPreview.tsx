@@ -758,8 +758,8 @@ function SPreviewContent({
                         position: 'relative'
                       }}
                       className={cn(
-                        "shadow-[0_10px_35px_-5px_rgba(0,0,0,0.5),0_20px_45px_-10px_rgba(0,0,0,0.7)] rounded-sm bg-white border border-slate-700/60 ring-1 ring-white/10 mx-auto my-auto",
-                        !isPinching && "transition-all duration-150"
+                        "invoice-preview-frame shadow-[0_10px_35px_-5px_rgba(0,0,0,0.5),0_20px_45px_-10px_rgba(0,0,0,0.7)] rounded-sm bg-white border border-slate-700/60 ring-1 ring-white/10 mx-auto my-auto",
+                        isPinching && "is-pinching"
                       )}
                     >
                       <div
@@ -771,7 +771,7 @@ function SPreviewContent({
                           top: 0,
                           left: 0
                         }}
-                        className="h-fit text-slate-900"
+                        className={cn("invoice-preview-transform h-fit text-slate-900", isPinching && "is-pinching")}
                       >
                         <div ref={previewRef} id="printable-invoice" className="h-fit">
                           <InvoicePrint invoice={verifiedInvoice} size={selectedSize} />

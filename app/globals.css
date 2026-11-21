@@ -16,6 +16,20 @@ html {
   overscroll-behavior: contain;
 }
 
+.invoice-preview-frame {
+  transition: width 0.2s ease, height 0.2s ease;
+}
+
+.invoice-preview-transform {
+  transition: transform 0.2s ease;
+  will-change: transform;
+}
+
+.invoice-preview-frame.is-pinching,
+.invoice-preview-transform.is-pinching {
+  transition-duration: 75ms;
+}
+
 @media print {
   * {
     -webkit-print-color-adjust: exact !important;

@@ -563,7 +563,10 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                         overflow: 'hidden',
                         position: 'relative'
                       }} 
-                      className={cn("shadow-2xl rounded-lg bg-white", !isPinching && "transition-[width,height] duration-100")}
+                      className={cn(
+                        "invoice-preview-frame shadow-2xl rounded-lg bg-white",
+                        isPinching && "is-pinching"
+                      )}
                     >
                       <div 
                         style={{ 
@@ -574,7 +577,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                           top: 0,
                           left: 0
                         }} 
-                        className="h-fit"
+                        className={cn("invoice-preview-transform h-fit", isPinching && "is-pinching")}
                       >
                         <div ref={printableInvoiceRef} id="printable-invoice" className="h-fit">
                           <InvoicePrint invoice={localInvoice || invoice} size={effectiveSize} />
