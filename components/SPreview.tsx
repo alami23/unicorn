@@ -72,12 +72,21 @@ function SPreviewContent({
   const autoValidatedRef = useRef(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
+  const transformRef = useRef<HTMLDivElement>(null)
+  const desktopZoomLabelRef = useRef<HTMLSpanElement>(null)
+  const mobileZoomLabelRef = useRef<HTMLSpanElement>(null)
   const isManuallyZoomedRef = useRef(false)
 
   const { isPinching } = usePinchZoom(containerRef, zoom, setZoom, {
     minZoom: 0.25,
     maxZoom: 2.5,
     enabled: Boolean(!initialChecking && verifiedInvoice),
+    contentWidth: 794,
+    contentHeight: unscaledHeight,
+    frameRef,
+    transformRef,
+    zoomLabelRefs: [desktopZoomLabelRef, mobileZoomLabelRef],
     onManualZoom: () => {
       isManuallyZoomedRef.current = true
     },
@@ -545,7 +554,7 @@ function SPreviewContent({
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
                 </button>
-                <span className="px-1.5 font-mono text-[11px] text-slate-300 min-w-[38px] text-center font-bold">
+                <span ref={desktopZoomLabelRef} className="px-1.5 font-mono text-[11px] text-slate-300 min-w-[38px] text-center font-bold">
                   {Math.round(zoom * 100)}%
                 </span>
                 <button
@@ -652,7 +661,7 @@ function SPreviewContent({
               >
                 <ZoomOut className="w-3.5 h-3.5" />
               </button>
-              <span className="px-1.5 font-mono text-[11px] text-slate-300 min-w-[34px] text-center font-bold">
+              <span ref={mobileZoomLabelRef} className="px-1.5 font-mono text-[11px] text-slate-300 min-w-[34px] text-center font-bold">
                 {Math.round(zoom * 100)}%
               </span>
               <button
@@ -751,6 +760,7 @@ function SPreviewContent({
                 >
                   <div className="min-w-full w-max min-h-full flex flex-col items-center justify-center my-auto mx-auto">
                     <div
+                      ref={frameRef}
                       style={{
                         width: `${originalWidth * zoom}px`,
                         height: `${unscaledHeight * zoom}px`,
@@ -763,8 +773,9 @@ function SPreviewContent({
                       )}
                     >
                       <div
+                        ref={transformRef}
                         style={{
-                          transform: `scale(${zoom})`,
+                          transform: `scale3d(${zoom}, ${zoom}, 1)`,
                           transformOrigin: 'top left',
                           width: `${originalWidth}px`,
                           position: 'absolute',

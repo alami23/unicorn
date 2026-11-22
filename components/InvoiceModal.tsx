@@ -22,15 +22,12 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
   const [selectedSize, setSelectedSize] = useState<'A4' | 'A5' | 'POS' | 'POS 2' | 'Chalan'>('A4')
   const [zoom, setZoom] = useState(0.8)
   const containerRef = useRef<HTMLDivElement>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
+  const transformRef = useRef<HTMLDivElement>(null)
+  const zoomLabelRef = useRef<HTMLSpanElement>(null)
   const [localInvoice, setLocalInvoice] = useState<any>(() => invoice || null)
   const [unscaledHeight, setUnscaledHeight] = useState(1123)
   const printableInvoiceRef = useRef<HTMLDivElement>(null)
-
-  const { isPinching } = usePinchZoom(containerRef, zoom, setZoom, {
-    minZoom: 0.2,
-    maxZoom: 2.5,
-    enabled: isOpen,
-  })
 
   const activeInvoice = localInvoice || invoice
   const isWoodInvoice = Boolean(
@@ -42,6 +39,20 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
     activeInvoice?.type?.toLowerCase() === 'solo_wood' ||
     activeInvoice?.id?.includes?.('-W-')
   )
+
+  const effectiveSize = (!isWoodInvoice && selectedSize === 'POS 2') ? 'POS' : selectedSize
+  const originalWidth = effectiveSize === 'A5' ? 559 : (effectiveSize === 'POS' || effectiveSize === 'POS 2') ? 302 : 794
+
+  const { isPinching } = usePinchZoom(containerRef, zoom, setZoom, {
+    minZoom: 0.2,
+    maxZoom: 2.5,
+    enabled: isOpen,
+    contentWidth: originalWidth,
+    contentHeight: unscaledHeight,
+    frameRef,
+    transformRef,
+    zoomLabelRefs: [zoomLabelRef],
+  })
 
   useEffect(() => {
     if (invoice) {
@@ -82,7 +93,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
       clearTimeout(t3)
       window.removeEventListener('resize', measure)
     }
-  }, [isOpen, selectedSize, zoom, localInvoice])
+  }, [isOpen, selectedSize, localInvoice])
 
   useEffect(() => {
     if (!isOpen || !invoice?.id) return
@@ -507,7 +518,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
                   >
                     -
                   </button>
-                  <span className="text-xs sm:text-sm font-mono font-bold text-slate-700 dark:text-slate-300 w-10 sm:w-12 text-center">
+                  <span ref={zoomLabelRef} className="text-xs sm:text-sm font-mono font-bold text-slate-700 dark:text-slate-300 w-10 sm:w-12 text-center">
                     {Math.round(zoom * 100)}%
                   </span>
                   <button 
@@ -541,53 +552,43 @@ export default function InvoiceModal({ isOpen, onClose, invoice }: InvoiceModalP
             </div>
 
             {/* Preview Area */}
-            {(() => {
-              const effectiveSize = (!isWoodInvoice && selectedSize === 'POS 2') ? 'POS' : selectedSize
-              let originalWidth = 794
-              if (effectiveSize === 'A5') {
-                originalWidth = 559
-              } else if (effectiveSize === 'POS' || effectiveSize === 'POS 2') {
-                originalWidth = 302
-              }
-
-              return (
+            <div 
+              ref={containerRef} 
+              className="invoice-preview-container flex-1 overflow-auto p-4 sm:p-8 bg-slate-100 dark:bg-slate-950 scrollbar-thin overscroll-contain touch-auto"
+            >
+              <div className="min-w-full w-max min-h-max flex items-start justify-center p-2">
                 <div 
-                  ref={containerRef} 
-                  className="invoice-preview-container flex-1 overflow-auto p-4 sm:p-8 bg-slate-100 dark:bg-slate-950 scrollbar-thin overscroll-contain touch-auto"
+                  ref={frameRef}
+                  style={{ 
+                    width: `${originalWidth * zoom}px`, 
+                    height: `${unscaledHeight * zoom}px`,
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }} 
+                  className={cn(
+                    "invoice-preview-frame shadow-2xl rounded-lg bg-white",
+                    isPinching && "is-pinching"
+                  )}
                 >
-                  <div className="min-w-full w-max min-h-max flex items-start justify-center p-2">
-                    <div 
-                      style={{ 
-                        width: `${originalWidth * zoom}px`, 
-                        height: `${unscaledHeight * zoom}px`,
-                        overflow: 'hidden',
-                        position: 'relative'
-                      }} 
-                      className={cn(
-                        "invoice-preview-frame shadow-2xl rounded-lg bg-white",
-                        isPinching && "is-pinching"
-                      )}
-                    >
-                      <div 
-                        style={{ 
-                          transform: `scale(${zoom})`, 
-                          transformOrigin: 'top left',
-                          width: `${originalWidth}px`,
-                          position: 'absolute',
-                          top: 0,
-                          left: 0
-                        }} 
-                        className={cn("invoice-preview-transform h-fit", isPinching && "is-pinching")}
-                      >
-                        <div ref={printableInvoiceRef} id="printable-invoice" className="h-fit">
-                          <InvoicePrint invoice={localInvoice || invoice} size={effectiveSize} />
-                        </div>
-                      </div>
+                  <div 
+                    ref={transformRef}
+                    style={{ 
+                      transform: `scale3d(${zoom}, ${zoom}, 1)`, 
+                      transformOrigin: 'top left',
+                      width: `${originalWidth}px`,
+                      position: 'absolute',
+                      top: 0,
+                      left: 0
+                    }} 
+                    className={cn("invoice-preview-transform h-fit", isPinching && "is-pinching")}
+                  >
+                    <div ref={printableInvoiceRef} id="printable-invoice" className="h-fit">
+                      <InvoicePrint invoice={localInvoice || invoice} size={effectiveSize} />
                     </div>
                   </div>
                 </div>
-              )
-            })()}
+              </div>
+            </div>
           </motion.div>
         </div>
       )}

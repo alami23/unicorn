@@ -12,7 +12,7 @@ interface InvoicePrintProps {
   size: 'A4' | 'A5' | 'POS' | 'POS 2' | 'Chalan'
 }
 
-export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
+function InvoicePrint({ invoice, size }: InvoicePrintProps) {
   // Synchronous initialization ensures zero render delay on frame 0
   const [settings, setSettings] = useState<any>(() => getSynchronousSettings())
   const [savedTags, setSavedTags] = useState<Array<{ name: string; sell_price: number }>>([])
@@ -1160,4 +1160,6 @@ export default function InvoicePrint({ invoice, size }: InvoicePrintProps) {
     </div>
   )
 }
+
+export default React.memo(InvoicePrint)
 
