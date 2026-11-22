@@ -1178,6 +1178,7 @@ function CustomerPageContent() {
         }}
         customerName={smsCustomer?.name || ''}
         customerId={smsCustomer?.id}
+        onPaymentsUpdated={fetchCustomers}
       />
 
       {/* Delete Confirmation Modal */}

@@ -759,4 +759,11 @@ BEGIN
   END IF;
 END $$;
 
+-- Performance indexes for tenant-scoped payment record lookups & standalone payment verification
+CREATE INDEX IF NOT EXISTS idx_transactions_org_customer_date
+  ON public.transactions (org_id, customer_id, date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_org_ref
+  ON public.transactions (org_id, ref);
+
 
