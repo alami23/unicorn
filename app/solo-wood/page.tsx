@@ -282,7 +282,7 @@ function SoloWoodContent() {
       toast.success('Customer added')
     } catch (error: any) {
       console.error('Error adding customer:', error)
-      toast.error('Failed to add customer')
+      throw error
     }
   }
 
@@ -1152,6 +1152,25 @@ function SoloWoodContent() {
           isOpen={isAddingCustomer}
           onClose={() => setIsAddingCustomer(false)}
           onAdd={handleAddCustomer}
+          onSelectExisting={(existing) => {
+            setCustomers(prev => {
+              const exists = prev.some(c => c.id === existing.id)
+              const mapped = {
+                id: existing.id,
+                name: existing.name,
+                phone: existing.phone,
+                address: existing.address || '',
+                type: existing.type || 'Regular',
+                totalDue: Number(existing.total_due || 0)
+              }
+              return sortByNameAsc(
+                exists
+                  ? prev.map(c => (c.id === existing.id ? { ...c, ...mapped } : c))
+                  : [...prev, mapped]
+              )
+            })
+            setSelectedCustomer(existing.name)
+          }}
         />
 
         <InvoiceModal 

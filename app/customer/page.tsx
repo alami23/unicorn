@@ -305,7 +305,7 @@ function CustomerPageContent() {
       setEditingCustomer(null)
     } catch (error: any) {
       console.error('Error saving customer:', error)
-      toast.error(error.message || 'Failed to save customer')
+      throw error
     }
   }
 
@@ -952,6 +952,10 @@ function CustomerPageContent() {
           setEditingCustomer(null)
         }} 
         onAdd={handleAddCustomer}
+        onExistingUpdated={() => {
+          fetchCustomers()
+          setEditingCustomer(null)
+        }}
         initialData={editingCustomer}
       />
 

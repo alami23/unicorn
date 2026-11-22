@@ -714,4 +714,49 @@ TO public
 USING (bucket_id = 'logos')
 WITH CHECK (bucket_id = 'logos');
 
+-- Performance indexes for tenant-scoped duplicate phone number validation
+CREATE INDEX IF NOT EXISTS idx_customer_org_phone
+  ON public.customer (org_id, phone);
+
+CREATE INDEX IF NOT EXISTS idx_customer_org_phone_digits
+  ON public.customer (org_id, regexp_replace(phone, '[^0-9]', '', 'g'));
+
+-- Tenant-scoped unique phone enforcement (unique per org_id; same phone allowed across different tenants)
+CREATE OR REPLACE FUNCTION public.canonicalize_customer_phone(raw_phone TEXT)
+RETURNS TEXT
+LANGUAGE SQL
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN regexp_replace(COALESCE(raw_phone, ''), '[^0-9]', '', 'g') ~ '^8801[0-9]{9}$'
+      THEN '0' || substr(regexp_replace(COALESCE(raw_phone, ''), '[^0-9]', '', 'g'), 4)
+    ELSE regexp_replace(COALESCE(raw_phone, ''), '[^0-9]', '', 'g')
+  END;
+$$;
+
+-- Remove any legacy global (non-tenant-scoped) unique constraint/index on phone so different tenants can share numbers
+ALTER TABLE public.customer DROP CONSTRAINT IF EXISTS customer_phone_key;
+DROP INDEX IF EXISTS public.customer_phone_key;
+DROP INDEX IF EXISTS public.idx_customer_phone_unique;
+
+-- Enforce uniqueness per tenant (org_id + canonical phone) safely without failing if legacy same-tenant duplicates exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.customer
+    WHERE org_id IS NOT NULL
+      AND public.canonicalize_customer_phone(phone) <> ''
+    GROUP BY org_id, public.canonicalize_customer_phone(phone)
+    HAVING COUNT(*) > 1
+  ) THEN
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_customer_org_canonical_phone
+      ON public.customer (org_id, public.canonicalize_customer_phone(phone))
+      WHERE org_id IS NOT NULL
+        AND public.canonicalize_customer_phone(phone) <> '';
+  ELSE
+    RAISE NOTICE 'Skipped creating uq_customer_org_canonical_phone because duplicate (org_id, phone) rows already exist in public.customer. Deduplicate those rows within each org_id and re-run.';
+  END IF;
+END $$;
+
 

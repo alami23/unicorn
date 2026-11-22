@@ -576,14 +576,17 @@ function DashboardContent() {
               photo: customer.photo
             }
 
-            const { error } = await supabase.from('customer').upsert(dbData)
+            const { error } = await supabase.from('customer').insert([dbData])
             if (error) throw error
             toast.success('Customer created successfully')
             fetchStats()
           } catch (error: any) {
             console.error('Error saving customer:', error)
-            toast.error('Failed to save customer: ' + (error?.message || 'Unknown error'))
+            throw error
           }
+        }}
+        onExistingUpdated={() => {
+          fetchStats()
         }}
       />
 

@@ -291,7 +291,8 @@ function POSWoodContent() {
       loadCustomers()
       setSelectedCustomer(customer.name)
     } catch (error: any) {
-      toast.error('Failed to add customer')
+      console.error('Error adding customer:', error)
+      throw error
     }
   }
 
@@ -1520,6 +1521,10 @@ function POSWoodContent() {
           isOpen={isAddingCustomer}
           onClose={() => setIsAddingCustomer(false)}
           onAdd={handleAddCustomer}
+          onSelectExisting={(existing) => {
+            loadCustomers()
+            setSelectedCustomer(existing.name)
+          }}
         />
 
         <InvoiceModal 
