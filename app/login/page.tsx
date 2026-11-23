@@ -24,8 +24,7 @@ import {
   EyeOff,
   Sun,
   Moon,
-  Download,
-  Smartphone
+  Download
 } from 'lucide-react';
 
 const SPreview = dynamic(() => import('@/components/SPreview'), { ssr: false });
@@ -371,29 +370,30 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative transition-colors duration-300">
-      {/* Top Left Navigation Buttons */}
-      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 flex items-center gap-2.5">
+      {/* Top Right Header Actions: Preview, Download APK, Theme Toggle */}
+      <div
+        id="login-theme-toggle-container"
+        className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 flex items-center gap-2"
+      >
         <Link
           href="/s"
-          className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800"
+          className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 active:scale-90 cursor-pointer"
+          title="Invoice Preview"
+          aria-label="Invoice Preview"
         >
-          Preview
+          <Eye className="w-4 h-4" />
         </Link>
         {apkUrl && (
           <a
             href={apkUrl}
             download={apkFileName}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-xl backdrop-blur-md transition-all duration-200 active:scale-95 cursor-pointer shadow-sm border bg-emerald-600/95 hover:bg-emerald-700 text-white border-emerald-500/40"
+            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-emerald-600/95 hover:bg-emerald-700 backdrop-blur-md text-white border border-emerald-500/40 shadow-sm transition-all duration-200 active:scale-90 cursor-pointer"
             title={`Download ${apkFileName}`}
+            aria-label="Download APK"
           >
-            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Download APK</span>
+            <Download className="w-4 h-4" />
           </a>
         )}
-      </div>
-
-      {/* Light Mode / Dark Mode Switcher */}
-      <div id="login-theme-toggle-container" className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20">
         <div id="login-theme-toggle-group">
           <button
             id="login-theme-toggle-btn"
@@ -506,37 +506,13 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <div className="mt-8 text-center space-y-2.5">
+              <div className="mt-8 text-center">
                 <p className="text-slate-500 dark:text-slate-400 text-sm">
                   Don&apos;t have an account?{' '}
                   <Link href="/signup" className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-semibold">
                     Create one
                   </Link>
                 </p>
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
-                    Customer verifying an invoice?{' '}
-                    <button
-                      type="button"
-                      onClick={() => { setViewMode('preview'); setError(null); }}
-                      className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline cursor-pointer"
-                    >
-                      Open Invoice Preview
-                    </button>
-                  </p>
-                  {apkUrl && (
-                    <a
-                      href={apkUrl}
-                      download={apkFileName}
-                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-700 transition-all active:scale-[0.98]"
-                      title={`Download ${apkFileName}`}
-                    >
-                      <Smartphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      <span>Download APK</span>
-                      <Download className="w-3.5 h-3.5 opacity-70" />
-                    </a>
-                  )}
-                </div>
               </div>
             </motion.div>
           )}
