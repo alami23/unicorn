@@ -53,7 +53,6 @@ const menuItems = [
     icon: FileText, 
     href: '/invoice',
     subItems: [
-      { name: 'All Invoices', icon: FileText, href: '/invoice', permission: 'Invoices' },
       { name: 'Furniture Invoice', icon: Armchair, href: '/invoice?type=Furniture', permission: 'Furniture Invoices' },
       { name: 'Wood Invoice', icon: Trees, href: '/invoice?type=Wood', permission: 'Wood Invoices' },
     ]
@@ -818,7 +817,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       { name: 'Solo Wood', icon: Trees, href: '/solo-wood', permission: 'solo wood' },
                       { name: 'POS Wood', icon: Trees, href: '/pos-wood', permission: 'pos wood' },
                       { name: 'POS Furniture', icon: Armchair, href: '/pos-furniture', permission: 'pos furniture' },
-                      { name: 'All Invoices', icon: FileText, href: '/invoice', permission: 'Invoices' },
                       { name: 'Furniture Invoices', icon: Armchair, href: '/invoice?type=Furniture', permission: 'Furniture Invoices' },
                       { name: 'Wood Invoices', icon: Trees, href: '/invoice?type=Wood', permission: 'Wood Invoices' },
                       { name: 'Bills', icon: Receipt, href: '/bills', permission: 'Bills & Expenses' },
@@ -880,9 +878,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   exit={{ opacity: 0, y: 100 }}
                   className="fixed bottom-24 left-4 right-4 bg-white dark:bg-slate-900 p-5 rounded-3xl z-[100] shadow-2xl flex flex-col"
                 >
-                  <div className="grid grid-cols-3 gap-x-3 gap-y-5">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-5">
                     {[
-                      { name: 'All Invoices', icon: FileText, href: '/invoice', permission: 'Invoices' },
                       { name: 'Furniture Invoices', icon: Armchair, href: '/invoice?type=Furniture', permission: 'Furniture Invoices' },
                       { name: 'Wood Invoices', icon: Trees, href: '/invoice?type=Wood', permission: 'Wood Invoices' },
                     ].map(item => (
