@@ -347,17 +347,58 @@ function InvoicePageContent() {
     return mapped
   }, [invoices, optimisticDeliveryStatuses, activeTab])
 
-  // Infinite scroll listener
+  // Infinite scroll sentinel ref (works across both window scroll and DashboardLayout's overflow-y-auto container)
+  const loadMoreSentinelRef = React.useRef<HTMLDivElement | null>(null)
+
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.innerHeight + document.documentElement.scrollTop + 120 >= document.documentElement.offsetHeight) {
-        if (!isLoading && !isLoadingMore && hasMore) {
+    if (isLoading || isLoadingMore || !hasMore) return
+
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
           loadMore()
         }
+      },
+      {
+        root: null,
+        rootMargin: '250px 0px',
+        threshold: 0.01,
+      }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [isLoading, isLoadingMore, hasMore, loadMore, displayedInvoices.length])
+
+  // Passive scroll fallback for environments without IntersectionObserver or rapid scrolling
+  useEffect(() => {
+    if (isLoading || isLoadingMore || !hasMore) return
+
+    const checkAndLoadMore = () => {
+      const sentinel = loadMoreSentinelRef.current
+      if (sentinel) {
+        const rect = sentinel.getBoundingClientRect()
+        if (rect.top <= window.innerHeight + 250) {
+          loadMore()
+          return
+        }
+      }
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || 0
+      if (window.innerHeight + scrollTop + 200 >= document.documentElement.scrollHeight) {
+        loadMore()
       }
     }
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+
+    const scrollContainer = loadMoreSentinelRef.current?.closest('.overflow-y-auto')
+    window.addEventListener('scroll', checkAndLoadMore, { passive: true })
+    scrollContainer?.addEventListener('scroll', checkAndLoadMore, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', checkAndLoadMore)
+      scrollContainer?.removeEventListener('scroll', checkAndLoadMore)
+    }
   }, [isLoading, isLoadingMore, hasMore, loadMore])
 
   // Sync selected categories to URL without wiping unrelated query params or router history state
@@ -1598,12 +1639,33 @@ function InvoicePageContent() {
           )}
         </div>
 
-        {/* Load More Spinner */}
-        {isLoadingMore && (
-          <div className="py-6 flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600"></div>
-          </div>
-        )}
+        {/* Infinite Scroll Sentinel & Load More Controls */}
+        <div ref={loadMoreSentinelRef} className="pt-2 pb-6 flex flex-col items-center justify-center gap-3">
+          {isLoadingMore ? (
+            <div className="flex items-center gap-2.5 text-sm font-medium text-slate-500 dark:text-slate-400 py-2">
+              <Loader2 size={18} className="animate-spin text-amber-600" />
+              <span>Loading more invoices...</span>
+            </div>
+          ) : hasMore ? (
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Showing {displayedInvoices.length} of {Math.max(totalCount, displayedInvoices.length)} invoices
+              </p>
+              <button
+                type="button"
+                onClick={loadMore}
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-amber-500/50 transition-all shadow-sm"
+              >
+                <span>Load More Invoices</span>
+                <ChevronDown size={14} className="text-amber-600" />
+              </button>
+            </div>
+          ) : displayedInvoices.length > 0 && totalCount > 12 ? (
+            <p className="text-xs text-slate-400 dark:text-slate-500 py-1">
+              All {totalCount} invoices loaded
+            </p>
+          ) : null}
+        </div>
 
         {/* View Invoice Modal */}
         <InvoiceModal 

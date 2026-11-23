@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE = `furnitrack-static-${CACHE_VERSION}`;
 const PAGES_CACHE = `furnitrack-pages-${CACHE_VERSION}`;
 const DATA_CACHE = `furnitrack-data-${CACHE_VERSION}`;
@@ -110,19 +110,38 @@ async function trimDataCache(cache) {
 }
 
 async function putTimestampedResponse(cache, cacheKey, response) {
-  if (!response || (response.status !== 200 && response.status !== 206)) return;
-  const headers = new Headers(response.headers);
-  headers.set('x-sw-cached-at', String(Date.now()));
-  const body = await response.clone().arrayBuffer();
-  // Skip caching oversized responses (> 2MB) to keep SW memory lean
-  if (body.byteLength > 2 * 1024 * 1024) return;
-  const wrapped = new Response(body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
-  await cache.put(cacheKey, wrapped);
-  await trimDataCache(cache);
+  try {
+    if (!response || (response.status !== 200 && response.status !== 206)) return;
+    const headers = new Headers(response.headers);
+    headers.set('x-sw-cached-at', String(Date.now()));
+    headers.set('x-sw-orig-status', String(response.status));
+    const body = await response.clone().arrayBuffer();
+    // Skip caching oversized responses (> 2MB) to keep SW memory lean
+    if (body.byteLength > 2 * 1024 * 1024) return;
+    // Web Cache Storage API strictly rejects HTTP 206 Partial Content on cache.put();
+    // store as 200 while preserving Content-Range and x-sw-orig-status for faithful restoration.
+    const wrapped = new Response(body, {
+      status: 200,
+      statusText: 'OK',
+      headers,
+    });
+    await cache.put(cacheKey, wrapped);
+    await trimDataCache(cache);
+  } catch {
+    // Non-blocking: never allow Cache API errors to break live Supabase network responses
+  }
+}
+
+function restoreCachedResponse(cached) {
+  const origStatus = Number(cached.headers.get('x-sw-orig-status') || cached.status || 200);
+  if (origStatus === 206 && cached.status === 200) {
+    return new Response(cached.body, {
+      status: 206,
+      statusText: 'Partial Content',
+      headers: cached.headers,
+    });
+  }
+  return cached;
 }
 
 self.addEventListener('message', (event) => {
@@ -204,14 +223,15 @@ self.addEventListener('fetch', (event) => {
         const cached = await cache.match(cacheKey);
 
         const networkFetch = fetch(request.clone())
-          .then(async (networkRes) => {
+          .then((networkRes) => {
             if (networkRes && (networkRes.status === 200 || networkRes.status === 206)) {
-              await putTimestampedResponse(cache, cacheKey, networkRes.clone());
+              const resClone = networkRes.clone();
+              event.waitUntil(putTimestampedResponse(cache, cacheKey, resClone));
             }
             return networkRes;
           })
           .catch((err) => {
-            if (cached) return cached;
+            if (cached) return restoreCachedResponse(cached);
             throw err;
           });
 
@@ -220,7 +240,7 @@ self.addEventListener('fetch', (event) => {
           const age = Date.now() - cachedAt;
           if (age <= MAX_DATA_AGE_MS) {
             event.waitUntil(networkFetch.catch(() => {}));
-            return cached;
+            return restoreCachedResponse(cached);
           }
         }
 

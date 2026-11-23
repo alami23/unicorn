@@ -31,6 +31,7 @@ export function useInvoices(params: InvoiceQueryParams) {
     hasMore: null
   })
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const isLoadingMoreRef = useRef(false)
 
   // Always points to the latest active cache key so in-flight loadMore calls
   // from a previously selected category can never append into the new category.
@@ -47,15 +48,17 @@ export function useInvoices(params: InvoiceQueryParams) {
     baseCacheKey,
     () => fetchInvoicesData({ ...params, page: 0 }),
     {
+      revalidateOnMount: true,
       revalidateOnFocus: false,
       revalidateIfStale: true,
-      dedupingInterval: 5000,
+      dedupingInterval: 2000,
       keepPreviousData: false,
     }
   )
 
   // Reset pagination loading flag immediately when switching tabs/filters
   useEffect(() => {
+    isLoadingMoreRef.current = false
     setIsLoadingMore(false)
   }, [baseCacheKey])
 
@@ -81,18 +84,20 @@ export function useInvoices(params: InvoiceQueryParams) {
 
   const currentPage = activeExtra ? activeExtra.page : 0
   const totalCount = baseData?.totalCount ?? 0
+  const effectiveHasMore = activeExtra?.hasMore ?? baseData?.hasMore ?? false
   const hasMore = Boolean(
     baseData &&
-      (activeExtra?.hasMore ?? baseData.hasMore) &&
-      invoices.length < totalCount
+      effectiveHasMore &&
+      (baseData.hasExactCount === false || invoices.length < totalCount)
   )
 
-  // Load more function for infinite scroll (strictly guarded by requestKey)
+  // Load more function for infinite scroll & manual button (strictly guarded by requestKey + sync ref lock)
   const loadMore = useCallback(async () => {
-    if (isLoadingMore || !hasMore) return
+    if (isLoadingMoreRef.current || isLoadingMore || !hasMore) return
 
     const requestKey = baseCacheKey
     const nextPage = currentPage + 1
+    isLoadingMoreRef.current = true
     setIsLoadingMore(true)
 
     try {
@@ -118,6 +123,7 @@ export function useInvoices(params: InvoiceQueryParams) {
       console.error('Error loading more invoices:', err)
     } finally {
       if (activeKeyRef.current === requestKey) {
+        isLoadingMoreRef.current = false
         setIsLoadingMore(false)
       }
     }
@@ -125,6 +131,8 @@ export function useInvoices(params: InvoiceQueryParams) {
 
   // Helper to force refetch / invalidate and reset accumulated pages
   const refresh = useCallback(async () => {
+    isLoadingMoreRef.current = false
+    setIsLoadingMore(false)
     setExtraState({
       cacheKey: activeKeyRef.current,
       items: [],

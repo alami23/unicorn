@@ -125,6 +125,7 @@ export interface InvoiceQueryResult {
   invoices: FormattedInvoice[]
   totalCount: number
   hasMore: boolean
+  hasExactCount?: boolean
   categoryCounts?: Partial<Record<InvoiceCategory, number>>
 }
 
@@ -475,10 +476,13 @@ async function executeInvoiceTableQuery(
     ? []
     : (res.data || []).map((row: any) => ({ ...row, _sourceCategory: category }))
 
+  const hasExactCount = !res.error && typeof res.count === 'number'
+
   return {
     category,
     rows,
     count: res.error ? 0 : (res.count ?? rows.length),
+    hasExactCount,
     error: res.error
   }
 }
@@ -605,12 +609,16 @@ export async function fetchInvoicesData(params: InvoiceQueryParams = {}): Promis
   const invoices = rawData.map(inv =>
     formatInvoice(inv, creatorsMap, usersMap, fallbackCreator, inv._sourceCategory)
   )
-  const hasMore = start + rawData.length < totalCount
+  const hasExactCount = succeeded.length > 0 && succeeded.every(r => r.hasExactCount)
+  const hasMore = hasExactCount
+    ? start + rawData.length < totalCount
+    : rawData.length >= limit
 
   return {
     invoices,
     totalCount,
     hasMore,
+    hasExactCount,
     categoryCounts
   }
 }
@@ -621,7 +629,7 @@ export async function fetchInvoicesData(params: InvoiceQueryParams = {}): Promis
  */
 let isPreloading = false
 export async function preloadInvoicesBackground() {
-  if (isPreloading) return
+  if (isPreloading || !getTenantId()) return
   isPreloading = true
 
   try {
