@@ -856,7 +856,7 @@ export default function PaymentHistoryModal({
                                             Invoice
                                           </span>
                                         ) : item.canModify ? (
-                                          <div className="inline-flex items-center gap-2 ml-1.5">
+                                          <div className="inline-flex items-center gap-1.5 ml-1">
                                             <button
                                               type="button"
                                               onClick={() =>
@@ -864,14 +864,14 @@ export default function PaymentHistoryModal({
                                               }
                                               disabled={isSavingEdit || isDeletingItem}
                                               title="Edit payment"
-                                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-40 ${
+                                              aria-label="Edit payment"
+                                              className={`w-8 h-8 inline-flex items-center justify-center rounded-xl border transition-all cursor-pointer disabled:opacity-40 ${
                                                 isEditingThis
                                                   ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                                                  : 'bg-amber-50 dark:bg-amber-900/25 text-amber-700 dark:text-amber-300 border-amber-200/80 dark:border-amber-800/60 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                                                  : 'bg-amber-50/70 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200/70 dark:border-amber-800/50 hover:bg-amber-100 dark:hover:bg-amber-900/40'
                                               }`}
                                             >
                                               <Pencil size={15} />
-                                              <span>Edit</span>
                                             </button>
                                             <button
                                               type="button"
@@ -880,14 +880,14 @@ export default function PaymentHistoryModal({
                                               }
                                               disabled={isSavingEdit || isDeletingItem}
                                               title="Delete payment"
-                                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-40 ${
+                                              aria-label="Delete payment"
+                                              className={`w-8 h-8 inline-flex items-center justify-center rounded-xl border transition-all cursor-pointer disabled:opacity-40 ${
                                                 isDeletingThis
                                                   ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
-                                                  : 'bg-rose-50 dark:bg-rose-900/25 text-rose-700 dark:text-rose-300 border-rose-200/80 dark:border-rose-800/60 hover:bg-rose-100 dark:hover:bg-rose-900/40'
+                                                  : 'bg-rose-50/70 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200/70 dark:border-rose-800/50 hover:bg-rose-100 dark:hover:bg-rose-900/40'
                                               }`}
                                             >
                                               <Trash2 size={15} />
-                                              <span>Delete</span>
                                             </button>
                                           </div>
                                         ) : null}
