@@ -370,36 +370,17 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative transition-colors duration-300">
-      {/* Top Right Header Actions: Preview, Download APK, Theme Toggle */}
+      {/* Top Right Header Actions: Theme Toggle, Preview, Download APK */}
       <div
         id="login-theme-toggle-container"
-        className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 flex items-center gap-2"
+        className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 flex items-center gap-2 sm:gap-2.5"
       >
-        <Link
-          href="/s"
-          className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 active:scale-90 cursor-pointer"
-          title="Invoice Preview"
-          aria-label="Invoice Preview"
-        >
-          <Eye className="w-4 h-4" />
-        </Link>
-        {apkUrl && (
-          <a
-            href={apkUrl}
-            download={apkFileName}
-            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-emerald-600/95 hover:bg-emerald-700 backdrop-blur-md text-white border border-emerald-500/40 shadow-sm transition-all duration-200 active:scale-90 cursor-pointer"
-            title={`Download ${apkFileName}`}
-            aria-label="Download APK"
-          >
-            <Download className="w-4 h-4" />
-          </a>
-        )}
-        <div id="login-theme-toggle-group">
+        <div id="login-theme-toggle-group" className="flex items-center">
           <button
             id="login-theme-toggle-btn"
             type="button"
             onClick={() => setTheme(currentTheme === 'dark' ? 'light' : 'dark')}
-            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 active:scale-90 cursor-pointer"
+            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
             title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             aria-label="Toggle theme"
           >
@@ -410,6 +391,25 @@ export default function LoginPage() {
             )}
           </button>
         </div>
+        <Link
+          href="/s"
+          className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
+          title="Invoice Preview"
+          aria-label="Invoice Preview"
+        >
+          <Eye className="w-4 h-4" />
+        </Link>
+        {apkUrl && (
+          <a
+            href={apkUrl}
+            download={apkFileName}
+            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-emerald-600/95 hover:bg-emerald-700 backdrop-blur-md text-white border border-emerald-500/40 shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
+            title={`Download ${apkFileName}`}
+            aria-label="Download APK"
+          >
+            <Download className="w-4 h-4" />
+          </a>
+        )}
       </div>
 
       <motion.div
