@@ -766,4 +766,11 @@ CREATE INDEX IF NOT EXISTS idx_transactions_org_customer_date
 CREATE INDEX IF NOT EXISTS idx_transactions_org_ref
   ON public.transactions (org_id, ref);
 
+-- Performance indexes for tenant-scoped invoice filtering & All Invoices dual-table chronological pagination
+CREATE INDEX IF NOT EXISTS idx_furniture_invoices_org_created_id
+  ON public.furniture_invoices (org_id, created_at DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_wood_invoices_org_created_id
+  ON public.wood_invoices (org_id, created_at DESC, id DESC);
+
 

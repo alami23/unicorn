@@ -1,6 +1,9 @@
 import { supabase, getTenantId, getCurrentUser } from '@/lib/supabase'
 import { getDisplayInvoiceId } from '@/lib/invoice'
+import { registerInvoiceCacheInvalidator } from '@/lib/supabaseCache'
 import { preload, mutate } from 'swr'
+
+export type InvoiceTypeFilter = 'All' | 'Furniture' | 'Wood'
 
 export interface FormattedInvoice {
   id: string
@@ -12,11 +15,12 @@ export interface FormattedInvoice {
   customerPhoto?: string
   customerAddress?: string
   date: string
+  createdAt?: string
   amount: number
   paid: number
   due: number
   status: 'Paid' | 'Partial' | 'Due'
-  type: string
+  type: 'Furniture' | 'Wood' | string
   originalType: string
   discount: number
   deliveryCharge: number
@@ -27,8 +31,41 @@ export interface FormattedInvoice {
   createdBy: string
 }
 
+export const normalizeInvoiceTypeFilter = (type?: string | null): InvoiceTypeFilter => {
+  const normalized = String(type || '').trim().toLowerCase()
+  if (
+    !normalized ||
+    normalized === 'all' ||
+    normalized === 'all invoices' ||
+    normalized === 'all_invoices'
+  ) {
+    return 'All'
+  }
+  if (
+    normalized === 'wood' ||
+    normalized === 'wood invoices' ||
+    normalized === 'wood invoice' ||
+    normalized === 'solo_wood' ||
+    normalized === 'wood_invoices'
+  ) {
+    return 'Wood'
+  }
+  if (
+    normalized === 'furniture' ||
+    normalized === 'furniture invoices' ||
+    normalized === 'furniture invoice' ||
+    normalized === 'furniture_invoices'
+  ) {
+    return 'Furniture'
+  }
+  return 'All'
+}
+
+export const getInvoiceCompositeKey = (inv: Pick<FormattedInvoice, 'id' | 'type'>): string =>
+  `${inv.type || 'Invoice'}:${inv.id}`
+
 export interface InvoiceQueryParams {
-  type?: 'All' | 'Furniture' | 'Wood' | string | null
+  type?: InvoiceTypeFilter | string | null
   searchTerm?: string
   status?: string
   dateRange?: string
@@ -162,7 +199,8 @@ export const formatInvoice = (
   inv: any,
   creatorsMap: Record<string, string> = {},
   usersMap: Record<string, string> = {},
-  fallbackCreator: string = 'Unassigned'
+  fallbackCreator: string = 'Unassigned',
+  sourceCategory?: 'Furniture' | 'Wood'
 ): FormattedInvoice => {
   const invoiceNum = inv.invoice_number || (inv.id && inv.id.includes('_') ? inv.id.split('_')[1] : inv.id)
 
@@ -209,22 +247,40 @@ export const formatInvoice = (
     resolvedCreatedBy = fallbackCreator || 'Unassigned'
   }
 
+  const effectiveSource = sourceCategory || inv._sourceCategory
+  const rawTypeLower = String(inv.type || '').trim().toLowerCase()
+  const resolvedType: 'Furniture' | 'Wood' =
+    effectiveSource === 'Wood'
+      ? 'Wood'
+      : effectiveSource === 'Furniture'
+        ? 'Furniture'
+        : rawTypeLower === 'wood' || rawTypeLower === 'solo_wood' || String(inv.id || '').includes('-W-')
+          ? 'Wood'
+          : 'Furniture'
+
+  const parsedCreatedAt = inv.created_at ? new Date(inv.created_at) : null
+  const formattedDate =
+    parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
+      ? parsedCreatedAt.toISOString().split('T')[0]
+      : ''
+
   return {
     id: inv.id,
-    displayId: getDisplayInvoiceId(inv.invoice_number || inv.id, inv.type === 'Wood' || inv.type === 'solo_wood'),
+    displayId: getDisplayInvoiceId(inv.invoice_number || inv.id, resolvedType === 'Wood'),
     customer: inv.customer_name,
     customerId: inv.customer_id || null,
     customer_id: inv.customer_id || null,
     customerPhone: inv.customer_phone,
     customerPhoto: inv.customer?.photo,
     customerAddress: inv.customer_address,
-    date: inv.created_at ? new Date(inv.created_at).toISOString().split('T')[0] : '',
+    date: formattedDate,
+    createdAt: inv.created_at || '',
     amount: Number(inv.total || 0),
     paid: Number(inv.paid_amount || 0),
     due: Number(inv.due_amount || 0),
     status: Number(inv.due_amount || 0) === 0 ? 'Paid' : (Number(inv.paid_amount || 0) > 0 ? 'Partial' : 'Due'),
-    type: inv.type === 'solo_wood' ? 'Wood' : (inv.type || 'Invoice'),
-    originalType: inv.type,
+    type: resolvedType,
+    originalType: inv.type || resolvedType,
     discount: Number(inv.discount || 0),
     deliveryCharge: Number(inv.delivery_charge || 0),
     deliveryDate: inv.delivery_date,
@@ -236,7 +292,8 @@ export const formatInvoice = (
 }
 
 export const getInvoiceCacheKey = (params: InvoiceQueryParams = {}): string => {
-  const normType = !params.type || params.type === 'All' ? 'All' : (params.type === 'Wood' ? 'Wood' : 'Furniture')
+  const tenantId = getTenantId() || 'anon'
+  const normType = normalizeInvoiceTypeFilter(params.type)
   const search = (params.searchTerm || '').trim().toLowerCase()
   const status = params.status || 'All'
   const dateRange = params.dateRange || 'All time'
@@ -245,7 +302,14 @@ export const getInvoiceCacheKey = (params: InvoiceQueryParams = {}): string => {
   const page = params.page || 0
   const limit = params.limit || (page === 0 ? 12 : 10)
 
-  return `invoices:${normType}:${search}:${status}:${dateRange}:${start}:${end}:${page}:${limit}`
+  return `invoices:${tenantId}:${normType}:${search}:${status}:${dateRange}:${start}:${end}:${page}:${limit}`
+}
+
+const getSafeTimestamp = (inv: any): number => {
+  const raw = inv?.created_at || inv?.createdAt || inv?.date
+  if (!raw) return 0
+  const ts = new Date(raw).getTime()
+  return Number.isFinite(ts) ? ts : 0
 }
 
 export const compareInvoiceIdsDesc = (a: any, b: any): number => {
@@ -265,9 +329,7 @@ export const compareInvoiceIdsDesc = (a: any, b: any): number => {
   const cmp = idB.localeCompare(idA, undefined, { numeric: true, sensitivity: 'base' })
   if (cmp !== 0) return cmp
 
-  const timeA = a?.created_at ? new Date(a.created_at).getTime() : (a?.date ? new Date(a.date).getTime() : 0)
-  const timeB = b?.created_at ? new Date(b.created_at).getTime() : (b?.date ? new Date(b.date).getTime() : 0)
-  return timeB - timeA
+  return getSafeTimestamp(b) - getSafeTimestamp(a)
 }
 
 export const buildInvoiceQuery = (tableName: string, params: InvoiceQueryParams) => {
@@ -275,11 +337,9 @@ export const buildInvoiceQuery = (tableName: string, params: InvoiceQueryParams)
     .from(tableName)
     .select('*, customer(photo)', { count: 'exact' })
 
-  if (tableName === 'wood_invoices') {
-    q = q.order('id', { ascending: false }).order('created_at', { ascending: false })
-  } else {
-    q = q.order('created_at', { ascending: false })
-  }
+  // Use identical deterministic primary ordering across both tables so All Invoices
+  // aggregation merges furniture_invoices and wood_invoices without dropping or skewing either category.
+  q = q.order('created_at', { ascending: false }).order('id', { ascending: false })
 
   if (params.searchTerm) {
     const rawSearch = params.searchTerm.trim().replace(/[,()]/g, '')
@@ -304,16 +364,14 @@ export const buildInvoiceQuery = (tableName: string, params: InvoiceQueryParams)
   if (params.dateRange && params.dateRange !== 'All time') {
     const now = new Date()
     if (params.dateRange === 'Today') {
-      const startOfDay = new Date(now.setHours(0, 0, 0, 0)).toISOString()
-      const endOfDay = new Date(now.setHours(23, 59, 59, 999)).toISOString()
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString()
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString()
       q = q.gte('created_at', startOfDay).lte('created_at', endOfDay)
     } else if (params.dateRange === 'Last 7 Days') {
-      const startRange = new Date(now)
-      startRange.setDate(now.getDate() - 7)
-      startRange.setHours(0, 0, 0, 0)
+      const startRange = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0, 0)
       q = q.gte('created_at', startRange.toISOString())
     } else if (params.dateRange === 'This Month') {
-      const startRange = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const startRange = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString()
       const endRange = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
       q = q.gte('created_at', startRange).lte('created_at', endRange)
     } else if (params.dateRange === 'Custom') {
@@ -335,38 +393,56 @@ export async function fetchInvoicesData(params: InvoiceQueryParams = {}): Promis
   const start = currentPage === 0 ? 0 : 12 + (currentPage - 1) * 10
   const end = start + limit - 1
 
-  const normType = !params.type || params.type === 'All' ? 'All' : (params.type === 'Wood' ? 'Wood' : 'Furniture')
+  const normType = normalizeInvoiceTypeFilter(params.type)
 
   let rawData: any[] = []
   let totalCount = 0
 
   if (normType === 'All') {
     const [furnRes, woodRes] = await Promise.all([
-      buildInvoiceQuery('furniture_invoices', params).range(0, start + limit - 1),
-      buildInvoiceQuery('wood_invoices', params).range(0, start + limit - 1)
+      buildInvoiceQuery('furniture_invoices', params).range(0, end),
+      buildInvoiceQuery('wood_invoices', params).range(0, end)
     ])
 
-    if (furnRes.error) throw furnRes.error
-    if (woodRes.error) throw woodRes.error
+    if (furnRes.error && woodRes.error) {
+      throw furnRes.error
+    }
+    if (furnRes.error) {
+      console.error('Failed to fetch furniture_invoices for All view:', furnRes.error)
+    }
+    if (woodRes.error) {
+      console.error('Failed to fetch wood_invoices for All view:', woodRes.error)
+    }
 
-    const combined = [...(furnRes.data || []), ...(woodRes.data || [])].sort((a, b) => {
-      const timeDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    const furnRows = furnRes.error
+      ? []
+      : (furnRes.data || []).map((row: any) => ({ ...row, _sourceCategory: 'Furniture' as const }))
+    const woodRows = woodRes.error
+      ? []
+      : (woodRes.data || []).map((row: any) => ({ ...row, _sourceCategory: 'Wood' as const }))
+
+    const combined = [...furnRows, ...woodRows].sort((a, b) => {
+      const timeDiff = getSafeTimestamp(b) - getSafeTimestamp(a)
       if (timeDiff !== 0) return timeDiff
       return compareInvoiceIdsDesc(a, b)
     })
 
     rawData = combined.slice(start, end + 1)
-    totalCount = (furnRes.count || 0) + (woodRes.count || 0)
+    const furnCount = furnRes.error ? 0 : (furnRes.count ?? furnRows.length)
+    const woodCount = woodRes.error ? 0 : (woodRes.count ?? woodRows.length)
+    totalCount = furnCount + woodCount
   } else if (normType === 'Furniture') {
     const res = await buildInvoiceQuery('furniture_invoices', params).range(start, end)
     if (res.error) throw res.error
-    rawData = res.data || []
-    totalCount = res.count || 0
+    rawData = (res.data || []).map((row: any) => ({ ...row, _sourceCategory: 'Furniture' as const }))
+    totalCount = res.count ?? rawData.length
   } else if (normType === 'Wood') {
     const res = await buildInvoiceQuery('wood_invoices', params).range(start, end)
     if (res.error) throw res.error
-    rawData = [...(res.data || [])].sort(compareInvoiceIdsDesc)
-    totalCount = res.count || 0
+    rawData = (res.data || [])
+      .map((row: any) => ({ ...row, _sourceCategory: 'Wood' as const }))
+      .sort(compareInvoiceIdsDesc)
+    totalCount = res.count ?? rawData.length
   }
 
   // 1. Load users map from custom_users table and app_settings
@@ -430,7 +506,9 @@ export async function fetchInvoicesData(params: InvoiceQueryParams = {}): Promis
   // Never default unassigned invoices to the Super Admin
   const fallbackCreator = 'Unassigned'
 
-  const invoices = rawData.map(inv => formatInvoice(inv, creatorsMap, usersMap, fallbackCreator))
+  const invoices = rawData.map(inv =>
+    formatInvoice(inv, creatorsMap, usersMap, fallbackCreator, inv._sourceCategory)
+  )
   const hasMore = start + rawData.length < totalCount
 
   return {
@@ -480,3 +558,17 @@ export function invalidateInvoiceCache() {
     { revalidate: true }
   )
 }
+
+/**
+ * Synchronously clear all SWR invoice cache entries without revalidating (used on logout / tenant switch)
+ */
+export function clearInvoiceCache() {
+  mutate(
+    (key) => typeof key === 'string' && key.startsWith('invoices:'),
+    undefined,
+    { revalidate: false }
+  )
+}
+
+// Hook SWR invoice cache invalidation into automatic Supabase write invalidation
+registerInvoiceCacheInvalidator(invalidateInvoiceCache)

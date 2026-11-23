@@ -47,7 +47,15 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense } from 'react'
 import { useInvoices } from '@/hooks/useInvoiceCache'
-import { invalidateInvoiceCache, formatInvoice, FormattedInvoice, compareInvoiceIdsDesc } from '@/lib/invoiceCache'
+import {
+  invalidateInvoiceCache,
+  formatInvoice,
+  FormattedInvoice,
+  compareInvoiceIdsDesc,
+  normalizeInvoiceTypeFilter,
+  getInvoiceCompositeKey,
+  InvoiceTypeFilter
+} from '@/lib/invoiceCache'
 import { preloadImage, getSynchronousBusiness } from '@/lib/settingsCache'
 
 import {
@@ -69,23 +77,19 @@ function InvoicePageContent() {
   const invoiceIdParam = searchParams?.get('invoiceId')
   const shouldOpenParam = searchParams?.get('open') === 'true'
 
+  const normalizedUrlType = normalizeInvoiceTypeFilter(typeFilterFromUrl)
+
   // Active tab state: 'All' | 'Furniture' | 'Wood'
-  const [activeTab, setActiveTab] = useState<'All' | 'Furniture' | 'Wood'>(() => {
-    if (typeFilterFromUrl === 'Furniture') return 'Furniture'
-    if (typeFilterFromUrl === 'Wood') return 'Wood'
-    return 'All'
-  })
+  const [activeTab, setActiveTab] = useState<InvoiceTypeFilter>(normalizedUrlType)
+  const lastUrlTypeRef = React.useRef<InvoiceTypeFilter>(normalizedUrlType)
 
   // Synchronize when URL changes externally (e.g. from sidebar navigation)
   useEffect(() => {
-    if (typeFilterFromUrl === 'Furniture') {
-      setActiveTab('Furniture')
-    } else if (typeFilterFromUrl === 'Wood') {
-      setActiveTab('Wood')
-    } else if (!typeFilterFromUrl) {
-      setActiveTab('All')
+    if (normalizedUrlType !== lastUrlTypeRef.current) {
+      lastUrlTypeRef.current = normalizedUrlType
+      setActiveTab(normalizedUrlType)
     }
-  }, [typeFilterFromUrl])
+  }, [normalizedUrlType])
 
   const initialUrlSearch = customerFilter || searchParamQuery || ''
   const [searchTerm, setSearchTerm] = useState(initialUrlSearch)
@@ -339,13 +343,20 @@ function InvoicePageContent() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [isLoading, isLoadingMore, hasMore, loadMore])
 
-  // Instant tab switcher handler that avoids full page reload
-  const handleTabChange = useCallback((tab: 'All' | 'Furniture' | 'Wood') => {
+  // Instant tab switcher handler that preserves unrelated URL params and router history state
+  const handleTabChange = useCallback((tab: InvoiceTypeFilter) => {
+    lastUrlTypeRef.current = tab
     setActiveTab(tab)
-    const newUrl = tab === 'All' ? '/invoice' : `/invoice?type=${tab}`
-    // Update browser URL without triggering Next.js full page reload
     if (typeof window !== 'undefined') {
-      window.history.replaceState(null, '', newUrl)
+      const nextParams = new URLSearchParams(window.location.search)
+      if (tab === 'All') {
+        nextParams.delete('type')
+      } else {
+        nextParams.set('type', tab)
+      }
+      const queryString = nextParams.toString()
+      const newUrl = queryString ? `/invoice?${queryString}` : '/invoice'
+      window.history.replaceState(window.history.state, '', newUrl)
     }
   }, [])
 
@@ -445,12 +456,8 @@ function InvoicePageContent() {
     const norm = (val: string | null | undefined) =>
       String(val || '').trim().replace(/^#+/, '').toUpperCase()
 
-    const expectedType =
-      typeFilterFromUrl === 'Wood'
-        ? 'Wood'
-        : typeFilterFromUrl === 'Furniture'
-          ? 'Furniture'
-          : null
+    const normalizedExpected = normalizeInvoiceTypeFilter(typeFilterFromUrl)
+    const expectedType = normalizedExpected === 'All' ? null : normalizedExpected
 
     const matchesTarget = (inv: any) => {
       if (expectedType) {
@@ -909,7 +916,9 @@ function InvoicePageContent() {
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {totalCount} total {activeTab.toLowerCase()} invoice{totalCount === 1 ? '' : 's'} recorded
+                {activeTab === 'All'
+                  ? `${totalCount} total invoice${totalCount === 1 ? '' : 's'} recorded`
+                  : `${totalCount} total ${activeTab.toLowerCase()} invoice${totalCount === 1 ? '' : 's'} recorded`}
               </p>
             </div>
 
@@ -1108,10 +1117,10 @@ function InvoicePageContent() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {displayedInvoices.map((inv) => (
-                      <tr key={`${inv.id}-desktop`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                      <tr key={`${getInvoiceCompositeKey(inv)}-desktop`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
-                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{getDisplayInvoiceId(inv.id)}</span>
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{inv.displayId || getDisplayInvoiceId(inv.id, inv.type === 'Wood')}</span>
                             <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
                               <Calendar size={12} /> {inv.date}
                             </span>
@@ -1335,7 +1344,7 @@ function InvoicePageContent() {
               {/* Mobile/Tablet Card View */}
               <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 p-3">
                 {displayedInvoices.map((inv) => (
-                  <div key={`${inv.id}-mobile`} className="p-4 space-y-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors rounded-[14px]">
+                  <div key={`${getInvoiceCompositeKey(inv)}-mobile`} className="p-4 space-y-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors rounded-[14px]">
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex items-center gap-3 min-w-0">
                         {inv.customerPhoto ? (
@@ -1349,7 +1358,7 @@ function InvoicePageContent() {
                         )}
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{getDisplayInvoiceId(inv.id)}</span>
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{inv.displayId || getDisplayInvoiceId(inv.id, inv.type === 'Wood')}</span>
                             <span className={cn(
                               "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase text-black",
                               inv.type === 'Furniture' ? "bg-purple-100 dark:bg-purple-900/30" : "bg-amber-100 dark:bg-amber-900/30"
