@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { usePathname, useSearchParams, useRouter } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import { useTheme } from 'next-themes'
 import { 
@@ -105,9 +105,6 @@ const menuItems = [
 import { supabase } from '@/lib/supabase'
 import { LogOut } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
-import PrefetchManager from '@/components/PrefetchManager'
-import { prefetchRouteData, resetRoutePrefetchHistory } from '@/lib/routePrefetcher'
-import { clearTenantDataCache } from '@/lib/supabaseCache'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -122,18 +119,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { theme, setTheme, resolvedTheme } = useTheme()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const router = useRouter()
   const { user, logout, businessName, businessLogo, businessLogoX, businessLogoY, businessLogoZoom, userRole } = useAuth()
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking')
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const checkDb = async (forceClearCache = false) => {
+  const checkDb = async () => {
     setIsRefreshing(true)
     try {
-      if (forceClearCache) {
-        clearTenantDataCache()
-        resetRoutePrefetchHistory()
-      }
       const { error } = await supabase.from('app_settings').select('id').limit(1)
       if (error) throw error
       setDbStatus('connected')
@@ -183,23 +175,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [unauthorizedAlert.isOpen]);
 
-  const hasPermission = useCallback((permission?: string) => {
+  const hasPermission = (permission?: string) => {
     if (!permission) return true;
     if (permission === 'Settings') return true;
     if (!userRole) return false;
     if (userRole.permissions?.includes('All Access')) return true;
     return userRole.permissions?.includes(permission);
-  }, [userRole]);
-
-  const handlePrefetchIntent = useCallback((href: string, permission?: string) => {
-    if (!hasPermission(permission)) return;
-    try {
-      router.prefetch(href);
-    } catch {
-      // Non-blocking
-    }
-    prefetchRouteData(href);
-  }, [hasPermission, router]);
+  };
 
   const toggleExpand = (name: string) => {
     setExpandedItems(prev => {
@@ -334,7 +316,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen flex max-w-full overflow-x-hidden">
-      <PrefetchManager hasPermission={hasPermission} />
       {/* Sidebar Overlay */}
       <AnimatePresence>
         {isMobile && isSidebarOpen && (
@@ -402,11 +383,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {item.subItems ? (
                   <button
                     onClick={() => toggleExpand(item.name)}
-                    onMouseEnter={() => {
-                      item.subItems?.forEach((sub: any) =>
-                        handlePrefetchIntent(sub.href, sub.permission || item.permission)
-                      )
-                    }}
                     className={cn(
                       "flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-300 group relative w-full text-left",
                       isActive 
@@ -436,10 +412,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 ) : (
                   <Link
                     href={item.href}
-                    prefetch={true}
-                    onMouseEnter={() => handlePrefetchIntent(item.href, item.permission)}
-                    onFocus={() => handlePrefetchIntent(item.href, item.permission)}
-                    onTouchStart={() => handlePrefetchIntent(item.href, item.permission)}
                     onClick={(e) => {
                       if (!hasPermission(item.permission)) {
                         e.preventDefault();
@@ -476,10 +448,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <Link
                           key={sub.name}
                           href={sub.href}
-                          prefetch={true}
-                          onMouseEnter={() => handlePrefetchIntent(sub.href, sub.permission || item.permission)}
-                          onFocus={() => handlePrefetchIntent(sub.href, sub.permission || item.permission)}
-                          onTouchStart={() => handlePrefetchIntent(sub.href, sub.permission || item.permission)}
                           onClick={(e) => {
                             const permToCheck = sub.permission || item.permission;
                             if (!hasPermission(permToCheck)) {
@@ -535,7 +503,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <div className="flex items-center gap-4">
             <div 
-              onClick={() => checkDb(true)}
+              onClick={() => checkDb()}
               className={cn(
                 "flex items-center justify-center w-8 h-8 rounded-2xl border transition-all duration-300 cursor-pointer select-none active:scale-95 group shadow-sm",
                 dbStatus === 'connected' ? "bg-emerald-500/5 border-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/30" : 
@@ -653,7 +621,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Global Status</span>
                         <div 
-                          onClick={() => checkDb(true)}
+                          onClick={() => checkDb()}
                           className="flex items-center gap-2 cursor-pointer select-none group"
                           title="Click to refresh database connection"
                         >
@@ -697,9 +665,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 lg:p-8 lg:pb-8">
           <motion.div
             key={pathname}
-            initial={{ opacity: 0, y: 4 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.12, ease: 'easeOut' }}
+            transition={{ duration: 0.3 }}
           >
             {children}
           </motion.div>
@@ -708,9 +676,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Mobile Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 xl:hidden flex items-center justify-around p-2 z-[90] pb-safe">
           <Link 
-            href="/"
-            prefetch={true}
-            onTouchStart={() => handlePrefetchIntent('/', 'Dashboard')}
+            href="/" 
             onClick={(e) => {
               if (!hasPermission('Dashboard')) {
                 e.preventDefault();
@@ -766,10 +732,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     ].map(item => (
                       <Link 
                         key={item.name} 
-                        href={item.href}
-                        prefetch={true}
-                        onMouseEnter={() => handlePrefetchIntent(item.href)}
-                        onTouchStart={() => handlePrefetchIntent(item.href)}
+                        href={item.href} 
                         onClick={() => setIsPosSellOpen(false)} 
                         className="flex flex-col items-center gap-1.5 p-1 rounded-xl transition-all active:scale-95 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                       >
@@ -826,10 +789,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     ].map(item => (
                       <Link 
                         key={item.name} 
-                        href={item.href}
-                        prefetch={true}
-                        onMouseEnter={() => handlePrefetchIntent(item.href, item.permission)}
-                        onTouchStart={() => handlePrefetchIntent(item.href, item.permission)}
+                        href={item.href} 
                         onClick={(e) => {
                           if (!hasPermission(item.permission)) {
                             e.preventDefault();
@@ -876,10 +836,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     ].map(item => (
                       <Link 
                         key={item.name} 
-                        href={item.href}
-                        prefetch={true}
-                        onMouseEnter={() => handlePrefetchIntent(item.href, item.permission)}
-                        onTouchStart={() => handlePrefetchIntent(item.href, item.permission)}
+                        href={item.href} 
                         onClick={(e) => {
                           if (!hasPermission(item.permission)) {
                             e.preventDefault();
@@ -919,9 +876,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className={cn("text-[10px] font-medium", pathname === '/invoice' ? "text-slate-900 dark:text-white font-bold" : "text-slate-400")}>Invoice</span>
           </button>
           <Link 
-            href="/transactions"
-            prefetch={true}
-            onTouchStart={() => handlePrefetchIntent('/transactions', 'Transaction')}
+            href="/transactions" 
             onClick={(e) => {
               if (!hasPermission('Transaction')) {
                 e.preventDefault();

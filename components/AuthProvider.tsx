@@ -4,10 +4,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useRouter, usePathname } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
-import { preloadInvoicesBackground, clearInvoiceCache } from '@/lib/invoiceCache';
+import { preloadInvoicesBackground } from '@/lib/invoiceCache';
 import { setSynchronousSettings, preloadImage } from '@/lib/settingsCache';
-import { clearTenantDataCache } from '@/lib/supabaseCache';
-import { resetRoutePrefetchHistory } from '@/lib/routePrefetcher';
 
 export interface CustomUser {
   id: string;
@@ -331,9 +329,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // 7. Login and Logout actions
   const login = React.useCallback((userData: CustomUser) => {
-    clearTenantDataCache();
-    clearInvoiceCache();
-    resetRoutePrefetchHistory();
     const enrichedUser: CustomUser = {
       ...userData,
       org_id: userData.org_id || userData.id
@@ -354,9 +349,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       clearTimeout(autoLogoutTimerRef.current);
       autoLogoutTimerRef.current = null;
     }
-    clearTenantDataCache();
-    clearInvoiceCache();
-    resetRoutePrefetchHistory();
     setUser(null);
     try {
       localStorage.removeItem('custom_user');
