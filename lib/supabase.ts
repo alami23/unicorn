@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { cachedSupabaseFetch } from '@/lib/supabaseCache';
 
 const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
 const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '').trim();
@@ -85,15 +86,16 @@ const rawSupabase = createClient(
     },
     global: {
       fetch: (input, init) => {
-        let options = { ...init };
+        const options = { ...init };
+        let plainHeaders = headersToPlainObject(options.headers);
+        let orgId = '';
+
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('db-fetch-start'));
           try {
             const storedUser = localStorage.getItem('custom_user');
             if (storedUser) {
               const userObj = JSON.parse(storedUser);
-              const plainHeaders = headersToPlainObject(options.headers);
-              const orgId = userObj.org_id || userObj.id || '';
+              orgId = userObj.org_id || userObj.id || '';
               if (orgId) {
                 plainHeaders['x-org-id'] = orgId;
               }
@@ -114,14 +116,13 @@ const rawSupabase = createClient(
           } catch (e) {
             console.warn('Error reading custom_user in global.fetch:', e);
           }
+
+          return cachedSupabaseFetch(input, options, plainHeaders, orgId);
         }
+
         return fetch(input, {
           ...options,
           cache: 'no-store',
-        }).finally(() => {
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('db-fetch-end'));
-          }
         });
       },
     },

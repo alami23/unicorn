@@ -1,5 +1,6 @@
 import { supabase, getTenantId, getCurrentUser } from '@/lib/supabase'
 import { getDisplayInvoiceId } from '@/lib/invoice'
+import { registerInvoiceCacheInvalidator } from '@/lib/supabaseCache'
 import { preload, mutate } from 'swr'
 
 export interface FormattedInvoice {
@@ -236,6 +237,7 @@ export const formatInvoice = (
 }
 
 export const getInvoiceCacheKey = (params: InvoiceQueryParams = {}): string => {
+  const tenantId = getTenantId() || 'anon'
   const normType = !params.type || params.type === 'All' ? 'All' : (params.type === 'Wood' ? 'Wood' : 'Furniture')
   const search = (params.searchTerm || '').trim().toLowerCase()
   const status = params.status || 'All'
@@ -245,7 +247,7 @@ export const getInvoiceCacheKey = (params: InvoiceQueryParams = {}): string => {
   const page = params.page || 0
   const limit = params.limit || (page === 0 ? 12 : 10)
 
-  return `invoices:${normType}:${search}:${status}:${dateRange}:${start}:${end}:${page}:${limit}`
+  return `invoices:${tenantId}:${normType}:${search}:${status}:${dateRange}:${start}:${end}:${page}:${limit}`
 }
 
 export const compareInvoiceIdsDesc = (a: any, b: any): number => {
@@ -480,3 +482,17 @@ export function invalidateInvoiceCache() {
     { revalidate: true }
   )
 }
+
+/**
+ * Synchronously clear all SWR invoice cache entries without revalidating (used on logout / tenant switch)
+ */
+export function clearInvoiceCache() {
+  mutate(
+    (key) => typeof key === 'string' && key.startsWith('invoices:'),
+    undefined,
+    { revalidate: false }
+  )
+}
+
+// Hook SWR invoice cache invalidation into automatic Supabase write invalidation
+registerInvoiceCacheInvalidator(invalidateInvoiceCache)
