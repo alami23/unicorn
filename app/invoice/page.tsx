@@ -26,6 +26,7 @@ import {
   BellRing,
   Truck,
   Undo,
+  Check,
   CheckCircle2,
   Loader2
 } from 'lucide-react'
@@ -53,7 +54,11 @@ import {
   FormattedInvoice,
   compareInvoiceIdsDesc,
   normalizeInvoiceTypeFilter,
+  parseInvoiceCategories,
+  categoriesToTypeFilter,
   getInvoiceCompositeKey,
+  ALL_INVOICE_CATEGORIES,
+  InvoiceCategory,
   InvoiceTypeFilter
 } from '@/lib/invoiceCache'
 import { preloadImage, getSynchronousBusiness } from '@/lib/settingsCache'
@@ -77,19 +82,29 @@ function InvoicePageContent() {
   const invoiceIdParam = searchParams?.get('invoiceId')
   const shouldOpenParam = searchParams?.get('open') === 'true'
 
-  const normalizedUrlType = normalizeInvoiceTypeFilter(typeFilterFromUrl)
+  const urlCategories = useMemo(
+    () => parseInvoiceCategories(typeFilterFromUrl),
+    [typeFilterFromUrl]
+  )
+  const normalizedUrlType = categoriesToTypeFilter(urlCategories)
 
-  // Active tab state: 'All' | 'Furniture' | 'Wood'
-  const [activeTab, setActiveTab] = useState<InvoiceTypeFilter>(normalizedUrlType)
+  // Non-mutually-exclusive category selection state:
+  // ['Furniture', 'Wood'] (All Invoices), ['Furniture'], or ['Wood']
+  const [selectedCategories, setSelectedCategories] = useState<InvoiceCategory[]>(urlCategories)
   const lastUrlTypeRef = React.useRef<InvoiceTypeFilter>(normalizedUrlType)
+
+  const hasFurniture = selectedCategories.includes('Furniture')
+  const hasWood = selectedCategories.includes('Wood')
+  const isAllSelected = hasFurniture && hasWood
+  const activeTab: InvoiceTypeFilter = categoriesToTypeFilter(selectedCategories)
 
   // Synchronize when URL changes externally (e.g. from sidebar navigation)
   useEffect(() => {
     if (normalizedUrlType !== lastUrlTypeRef.current) {
       lastUrlTypeRef.current = normalizedUrlType
-      setActiveTab(normalizedUrlType)
+      setSelectedCategories(urlCategories)
     }
-  }, [normalizedUrlType])
+  }, [normalizedUrlType, urlCategories])
 
   const initialUrlSearch = customerFilter || searchParamQuery || ''
   const [searchTerm, setSearchTerm] = useState(initialUrlSearch)
@@ -288,20 +303,22 @@ function InvoicePageContent() {
     }
   }
 
-  // SWR-backed cached query params
+  // SWR-backed cached query params (passes non-mutually-exclusive categories array)
   const queryParams = useMemo(() => ({
     type: activeTab,
+    categories: selectedCategories,
     searchTerm: debouncedSearch,
     status: selectedStatusFilter,
     dateRange: selectedDateRange,
     startDate,
     endDate
-  }), [activeTab, debouncedSearch, selectedStatusFilter, selectedDateRange, startDate, endDate])
+  }), [activeTab, selectedCategories, debouncedSearch, selectedStatusFilter, selectedDateRange, startDate, endDate])
 
-  // Fetch using SWR cache - instant data return on tab transitions
+  // Fetch using SWR cache - instant data return on category transitions
   const {
     invoices,
     totalCount,
+    categoryCounts,
     hasMore,
     isLoading,
     isValidating,
@@ -343,22 +360,45 @@ function InvoicePageContent() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [isLoading, isLoadingMore, hasMore, loadMore])
 
-  // Instant tab switcher handler that preserves unrelated URL params and router history state
-  const handleTabChange = useCallback((tab: InvoiceTypeFilter) => {
-    lastUrlTypeRef.current = tab
-    setActiveTab(tab)
+  // Sync selected categories to URL without wiping unrelated query params or router history state
+  const applyCategoriesSelection = useCallback((nextCategories: InvoiceCategory[]) => {
+    const normalized = parseInvoiceCategories(nextCategories)
+    const nextFilter = categoriesToTypeFilter(normalized)
+    lastUrlTypeRef.current = nextFilter
+    setSelectedCategories(normalized)
+
     if (typeof window !== 'undefined') {
       const nextParams = new URLSearchParams(window.location.search)
-      if (tab === 'All') {
+      if (nextFilter === 'All') {
         nextParams.delete('type')
       } else {
-        nextParams.set('type', tab)
+        nextParams.set('type', nextFilter)
       }
       const queryString = nextParams.toString()
       const newUrl = queryString ? `/invoice?${queryString}` : '/invoice'
       window.history.replaceState(window.history.state, '', newUrl)
     }
   }, [])
+
+  // Non-mutually-exclusive category toggle:
+  // - From All (both selected), clicking a category isolates it.
+  // - From one category, clicking the other category ADDS it (aggregating both Furniture & Wood).
+  // - Clicking the sole active category restores All so an empty 0-category state never occurs.
+  const handleToggleCategory = useCallback((category: InvoiceCategory) => {
+    if (isAllSelected) {
+      applyCategoriesSelection([category])
+      return
+    }
+    if (selectedCategories.includes(category)) {
+      applyCategoriesSelection([...ALL_INVOICE_CATEGORIES])
+    } else {
+      applyCategoriesSelection([...selectedCategories, category])
+    }
+  }, [isAllSelected, selectedCategories, applyCategoriesSelection])
+
+  const handleSelectAllCategories = useCallback(() => {
+    applyCategoriesSelection([...ALL_INVOICE_CATEGORIES])
+  }, [applyCategoriesSelection])
 
   const handleOpenInvoice = async (invoice: any) => {
     setIsFetchingItems(true)
@@ -916,9 +956,18 @@ function InvoicePageContent() {
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {activeTab === 'All'
-                  ? `${totalCount} total invoice${totalCount === 1 ? '' : 's'} recorded`
-                  : `${totalCount} total ${activeTab.toLowerCase()} invoice${totalCount === 1 ? '' : 's'} recorded`}
+                {isAllSelected ? (
+                  <>
+                    {totalCount} total invoice{totalCount === 1 ? '' : 's'} recorded
+                    {categoryCounts && typeof categoryCounts.Furniture === 'number' && typeof categoryCounts.Wood === 'number' && (
+                      <span className="ml-1.5 text-slate-400 dark:text-slate-500">
+                        ({categoryCounts.Furniture} Furniture · {categoryCounts.Wood} Wood)
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  `${totalCount} total ${activeTab.toLowerCase()} invoice${totalCount === 1 ? '' : 's'} recorded`
+                )}
               </p>
             </div>
 
@@ -934,47 +983,75 @@ function InvoicePageContent() {
             </div>
           </div>
 
-          {/* Navigation Tabs: Centered on mobile, inline on desktop */}
+          {/* Non-mutually-exclusive Category Filter Controls: Centered on mobile, inline on desktop */}
           <div className="w-full md:w-auto flex items-center justify-center">
-            <div className="flex items-center justify-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 shadow-inner w-full max-w-xs sm:max-w-sm md:w-fit mx-auto md:mx-0">
+            <div
+              role="group"
+              aria-label="Invoice categories"
+              className="flex items-center justify-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 shadow-inner w-full max-w-xs sm:max-w-sm md:w-fit mx-auto md:mx-0 gap-1"
+            >
               <button
                 type="button"
-                onClick={() => handleTabChange('All')}
+                aria-pressed={isAllSelected}
+                onClick={handleSelectAllCategories}
+                title="Show both Furniture and Wood invoices"
                 className={cn(
                   "flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 whitespace-nowrap",
-                  activeTab === 'All'
+                  isAllSelected
                     ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 )}
               >
-                <FileText size={14} className={activeTab === 'All' ? "text-amber-500" : "opacity-60"} />
+                <FileText size={14} className={isAllSelected ? "text-amber-500" : "opacity-60"} />
                 <span>All Invoices</span>
               </button>
               <button
                 type="button"
-                onClick={() => handleTabChange('Furniture')}
+                aria-pressed={hasFurniture}
+                onClick={() => handleToggleCategory('Furniture')}
+                title={
+                  isAllSelected
+                    ? 'Focus Furniture invoices only'
+                    : hasFurniture
+                      ? 'Show All Invoices (include Wood)'
+                      : 'Include Furniture invoices alongside Wood'
+                }
                 className={cn(
                   "flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 whitespace-nowrap",
-                  activeTab === 'Furniture'
+                  hasFurniture && !isAllSelected
                     ? "bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-sm"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                    : hasFurniture
+                      ? "bg-purple-50/80 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 hover:bg-white dark:hover:bg-slate-900"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 )}
               >
-                <Armchair size={14} className={activeTab === 'Furniture' ? "text-purple-600" : "opacity-60"} />
+                <Armchair size={14} className={hasFurniture ? "text-purple-600 dark:text-purple-400" : "opacity-60"} />
                 <span>Furniture</span>
+                {hasFurniture && <Check size={12} className="text-purple-600 dark:text-purple-400 shrink-0" />}
               </button>
               <button
                 type="button"
-                onClick={() => handleTabChange('Wood')}
+                aria-pressed={hasWood}
+                onClick={() => handleToggleCategory('Wood')}
+                title={
+                  isAllSelected
+                    ? 'Focus Wood invoices only'
+                    : hasWood
+                      ? 'Show All Invoices (include Furniture)'
+                      : 'Include Wood invoices alongside Furniture'
+                }
                 className={cn(
                   "flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 whitespace-nowrap",
-                  activeTab === 'Wood'
+                  hasWood && !isAllSelected
                     ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-sm"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                    : hasWood
+                      ? "bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-white dark:hover:bg-slate-900"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 )}
               >
-                <Trees size={14} className={activeTab === 'Wood' ? "text-emerald-600" : "opacity-60"} />
+                <Trees size={14} className={hasWood ? "text-emerald-600 dark:text-emerald-400" : "opacity-60"} />
                 <span>Wood</span>
+                {hasWood && <Check size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0" />}
               </button>
             </div>
           </div>

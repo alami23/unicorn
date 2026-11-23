@@ -138,6 +138,7 @@ export function useInvoices(params: InvoiceQueryParams) {
   return {
     invoices,
     totalCount,
+    categoryCounts: baseData?.categoryCounts,
     hasMore,
     isLoading: isBaseLoading && !baseData,
     isValidating,

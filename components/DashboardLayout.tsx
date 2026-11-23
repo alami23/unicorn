@@ -53,6 +53,7 @@ const menuItems = [
     icon: FileText, 
     href: '/invoice',
     subItems: [
+      { name: 'All Invoices', icon: FileText, href: '/invoice', permission: 'Invoices' },
       { name: 'Furniture Invoice', icon: Armchair, href: '/invoice?type=Furniture', permission: 'Furniture Invoices' },
       { name: 'Wood Invoice', icon: Trees, href: '/invoice?type=Wood', permission: 'Wood Invoices' },
     ]
@@ -188,6 +189,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (permission === 'Settings') return true;
     if (!userRole) return false;
     if (userRole.permissions?.includes('All Access')) return true;
+    if (permission === 'Invoices') {
+      return userRole.permissions?.includes('Furniture Invoices') || userRole.permissions?.includes('Wood Invoices');
+    }
     return userRole.permissions?.includes(permission);
   }, [userRole]);
 
@@ -225,11 +229,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isItemActive = (href: string) => {
     const [path, query] = href.split('?')
     if (pathname !== path) return false
-    if (!query) return !searchParams?.toString()
+    if (!query) {
+      if (path === '/invoice') {
+        const typeParam = (searchParams?.get('type') || '').trim().toLowerCase()
+        return !typeParam || typeParam === 'all' || typeParam.includes(',')
+      }
+      return !searchParams?.toString()
+    }
     
     const params = new URLSearchParams(query)
     for (const [key, value] of params.entries()) {
-      if (searchParams?.get(key) !== value) return false
+      if ((searchParams?.get(key) || '').toLowerCase() !== value.toLowerCase()) return false
     }
     return true
   }
@@ -808,8 +818,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       { name: 'Solo Wood', icon: Trees, href: '/solo-wood', permission: 'solo wood' },
                       { name: 'POS Wood', icon: Trees, href: '/pos-wood', permission: 'pos wood' },
                       { name: 'POS Furniture', icon: Armchair, href: '/pos-furniture', permission: 'pos furniture' },
-                      { name: 'Furniture Invoices', icon: FileText, href: '/invoice?type=Furniture', permission: 'Furniture Invoices' },
-                      { name: 'Wood Invoices', icon: FileText, href: '/invoice?type=Wood', permission: 'Wood Invoices' },
+                      { name: 'All Invoices', icon: FileText, href: '/invoice', permission: 'Invoices' },
+                      { name: 'Furniture Invoices', icon: Armchair, href: '/invoice?type=Furniture', permission: 'Furniture Invoices' },
+                      { name: 'Wood Invoices', icon: Trees, href: '/invoice?type=Wood', permission: 'Wood Invoices' },
                       { name: 'Bills', icon: Receipt, href: '/bills', permission: 'Bills & Expenses' },
                       { name: 'Customer', icon: Users, href: '/customer', permission: 'Customer' },
                       { name: 'Customer Statement', icon: UserCircle, href: '/customer-statement', permission: 'Customer Statement' },
@@ -869,10 +880,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   exit={{ opacity: 0, y: 100 }}
                   className="fixed bottom-24 left-4 right-4 bg-white dark:bg-slate-900 p-5 rounded-3xl z-[100] shadow-2xl flex flex-col"
                 >
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-5">
+                  <div className="grid grid-cols-3 gap-x-3 gap-y-5">
                     {[
-                      { name: 'Furniture Invoices', icon: FileText, href: '/invoice?type=Furniture', permission: 'Furniture Invoices' },
-                      { name: 'Wood Invoices', icon: FileText, href: '/invoice?type=Wood', permission: 'Wood Invoices' },
+                      { name: 'All Invoices', icon: FileText, href: '/invoice', permission: 'Invoices' },
+                      { name: 'Furniture Invoices', icon: Armchair, href: '/invoice?type=Furniture', permission: 'Furniture Invoices' },
+                      { name: 'Wood Invoices', icon: Trees, href: '/invoice?type=Wood', permission: 'Wood Invoices' },
                     ].map(item => (
                       <Link 
                         key={item.name} 

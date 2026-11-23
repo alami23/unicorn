@@ -3,7 +3,9 @@ import { getDisplayInvoiceId } from '@/lib/invoice'
 import { registerInvoiceCacheInvalidator } from '@/lib/supabaseCache'
 import { preload, mutate } from 'swr'
 
-export type InvoiceTypeFilter = 'All' | 'Furniture' | 'Wood'
+export type InvoiceCategory = 'Furniture' | 'Wood'
+export type InvoiceTypeFilter = 'All' | InvoiceCategory
+export const ALL_INVOICE_CATEGORIES: readonly InvoiceCategory[] = ['Furniture', 'Wood']
 
 export interface FormattedInvoice {
   id: string
@@ -20,7 +22,7 @@ export interface FormattedInvoice {
   paid: number
   due: number
   status: 'Paid' | 'Partial' | 'Due'
-  type: 'Furniture' | 'Wood' | string
+  type: InvoiceCategory | string
   originalType: string
   discount: number
   deliveryCharge: number
@@ -31,34 +33,77 @@ export interface FormattedInvoice {
   createdBy: string
 }
 
-export const normalizeInvoiceTypeFilter = (type?: string | null): InvoiceTypeFilter => {
-  const normalized = String(type || '').trim().toLowerCase()
-  if (
-    !normalized ||
-    normalized === 'all' ||
-    normalized === 'all invoices' ||
-    normalized === 'all_invoices'
-  ) {
+/**
+ * Parses a category filter (string, comma-separated list, or array) into a canonical,
+ * non-empty list of included categories without mutual exclusion.
+ * Examples:
+ * - null / '' / 'All' / 'All Invoices' / 'Furniture,Wood' -> ['Furniture', 'Wood']
+ * - 'Furniture' -> ['Furniture']
+ * - 'Wood' / 'solo_wood' -> ['Wood']
+ */
+export const parseInvoiceCategories = (
+  input?: string | readonly (InvoiceCategory | string)[] | null
+): InvoiceCategory[] => {
+  const included = new Set<InvoiceCategory>()
+
+  const tokens = Array.isArray(input)
+    ? input.map(v => String(v || '').trim().toLowerCase()).filter(Boolean)
+    : String(input || '')
+        .split(',')
+        .map(v => v.trim().toLowerCase())
+        .filter(Boolean)
+
+  if (tokens.length === 0) {
+    return [...ALL_INVOICE_CATEGORIES]
+  }
+
+  for (const token of tokens) {
+    if (token === 'all' || token === 'all invoices' || token === 'all_invoices') {
+      included.add('Furniture')
+      included.add('Wood')
+    } else if (
+      token === 'wood' ||
+      token === 'wood invoices' ||
+      token === 'wood invoice' ||
+      token === 'solo_wood' ||
+      token === 'wood_invoices'
+    ) {
+      included.add('Wood')
+    } else if (
+      token === 'furniture' ||
+      token === 'furniture invoices' ||
+      token === 'furniture invoice' ||
+      token === 'furniture_invoices'
+    ) {
+      included.add('Furniture')
+    }
+  }
+
+  if (included.size === 0) {
+    return [...ALL_INVOICE_CATEGORIES]
+  }
+
+  return ALL_INVOICE_CATEGORIES.filter(cat => included.has(cat))
+}
+
+export const categoriesToTypeFilter = (categories: readonly InvoiceCategory[]): InvoiceTypeFilter => {
+  const hasFurniture = categories.includes('Furniture')
+  const hasWood = categories.includes('Wood')
+  if ((hasFurniture && hasWood) || (!hasFurniture && !hasWood)) {
     return 'All'
   }
-  if (
-    normalized === 'wood' ||
-    normalized === 'wood invoices' ||
-    normalized === 'wood invoice' ||
-    normalized === 'solo_wood' ||
-    normalized === 'wood_invoices'
-  ) {
-    return 'Wood'
+  return hasFurniture ? 'Furniture' : 'Wood'
+}
+
+export const normalizeInvoiceTypeFilter = (type?: string | null): InvoiceTypeFilter => {
+  return categoriesToTypeFilter(parseInvoiceCategories(type))
+}
+
+export const resolveQueryCategories = (params: InvoiceQueryParams = {}): InvoiceCategory[] => {
+  if (params.categories && params.categories.length > 0) {
+    return parseInvoiceCategories(params.categories)
   }
-  if (
-    normalized === 'furniture' ||
-    normalized === 'furniture invoices' ||
-    normalized === 'furniture invoice' ||
-    normalized === 'furniture_invoices'
-  ) {
-    return 'Furniture'
-  }
-  return 'All'
+  return parseInvoiceCategories(params.type)
 }
 
 export const getInvoiceCompositeKey = (inv: Pick<FormattedInvoice, 'id' | 'type'>): string =>
@@ -66,6 +111,7 @@ export const getInvoiceCompositeKey = (inv: Pick<FormattedInvoice, 'id' | 'type'
 
 export interface InvoiceQueryParams {
   type?: InvoiceTypeFilter | string | null
+  categories?: readonly InvoiceCategory[]
   searchTerm?: string
   status?: string
   dateRange?: string
@@ -79,6 +125,7 @@ export interface InvoiceQueryResult {
   invoices: FormattedInvoice[]
   totalCount: number
   hasMore: boolean
+  categoryCounts?: Partial<Record<InvoiceCategory, number>>
 }
 
 /**
@@ -200,7 +247,7 @@ export const formatInvoice = (
   creatorsMap: Record<string, string> = {},
   usersMap: Record<string, string> = {},
   fallbackCreator: string = 'Unassigned',
-  sourceCategory?: 'Furniture' | 'Wood'
+  sourceCategory?: InvoiceCategory
 ): FormattedInvoice => {
   const invoiceNum = inv.invoice_number || (inv.id && inv.id.includes('_') ? inv.id.split('_')[1] : inv.id)
 
@@ -249,7 +296,7 @@ export const formatInvoice = (
 
   const effectiveSource = sourceCategory || inv._sourceCategory
   const rawTypeLower = String(inv.type || '').trim().toLowerCase()
-  const resolvedType: 'Furniture' | 'Wood' =
+  const resolvedType: InvoiceCategory =
     effectiveSource === 'Wood'
       ? 'Wood'
       : effectiveSource === 'Furniture'
@@ -293,7 +340,7 @@ export const formatInvoice = (
 
 export const getInvoiceCacheKey = (params: InvoiceQueryParams = {}): string => {
   const tenantId = getTenantId() || 'anon'
-  const normType = normalizeInvoiceTypeFilter(params.type)
+  const normType = categoriesToTypeFilter(resolveQueryCategories(params))
   const search = (params.searchTerm || '').trim().toLowerCase()
   const status = params.status || 'All'
   const dateRange = params.dateRange || 'All time'
@@ -332,20 +379,33 @@ export const compareInvoiceIdsDesc = (a: any, b: any): number => {
   return getSafeTimestamp(b) - getSafeTimestamp(a)
 }
 
-export const buildInvoiceQuery = (tableName: string, params: InvoiceQueryParams) => {
+interface BuildInvoiceQueryOptions {
+  includeCustomerPhoto?: boolean
+  includeInvoiceNumberSearch?: boolean
+}
+
+export const buildInvoiceQuery = (
+  tableName: string,
+  params: InvoiceQueryParams,
+  options: BuildInvoiceQueryOptions = {}
+) => {
+  const { includeCustomerPhoto = true, includeInvoiceNumberSearch = true } = options
+
   let q = supabase
     .from(tableName)
-    .select('*, customer(photo)', { count: 'exact' })
+    .select(includeCustomerPhoto ? '*, customer(photo)' : '*', { count: 'exact' })
 
-  // Use identical deterministic primary ordering across both tables so All Invoices
+  // Use identical deterministic primary ordering across both tables so combined
   // aggregation merges furniture_invoices and wood_invoices without dropping or skewing either category.
   q = q.order('created_at', { ascending: false }).order('id', { ascending: false })
 
   if (params.searchTerm) {
     const rawSearch = params.searchTerm.trim().replace(/[,()]/g, '')
     const cleanInvSearch = rawSearch.replace(/^#+/, '')
-    if (cleanInvSearch) {
+    if (cleanInvSearch && includeInvoiceNumberSearch) {
       q = q.or(`id.ilike.%${cleanInvSearch}%,invoice_number.ilike.%${cleanInvSearch}%,customer_name.ilike.%${rawSearch}%`)
+    } else if (cleanInvSearch) {
+      q = q.or(`id.ilike.%${cleanInvSearch}%,customer_name.ilike.%${rawSearch}%`)
     } else if (rawSearch) {
       q = q.or(`id.ilike.%${rawSearch}%,customer_name.ilike.%${rawSearch}%`)
     }
@@ -387,62 +447,98 @@ export const buildInvoiceQuery = (tableName: string, params: InvoiceQueryParams)
   return q
 }
 
+async function executeInvoiceTableQuery(
+  tableName: 'furniture_invoices' | 'wood_invoices',
+  category: InvoiceCategory,
+  params: InvoiceQueryParams,
+  rangeStart: number,
+  rangeEnd: number
+) {
+  let res = await buildInvoiceQuery(tableName, params).range(rangeStart, rangeEnd)
+
+  // Graceful fallback if a live table is missing the customer FK relationship (PGRST200)
+  // or legacy invoice_number column (42703), preventing one category from silently vanishing.
+  if (res.error) {
+    const errMsg = `${res.error.code || ''} ${res.error.message || ''} ${res.error.details || ''}`.toLowerCase()
+    const isRelationshipErr = errMsg.includes('pgrst200') || errMsg.includes('relationship') || errMsg.includes('customer')
+    const isInvoiceNumColErr = errMsg.includes('42703') || errMsg.includes('invoice_number')
+
+    if (isRelationshipErr || isInvoiceNumColErr) {
+      res = await buildInvoiceQuery(tableName, params, {
+        includeCustomerPhoto: !isRelationshipErr,
+        includeInvoiceNumberSearch: !isInvoiceNumColErr
+      }).range(rangeStart, rangeEnd)
+    }
+  }
+
+  const rows = res.error
+    ? []
+    : (res.data || []).map((row: any) => ({ ...row, _sourceCategory: category }))
+
+  return {
+    category,
+    rows,
+    count: res.error ? 0 : (res.count ?? rows.length),
+    error: res.error
+  }
+}
+
 export async function fetchInvoicesData(params: InvoiceQueryParams = {}): Promise<InvoiceQueryResult> {
   const currentPage = params.page || 0
   const limit = params.limit || (currentPage === 0 ? 12 : 10)
   const start = currentPage === 0 ? 0 : 12 + (currentPage - 1) * 10
   const end = start + limit - 1
 
-  const normType = normalizeInvoiceTypeFilter(params.type)
+  const selectedCategories = resolveQueryCategories(params)
+  const includeFurniture = selectedCategories.includes('Furniture')
+  const includeWood = selectedCategories.includes('Wood')
+  const isAggregated = includeFurniture && includeWood
+
+  // Fetch all selected category tables concurrently without mutually exclusive branching.
+  // When aggregating multiple tables, query [0..end] from each identically ordered table
+  // so the global top [start..end] slice is mathematically exact across both categories.
+  const queryStart = isAggregated ? 0 : start
+  const tasks: Array<ReturnType<typeof executeInvoiceTableQuery>> = []
+  if (includeFurniture) {
+    tasks.push(executeInvoiceTableQuery('furniture_invoices', 'Furniture', params, queryStart, end))
+  }
+  if (includeWood) {
+    tasks.push(executeInvoiceTableQuery('wood_invoices', 'Wood', params, queryStart, end))
+  }
+
+  const results = await Promise.all(tasks)
+  const succeeded = results.filter(r => !r.error)
+  const failed = results.filter(r => r.error)
+
+  if (succeeded.length === 0 && failed.length > 0) {
+    throw failed[0].error
+  }
+  for (const f of failed) {
+    console.error(`Failed to fetch ${f.category} invoices:`, f.error)
+  }
+
+  const categoryCounts: Partial<Record<InvoiceCategory, number>> = {}
+  let totalCount = 0
+  for (const r of results) {
+    categoryCounts[r.category] = r.count
+    totalCount += r.count
+  }
 
   let rawData: any[] = []
-  let totalCount = 0
-
-  if (normType === 'All') {
-    const [furnRes, woodRes] = await Promise.all([
-      buildInvoiceQuery('furniture_invoices', params).range(0, end),
-      buildInvoiceQuery('wood_invoices', params).range(0, end)
-    ])
-
-    if (furnRes.error && woodRes.error) {
-      throw furnRes.error
-    }
-    if (furnRes.error) {
-      console.error('Failed to fetch furniture_invoices for All view:', furnRes.error)
-    }
-    if (woodRes.error) {
-      console.error('Failed to fetch wood_invoices for All view:', woodRes.error)
-    }
-
-    const furnRows = furnRes.error
-      ? []
-      : (furnRes.data || []).map((row: any) => ({ ...row, _sourceCategory: 'Furniture' as const }))
-    const woodRows = woodRes.error
-      ? []
-      : (woodRes.data || []).map((row: any) => ({ ...row, _sourceCategory: 'Wood' as const }))
-
-    const combined = [...furnRows, ...woodRows].sort((a, b) => {
-      const timeDiff = getSafeTimestamp(b) - getSafeTimestamp(a)
-      if (timeDiff !== 0) return timeDiff
-      return compareInvoiceIdsDesc(a, b)
-    })
-
+  if (isAggregated) {
+    const combined = results
+      .flatMap(r => r.rows)
+      .sort((a, b) => {
+        const timeDiff = getSafeTimestamp(b) - getSafeTimestamp(a)
+        if (timeDiff !== 0) return timeDiff
+        return compareInvoiceIdsDesc(a, b)
+      })
     rawData = combined.slice(start, end + 1)
-    const furnCount = furnRes.error ? 0 : (furnRes.count ?? furnRows.length)
-    const woodCount = woodRes.error ? 0 : (woodRes.count ?? woodRows.length)
-    totalCount = furnCount + woodCount
-  } else if (normType === 'Furniture') {
-    const res = await buildInvoiceQuery('furniture_invoices', params).range(start, end)
-    if (res.error) throw res.error
-    rawData = (res.data || []).map((row: any) => ({ ...row, _sourceCategory: 'Furniture' as const }))
-    totalCount = res.count ?? rawData.length
-  } else if (normType === 'Wood') {
-    const res = await buildInvoiceQuery('wood_invoices', params).range(start, end)
-    if (res.error) throw res.error
-    rawData = (res.data || [])
-      .map((row: any) => ({ ...row, _sourceCategory: 'Wood' as const }))
-      .sort(compareInvoiceIdsDesc)
-    totalCount = res.count ?? rawData.length
+  } else {
+    const singleRows = results[0]?.rows || []
+    rawData = includeWood && !includeFurniture
+      ? [...singleRows].sort(compareInvoiceIdsDesc)
+      : singleRows
   }
 
   // 1. Load users map from custom_users table and app_settings
@@ -514,7 +610,8 @@ export async function fetchInvoicesData(params: InvoiceQueryParams = {}): Promis
   return {
     invoices,
     totalCount,
-    hasMore
+    hasMore,
+    categoryCounts
   }
 }
 

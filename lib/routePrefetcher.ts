@@ -11,6 +11,7 @@ export const CRITICAL_ROUTES: CriticalRouteDef[] = [
   // Tier 1: Most frequently visited high-priority views
   { href: '/', permission: 'Dashboard', tier: 1 },
   { href: '/customer', permission: 'Customer', tier: 1 },
+  { href: '/invoice', permission: 'Invoices', tier: 1 },
   { href: '/invoice?type=Furniture', permission: 'Furniture Invoices', tier: 1 },
   { href: '/invoice?type=Wood', permission: 'Wood Invoices', tier: 1 },
 
